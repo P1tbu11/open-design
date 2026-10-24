@@ -1115,9 +1115,13 @@ export function EntryTopRightCluster({
 
   // Account identity (real). No email field on the context → the head shows the
   // avatar + name only.
-  const displayName = context?.displayName?.trim() || '';
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const [accountUserName, setAccountUserName] = useState<string>('');
+  const [accountAvatarUrl, setAccountAvatarUrl] = useState<string>('');
+  const displayName = context?.displayName?.trim() || accountUserName;
   const accountName = displayName || t('app.brand');
   const accountInitial = accountName.charAt(0).toUpperCase() || '·';
+  const resolvedAvatarUrl = context?.avatarUrl?.trim() || accountAvatarUrl;
 
   // Billing chip: prefer the real summary metadata; fall back to the context
   // plan-tier hint when metadata has not loaded. Money is a separate,
@@ -1226,25 +1230,24 @@ export function EntryTopRightCluster({
   // confirmation dialog; the real logout chain runs on explicit confirm.
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const githubStars = useGithubStars();
-  // Signed-in account email for the menu head (#5517 shows it under the
-  // display name). The workspace context carries no email, so lazily read the
-  // vela login-status projection the first time the menu opens — never on
-  // mount, so shells without an open menu spend zero requests on it.
-  const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const hasWorkspaceContext = Boolean(context);
   useEffect(() => {
-    if (!accountOpen) return;
+    if (!hasWorkspaceContext && !accountOpen) return;
     // Refetch on EVERY open (the previous value stays visible while the read
     // is in flight, so there is no flicker). A fetch-once cache here went
     // stale the moment the user switched vela accounts mid-session — the menu
     // kept showing the first account's email (#102).
     let cancelled = false;
     void fetchVelaLoginStatus().then((status) => {
-      if (!cancelled) setAccountEmail(status?.user?.email?.trim() || '');
+      if (cancelled) return;
+      setAccountEmail(status?.user?.email?.trim() || '');
+      setAccountUserName(status?.user?.name?.trim() || '');
+      setAccountAvatarUrl(status?.user?.image?.trim() || '');
     });
     return () => {
       cancelled = true;
     };
-  }, [accountOpen]);
+  }, [accountOpen, hasWorkspaceContext]);
   // Hover-open for the account menu (#5517 interaction). The popover floats
   // above the trigger, so closing is delayed just long enough for the pointer
   // to cross the gap; re-entering the container (menu included — it's a DOM
@@ -1694,7 +1697,23 @@ export function EntryTopRightCluster({
                       row owns that signal, and duplicating it on the avatar
                       pointed at two different things with one mark. */}
                   <span className="entry-nav-rail__account-avatar" aria-hidden>
-                    {accountInitial}
+                    {resolvedAvatarUrl ? (
+                      <img
+                        src={resolvedAvatarUrl}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          borderRadius: 'inherit',
+                          objectFit: 'cover',
+                          display: 'block',
+                        }}
+                        onError={() => setAccountAvatarUrl('')}
+                      />
+                    ) : (
+                      accountInitial
+                    )}
                   </span>
                   {/* The rail is wide enough to name the identity, so the
                       avatar no longer has to carry it alone. Truncates rather
@@ -1757,7 +1776,25 @@ export function EntryTopRightCluster({
                       }
                     >
                       <div className="entry-nav-rail__account-head">
-                        <span className="entry-nav-rail__account-head-avatar" aria-hidden>{accountInitial}</span>
+                        <span className="entry-nav-rail__account-head-avatar" aria-hidden>
+                          {resolvedAvatarUrl ? (
+                            <img
+                              src={resolvedAvatarUrl}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                borderRadius: 'inherit',
+                                objectFit: 'cover',
+                                display: 'block',
+                              }}
+                              onError={() => setAccountAvatarUrl('')}
+                            />
+                          ) : (
+                            accountInitial
+                          )}
+                        </span>
                         <span className="entry-nav-rail__account-head-name">{accountName}</span>
                         {accountEmail ? (
                           <span className="entry-nav-rail__account-head-email">{accountEmail}</span>
