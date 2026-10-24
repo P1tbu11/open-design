@@ -421,11 +421,25 @@ export function registerMediaRoutes(app: Express, ctx: RegisterMediaRoutesDeps) 
             : '';
         if (!runId || !name) return;
         try {
+          const projectDir = resolveProjectDir(PROJECTS_DIR, projectId);
           await associateLateRunProducedFile(db, {
             runId,
-            projectRoot: resolveProjectDir(PROJECTS_DIR, projectId),
+            projectRoot: projectDir,
             projectRelativePath: name,
           });
+          const layers =
+            meta && typeof meta === 'object' && Array.isArray((meta as { layers?: unknown }).layers)
+              ? (meta as { layers: unknown[] }).layers.filter(
+                  (l): l is string => typeof l === 'string' && l.length > 0,
+                )
+              : [];
+          for (const layerName of layers) {
+            await associateLateRunProducedFile(db, {
+              runId,
+              projectRoot: projectDir,
+              projectRelativePath: layerName,
+            });
+          }
         } catch (err) {
           console.warn('[media] late produced-file association failed', err);
         }
@@ -470,6 +484,10 @@ export function registerMediaRoutes(app: Express, ctx: RegisterMediaRoutesDeps) 
         compositionDir: req.body?.compositionDir,
         image: req.body?.image,
         images: Array.isArray(req.body?.images) ? req.body.images : undefined,
+        layerDecomposition:
+          typeof req.body?.layerDecomposition === 'boolean'
+            ? req.body.layerDecomposition
+            : undefined,
         workspaceId,
         // Strong capture path (spec §5.1.1): freeze the provider's own bytes
         // the moment they land, so a later turn overwriting the same output

@@ -92,6 +92,7 @@ const MEDIA_GENERATE_BOOLEAN_FLAGS = new Set([
   'help',
   'h',
   'loop',
+  'layer-decomposition',
 ]);
 const MEDIA_SCAFFOLD_STRING_FLAGS = new Set([
   'project',
@@ -2205,6 +2206,7 @@ async function runMediaGenerate(rawArgs) {
   if (flags.duration != null) body.duration = Number(flags.duration);
   if (flags['prompt-influence'] != null) body.promptInfluence = Number(flags['prompt-influence']);
   if (flags.loop === true) body.loop = true;
+  if (flags['layer-decomposition'] === true) body.layerDecomposition = true;
 
   const url = token
     ? `${daemonUrl.replace(/\/$/, '')}/api/tools/media/generate`
@@ -2616,10 +2618,12 @@ Common options:
                             create it; the daemon renders it with its pinned
                             HyperFrames runtime.
   --image <path>            Project-relative reference image; repeat up to 5
-                            times for Vela image editing or video references.
-                            The first video image is the first frame; the rest
-                            are references. Existing providers still receive
-                            the first image through the legacy single-image field.
+                            times for Vela image editing, Volcengine Seedream,
+                            or video references. The first video image is the
+                            first frame; the rest are references.
+  --layer-decomposition     Volcengine Seedream 5.0 (flash/pro) only: decompose
+                            the reference --image into a base layer + up to 16
+                            transparent PNG layers (<stem>-layer-1.png …).
   --daemon-url <url>
 
 Output: a single line of JSON: {"file": { name, size, kind, mime, ... }}

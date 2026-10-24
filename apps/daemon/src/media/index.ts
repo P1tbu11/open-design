@@ -165,6 +165,7 @@ type MediaContext = {
   audioKind: AudioKind | undefined;
   language: string;
   loop: boolean;
+  layerDecomposition: boolean | undefined;
   promptInfluence: number | undefined;
   compositionDir: string | null;
   imageRef: ImageRef | null;
@@ -177,7 +178,13 @@ type MediaContext = {
     | ((summary: ImageGenerationRequestSummary & { providerId: string }) => void)
     | undefined;
 };
-type RenderResult = { bytes: Buffer; providerNote: string; suggestedExt?: string };
+type RenderExtraFile = { bytes: Buffer; suggestedExt?: string };
+type RenderResult = {
+  bytes: Buffer;
+  providerNote: string;
+  suggestedExt?: string;
+  extraFiles?: RenderExtraFile[];
+};
 type JsonRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -352,7 +359,7 @@ export async function generateMedia(args: {
   projectRoot: string; projectsRoot: string; projectId: string; surface: MediaSurface; model: string;
   prompt?: string; output?: string; aspect?: string; quality?: string; resolution?: string;
   length?: number; duration?: number; voice?: string;
-  audioKind?: AudioKind; language?: string; loop?: boolean; promptInfluence?: number;
+  audioKind?: AudioKind; language?: string; loop?: boolean; layerDecomposition?: boolean; promptInfluence?: number;
   compositionDir?: string; image?: string; images?: string[]; onProgress?: ProgressFn; requestInit?: MediaRequestInit;
   desktopFrameRenderer?: DesktopFrameRenderer | null;
   workspaceId?: string;
@@ -395,6 +402,7 @@ export async function generateMedia(args: {
     audioKind,
     language,
     loop,
+    layerDecomposition,
     promptInfluence,
     compositionDir,
     image,
@@ -565,6 +573,8 @@ export async function generateMedia(args: {
     audioKind: resolvedAudioKind,
     language: language || '',
     loop: loop === true,
+    layerDecomposition:
+      typeof layerDecomposition === 'boolean' ? layerDecomposition : undefined,
     promptInfluence: typeof promptInfluence === 'number' && Number.isFinite(promptInfluence)
       ? promptInfluence
       : undefined,
@@ -591,6 +601,7 @@ export async function generateMedia(args: {
   let bytes: Buffer;
   let providerNote: string;
   let suggestedExt: string | undefined;
+  let extraFiles: RenderExtraFile[] | undefined;
   let providerId = def.provider;
   // Tracks whether the bytes came from a real provider call or from the
   // stub fallback. Surfaces in the response so the CLI/agent can tell a
@@ -618,6 +629,7 @@ export async function generateMedia(args: {
       bytes = result.bytes;
       providerNote = result.providerNote;
       suggestedExt = result.suggestedExt;
+      extraFiles = result.extraFiles;
     } else if (def.provider === 'vela' && surface === 'image') {
       const result = await renderVelaImage(ctx);
       bytes = result.bytes;
@@ -674,6 +686,7 @@ export async function generateMedia(args: {
       bytes = result.bytes;
       providerNote = result.providerNote;
       suggestedExt = result.suggestedExt;
+      extraFiles = result.extraFiles;
     } else if (def.provider === 'grok' && surface === 'image') {
       const result = await renderGrokImage(ctx, credentials);
       bytes = result.bytes;
@@ -713,6 +726,7 @@ export async function generateMedia(args: {
       bytes = result.bytes;
       providerNote = result.providerNote;
       suggestedExt = result.suggestedExt;
+      extraFiles = result.extraFiles;
     } else if (def.provider === 'openrouter' && surface === 'image') {
       const result = await renderOpenRouterImage(ctx, credentials);
       bytes = result.bytes;
@@ -889,6 +903,54 @@ export async function generateMedia(args: {
       console.warn('[media] onBytesWritten hook failed', err);
     }
   }
+  const writtenLayers: string[] = [];
+  const writtenFiles: Array<{
+    name: string;
+    size: number;
+    mtime: number;
+    kind: string;
+    mime: string;
+  }> = [
+    {
+      name: finalOut,
+      size: st.size,
+      mtime: st.mtimeMs,
+      kind: kindFor(finalOut),
+      mime: mimeFor(finalOut),
+    },
+  ];
+  if (extraFiles && extraFiles.length > 0) {
+    const dot = finalOut.lastIndexOf('.');
+    const baseStem = dot > 0 ? finalOut.slice(0, dot) : finalOut;
+    const defaultExt = dot > 0 ? finalOut.slice(dot) : '.png';
+    for (let i = 0; i < extraFiles.length; i++) {
+      const extra = extraFiles[i]!;
+      const layerExt = extra.suggestedExt || defaultExt;
+      const layerName = `${baseStem}-layer-${i + 1}${layerExt}`;
+      const layerTarget = path.join(dir, layerName);
+      await writeFile(layerTarget, extra.bytes);
+      const layerStat = await stat(layerTarget);
+      const layerMeta = {
+        name: layerName,
+        size: layerStat.size,
+        mtime: layerStat.mtimeMs,
+        kind: kindFor(layerName),
+        mime: mimeFor(layerName),
+      };
+      writtenLayers.push(layerName);
+      writtenFiles.push(layerMeta);
+      if (args.onBytesWritten) {
+        try {
+          await args.onBytesWritten({
+            bytes: extra.bytes,
+            ...layerMeta,
+          });
+        } catch (err) {
+          console.warn('[media] onBytesWritten hook failed for layer', err);
+        }
+      }
+    }
+  }
   return {
     name: finalOut,
     size: st.size,
@@ -897,12 +959,18 @@ export async function generateMedia(args: {
     mime: mimeFor(finalOut),
     model,
     surface,
-    providerNote,
+    providerNote:
+      writtenLayers.length > 0
+        ? `${providerNote} · ${writtenLayers.length} layers (${writtenLayers.join(', ')})`
+        : providerNote,
     providerId,
     providerError,
     usedStubFallback,
     intentionalStub,
     warnings,
+    ...(writtenLayers.length > 0
+      ? { layers: writtenLayers, files: writtenFiles }
+      : {}),
   };
 }
 
@@ -1132,6 +1200,14 @@ async function renderCustomOpenAIImage(ctx: MediaContext, credentials: ProviderC
     );
   }
 
+  if (isVolcengineArkEndpoint(baseUrl, wireModel)) {
+    return renderVolcengineImage(
+      { ...ctx, wireModel },
+      { ...credentials, baseUrl },
+      'custom-image',
+    );
+  }
+
   const headers: Record<string, string> = {
     'content-type': 'application/json',
   };
@@ -1169,11 +1245,20 @@ async function renderCustomOpenAIImage(ctx: MediaContext, credentials: ProviderC
     }),
   );
   const data = await parseOpenAICompatibleJson(resp, 'custom image');
-  const bytes = await bytesFromOpenAICompatibleData(data, 'custom image', ctx.requestInit);
+  const allBytes = await allBytesFromOpenAICompatibleData(data, 'custom image', ctx.requestInit);
+  const bytes = allBytes[0]!;
+  const extraFiles =
+    allBytes.length > 1
+      ? allBytes.slice(1).map((buf) => ({
+          bytes: buf,
+          suggestedExt: sniffImageExt(buf) || '.png',
+        }))
+      : undefined;
   return {
     bytes,
     providerNote: `custom-image/${wireModel} · ${body.size} · ${bytes.length} bytes`,
     suggestedExt: sniffImageExt(bytes),
+    ...(extraFiles ? { extraFiles } : {}),
   };
 }
 
@@ -1199,9 +1284,14 @@ async function parseOpenAICompatibleJson(resp: Response, providerTag: string): P
   }
 }
 
-async function bytesFromOpenAICompatibleData(data: any, providerTag: string, requestInit: MediaRequestInit = {}): Promise<Buffer> {
-  const entry = data && Array.isArray(data.data) ? data.data[0] : null;
-  if (!entry) throw new Error(`${providerTag} response had no data[0]`);
+async function bytesFromOpenAICompatibleEntry(
+  entry: any,
+  providerTag: string,
+  requestInit: MediaRequestInit = {},
+): Promise<Buffer> {
+  if (!entry || typeof entry !== 'object') {
+    throw new Error(`${providerTag} response had no data[0]`);
+  }
   if (typeof entry.b64_json === 'string' && entry.b64_json) {
     const raw = entry.b64_json.includes(',')
       ? entry.b64_json.slice(entry.b64_json.indexOf(',') + 1)
@@ -1217,6 +1307,28 @@ async function bytesFromOpenAICompatibleData(data: any, providerTag: string, req
     return Buffer.from(arr);
   }
   throw new Error(`${providerTag} response had neither b64_json nor url`);
+}
+
+async function allBytesFromOpenAICompatibleData(
+  data: any,
+  providerTag: string,
+  requestInit: MediaRequestInit = {},
+): Promise<Buffer[]> {
+  const entries = data && Array.isArray(data.data) ? data.data : [];
+  if (entries.length === 0) {
+    throw new Error(`${providerTag} response had no data[0]`);
+  }
+  return Promise.all(
+    entries.map((entry: any) =>
+      bytesFromOpenAICompatibleEntry(entry, providerTag, requestInit),
+    ),
+  );
+}
+
+async function bytesFromOpenAICompatibleData(data: any, providerTag: string, requestInit: MediaRequestInit = {}): Promise<Buffer> {
+  const entry = data && Array.isArray(data.data) ? data.data[0] : null;
+  if (!entry) throw new Error(`${providerTag} response had no data[0]`);
+  return bytesFromOpenAICompatibleEntry(entry, providerTag, requestInit);
 }
 
 function imageRouterSizeFor(aspect: string | undefined, surface: 'image' | 'video'): string {
@@ -1602,31 +1714,136 @@ function volcengineRatioFor(aspect?: string): string {
   return '16:9';
 }
 
+function isVolcengineArkEndpoint(baseUrl: string, modelId: string): boolean {
+  const normalizedUrl = baseUrl.trim().toLowerCase();
+  const normalizedModel = modelId.trim().toLowerCase();
+  return (
+    normalizedUrl.includes('volces.com') ||
+    normalizedModel.startsWith('doubao-seedream-') ||
+    normalizedModel.startsWith('doubao-seededit-')
+  );
+}
+
+function isVolcengineSeedream5Model(modelId: string): boolean {
+  const normalized = modelId.trim().toLowerCase();
+  return (
+    normalized.startsWith('doubao-seedream-5-0') ||
+    normalized.startsWith('doubao-seedream-5.0') ||
+    normalized.includes('seedream-5-0') ||
+    normalized.includes('seedream-5.0')
+  );
+}
+
+function shouldEnableVolcengineLayerDecomposition(ctx: MediaContext): boolean {
+  if (typeof ctx.layerDecomposition === 'boolean') {
+    return ctx.layerDecomposition;
+  }
+  if (!ctx.imageRef?.dataUrl) return false;
+  const isFlash5 =
+    ctx.model.toLowerCase().includes('seedream-5-0-flash') ||
+    ctx.wireModel.toLowerCase().includes('seedream-5-0-flash');
+  const trimmedPrompt = (ctx.prompt || '').trim();
+  if (!trimmedPrompt && isFlash5) return true;
+  if (
+    /拆(出|分|解|元素|图层)|图层拆分|拆分图层|提取.*(元素|图层)|layer[_\s-]*decomposition|decompose\s+layers?/iu.test(
+      trimmedPrompt,
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function volcengineImageSizeFor(
+  ctx: MediaContext,
+  isSeedream5: boolean,
+  layerDecomposition: boolean,
+): string {
+  const res = ctx.resolution?.trim();
+  if (res) {
+    if (/^(1k|1\.5k|2k)$/i.test(res)) return res.toUpperCase();
+    if (/^\d+x\d+$/i.test(res)) return res.toLowerCase();
+  }
+  if (isSeedream5 || layerDecomposition) {
+    return '2K';
+  }
+  return openaiSizeFor(ctx.model, ctx.aspect);
+}
+
 // Volcengine Seedream / Seededit images. Same auth, different endpoint:
-// POST /api/v3/images/generations (OpenAI-compatible payload).
-async function renderVolcengineImage(ctx: MediaContext, credentials: ProviderConfig): Promise<RenderResult> {
+// POST /api/v3/images/generations (t2i, i2i, and Seedream 5.0 layer_decomposition
+// all share /images/generations — there is no /images/edits route on Ark).
+async function renderVolcengineImage(
+  ctx: MediaContext,
+  credentials: ProviderConfig,
+  providerIdOverride: 'volcengine' | 'custom-image' = 'volcengine',
+): Promise<RenderResult> {
   if (!credentials.apiKey) {
     throw new Error(`no Volcengine Ark API key — configure it in ${SETTINGS_MEDIA_PROVIDERS_PATH} or set ARK_API_KEY`);
   }
-  const baseUrl = (credentials.baseUrl || 'https://ark.cn-beijing.volces.com/api/v3').replace(/\/$/, '');
+  const baseUrl = (credentials.baseUrl || 'https://ark.cn-beijing.volces.com/api/v3').trim();
+  const url = buildOpenAICompatibleGenerationUrl(baseUrl, 'images');
+  const wireModel = (
+    ctx.wireModel !== CUSTOM_IMAGE_MODEL_ID
+      ? ctx.wireModel
+      : credentials.model || ctx.wireModel
+  ).trim();
+  const isSeedream5 =
+    isVolcengineSeedream5Model(ctx.model) || isVolcengineSeedream5Model(wireModel);
+  const layerDecomposition = shouldEnableVolcengineLayerDecomposition(ctx);
+  const size = volcengineImageSizeFor(ctx, isSeedream5, layerDecomposition);
 
-  const body = {
-    model: ctx.wireModel,
-    prompt: ctx.prompt || 'A high-quality reference image.',
+  const body: Record<string, unknown> = {
+    model: wireModel,
+    size,
     response_format: 'b64_json',
-    // openaiSizeFor branches on the catalog id (gpt-image-* vs dall-e-*
-    // accept different size enums), so it must NOT see the post-alias
-    // wire name. lefarcen + codex P2 on PR #1309.
-    size: openaiSizeFor(ctx.model, ctx.aspect),
+    watermark: false,
   };
-  const resp = await fetch(`${baseUrl}/images/generations`, withMediaRequestInit(ctx, {
-    method: 'POST',
-    headers: {
-      'authorization': `Bearer ${credentials.apiKey}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  }));
+
+  if (isSeedream5 || layerDecomposition) {
+    body.output_format = 'png';
+  }
+
+  if (layerDecomposition) {
+    if (!ctx.imageRef?.dataUrl) {
+      throw new Error(
+        'volcengine layer_decomposition requires a reference image (--image <path>)',
+      );
+    }
+    // Ark layer_decomposition requires a single top-level `image` string.
+    body.image = ctx.imageRef.dataUrl;
+    body.layer_decomposition = true;
+    const trimmedPrompt = (ctx.prompt || '').trim();
+    if (trimmedPrompt) {
+      body.prompt = trimmedPrompt;
+    }
+  } else {
+    body.prompt = (ctx.prompt && ctx.prompt.trim()) || 'A high-quality reference image.';
+    if (ctx.imageRefs.length > 1) {
+      body.image = ctx.imageRefs.map((ref) => ref.dataUrl);
+    } else if (ctx.imageRefs.length === 1) {
+      body.image = ctx.imageRefs[0]!.dataUrl;
+    } else if (ctx.imageRef?.dataUrl) {
+      body.image = ctx.imageRef.dataUrl;
+    }
+  }
+
+  const resp = await fetchImageGenerationWithResponseRetry(
+    () =>
+      fetch(url, withMediaRequestInit(ctx, {
+        method: 'POST',
+        headers: {
+          'authorization': `Bearer ${credentials.apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })),
+    (summary) =>
+      ctx.onProviderRequestSettled?.({
+        providerId: providerIdOverride,
+        ...summary,
+      }),
+  );
   const text = await resp.text();
   if (!resp.ok) {
     throw new Error(`volcengine image ${resp.status}: ${truncate(text, 240)}`);
@@ -1637,22 +1854,24 @@ async function renderVolcengineImage(ctx: MediaContext, credentials: ProviderCon
   } catch {
     throw new Error(`volcengine image non-JSON: ${truncate(text, 200)}`);
   }
-  const entry = data && Array.isArray(data.data) ? data.data[0] : null;
-  if (!entry) throw new Error('volcengine image response had no data[0]');
-  let bytes;
-  if (entry.b64_json) {
-    bytes = Buffer.from(entry.b64_json, 'base64');
-  } else if (entry.url) {
-    const imgResp = await fetch(entry.url, withMediaRequestInit(ctx));
-    if (!imgResp.ok) throw new Error(`volcengine image fetch ${imgResp.status}`);
-    bytes = Buffer.from(await imgResp.arrayBuffer());
-  } else {
-    throw new Error('volcengine image response missing b64_json/url');
-  }
+  const allBytes = await allBytesFromOpenAICompatibleData(
+    data,
+    'volcengine image',
+    ctx.requestInit,
+  );
+  const bytes = allBytes[0]!;
+  const extraFiles =
+    allBytes.length > 1
+      ? allBytes.slice(1).map((buf) => ({
+          bytes: buf,
+          suggestedExt: sniffImageExt(buf) || '.png',
+        }))
+      : undefined;
   return {
     bytes,
-    providerNote: `volcengine/${ctx.wireModel} · ${ctx.aspect} · ${bytes.length} bytes`,
-    suggestedExt: '.png',
+    providerNote: `${providerIdOverride}/${wireModel} · ${size} · ${bytes.length} bytes`,
+    suggestedExt: sniffImageExt(bytes) || '.png',
+    ...(extraFiles ? { extraFiles } : {}),
   };
 }
 

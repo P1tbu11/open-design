@@ -103,10 +103,12 @@ export const MEDIA_PROVIDERS: MediaProvider[] = [
   {
     id: 'volcengine',
     label: 'Volcengine Ark (Doubao)',
-    hint: 'Seedance 2.0 / Seedream',
+    hint: 'Seedance 2.0 / Seedream 5.0',
     integrated: true,
     defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     docsUrl: 'https://console.volcengine.com/ark',
+    supportsCustomModel: true,
+    customModelPlaceholder: 'doubao-seedream-5-0-flash-260915',
   },
   {
     id: 'grok',
@@ -375,6 +377,20 @@ export const IMAGE_MODELS: MediaModel[] = [
     caps: ['t2i'],
   },
   // Volcengine — Doubao Seedream image generation.
+  {
+    id: 'doubao-seedream-5-0-pro-260628',
+    label: 'seedream-5.0-pro',
+    hint: 'ByteDance · Seedream 5.0 Pro (t2i + i2i + layer decomposition)',
+    provider: 'volcengine',
+    caps: ['t2i', 'i2i'],
+  },
+  {
+    id: 'doubao-seedream-5-0-flash-260915',
+    label: 'seedream-5.0-flash',
+    hint: 'ByteDance · Seedream 5.0 Flash (t2i + i2i + layer decomposition)',
+    provider: 'volcengine',
+    caps: ['t2i', 'i2i'],
+  },
   {
     id: 'doubao-seedream-3-0-t2i-250415',
     label: 'seedream-3.0',

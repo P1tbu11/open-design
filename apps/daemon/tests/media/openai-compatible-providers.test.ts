@@ -569,4 +569,140 @@ describe('OpenAI-compatible media providers', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('renders Volcengine Seedream 5.0 Flash layer decomposition on /images/generations and writes all returned layers', async () => {
+    await writeConfig({
+      providers: {
+        volcengine: {
+          apiKey: 'ark-test-key',
+          baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+        },
+      },
+    });
+    const projectDir = path.join(projectsRoot, 'project-1');
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(
+      path.join(projectDir, 'ref.png'),
+      Buffer.from(PNG_BASE64, 'base64'),
+    );
+
+    const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
+      expect(String(input)).toBe('https://ark.cn-beijing.volces.com/api/v3/images/generations');
+      expect(init?.method).toBe('POST');
+      expect(init?.headers).toMatchObject({
+        authorization: 'Bearer ark-test-key',
+        'content-type': 'application/json',
+      });
+      expect(JSON.parse(String(init?.body))).toEqual({
+        model: 'doubao-seedream-5-0-flash-260915',
+        image: `data:image/png;base64,${PNG_BASE64}`,
+        prompt: '拆出所有主体元素',
+        size: '2K',
+        output_format: 'png',
+        response_format: 'b64_json',
+        layer_decomposition: true,
+        watermark: false,
+      });
+      return new Response(
+        JSON.stringify({
+          data: [
+            { b64_json: PNG_BASE64 },
+            { b64_json: PNG_BASE64 },
+            { b64_json: PNG_BASE64 },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const writtenNames: string[] = [];
+    const result = await generateMedia({
+      projectRoot,
+      projectsRoot,
+      projectId: 'project-1',
+      surface: 'image',
+      model: 'doubao-seedream-5-0-flash-260915',
+      prompt: '拆出所有主体元素',
+      image: 'ref.png',
+      layerDecomposition: true,
+      output: 'decomposed.png',
+      onBytesWritten: (written) => {
+        writtenNames.push(written.name);
+      },
+    });
+
+    expect(result.name).toBe('decomposed.png');
+    expect(result.layers).toEqual([
+      'decomposed-layer-1.png',
+      'decomposed-layer-2.png',
+    ]);
+    expect(result.files?.map((f) => f.name)).toEqual([
+      'decomposed.png',
+      'decomposed-layer-1.png',
+      'decomposed-layer-2.png',
+    ]);
+    expect(writtenNames).toEqual([
+      'decomposed.png',
+      'decomposed-layer-1.png',
+      'decomposed-layer-2.png',
+    ]);
+    for (const fileName of writtenNames) {
+      const buf = await readFile(path.join(projectDir, fileName));
+      expect(buf.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('routes Custom Image API pointed at Volcengine Ark to /images/generations with image and watermark=false instead of /images/edits', async () => {
+    await writeConfig({
+      providers: {
+        'custom-image': {
+          apiKey: 'ark-custom-key',
+          baseUrl: 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+          model: 'doubao-seedream-5-0-flash-260915',
+        },
+      },
+    });
+    const projectDir = path.join(projectsRoot, 'project-1');
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(
+      path.join(projectDir, 'source.png'),
+      Buffer.from(PNG_BASE64, 'base64'),
+    );
+
+    const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
+      expect(String(input)).toBe('https://ark.cn-beijing.volces.com/api/v3/images/generations');
+      const body = JSON.parse(String(init?.body));
+      expect(body).toEqual({
+        model: 'doubao-seedream-5-0-flash-260915',
+        image: `data:image/png;base64,${PNG_BASE64}`,
+        size: '2K',
+        output_format: 'png',
+        response_format: 'b64_json',
+        layer_decomposition: true,
+        watermark: false,
+      });
+      return new Response(
+        JSON.stringify({
+          data: [{ b64_json: PNG_BASE64 }, { b64_json: PNG_BASE64 }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await generateMedia({
+      projectRoot,
+      projectsRoot,
+      projectId: 'project-1',
+      surface: 'image',
+      model: 'custom-image',
+      prompt: '',
+      image: 'source.png',
+      output: 'custom-ark.png',
+    });
+
+    expect(result.providerId).toBe('custom-image');
+    expect(result.layers).toEqual(['custom-ark-layer-1.png']);
+  });
+
 });
