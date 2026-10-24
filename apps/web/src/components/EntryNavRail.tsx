@@ -1432,9 +1432,7 @@ export function EntryTopRightCluster({
   const accountInRail = Boolean(context && accountHost);
   const updaterInRail = accountInRail && !railAutoCollapsed;
   const showTopRightPromos = false;
-  const clusterVisible = Boolean(
-    (showTopRightPromos && (leadingSlot || context)) || (!updaterInRail && updaterControlVisible),
-  );
+  const clusterVisible = Boolean(leadingSlot || context || updaterControlVisible);
   const updaterHostVisible = !updaterInRail && Boolean(context || updaterControlVisible);
 
   return (
@@ -1445,7 +1443,7 @@ export function EntryTopRightCluster({
           {/* GitHub star chip: its own option in the cluster, right after the
               campaign badge (per product) — it used to live in the account
               menu's social row. */}
-          {showTopRightPromos && clusterVisible ? (
+          {clusterVisible ? (
             <a
               className="entry-top-right-github"
               href={REPO_URL}
