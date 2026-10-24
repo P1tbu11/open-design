@@ -1431,18 +1431,21 @@ export function EntryTopRightCluster({
   // an update reminder parked in a hidden column is no reminder.
   const accountInRail = Boolean(context && accountHost);
   const updaterInRail = accountInRail && !railAutoCollapsed;
-  const clusterVisible = Boolean(leadingSlot || context || updaterControlVisible);
+  const showTopRightPromos = false;
+  const clusterVisible = Boolean(
+    (showTopRightPromos && (leadingSlot || context)) || (!updaterInRail && updaterControlVisible),
+  );
   const updaterHostVisible = !updaterInRail && Boolean(context || updaterControlVisible);
 
   return (
     <>
       {createPortal(
         <div className={clusterVisible ? 'entry-top-right-cluster' : undefined}>
-          {leadingSlot}
+          {showTopRightPromos ? leadingSlot : null}
           {/* GitHub star chip: its own option in the cluster, right after the
               campaign badge (per product) — it used to live in the account
               menu's social row. */}
-          {clusterVisible ? (
+          {showTopRightPromos && clusterVisible ? (
             <a
               className="entry-top-right-github"
               href={REPO_URL}
@@ -1465,7 +1468,7 @@ export function EntryTopRightCluster({
               anchor around it owns the hover region for the billing panel
               below: the panel is a DOM child, so crossing from the pill into
               it never leaves the anchor and never arms the close. */}
-          {context && showCreditsPill ? (
+          {showTopRightPromos && context && showCreditsPill ? (
             <div
               ref={creditsAnchorRef}
               className="entry-top-right-credits-anchor"
