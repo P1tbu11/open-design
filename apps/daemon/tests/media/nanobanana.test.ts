@@ -256,4 +256,75 @@ describe('nano-banana media generation', () => {
     })).rejects.toThrow(/nano-banana image 429:.*quota exceeded/);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it('forwards single and multiple local reference images as inlineData parts and honors resolution override', async () => {
+    const projectDir = path.join(projectsRoot, 'project-1');
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(path.join(projectDir, 'ref1.png'), Buffer.from(PNG_BASE64, 'base64'));
+    await writeFile(path.join(projectDir, 'ref2.png'), Buffer.from(PNG_BASE64, 'base64'));
+
+    const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
+      expect(String(input)).toBe(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent',
+      );
+      expect(JSON.parse(String(init?.body))).toEqual({
+        contents: [
+          {
+            parts: [
+              { text: 'Combine the character from ref1 with the outfit from ref2' },
+              { inlineData: { mimeType: 'image/png', data: PNG_BASE64 } },
+              { inlineData: { mimeType: 'image/png', data: PNG_BASE64 } },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseModalities: ['IMAGE'],
+          imageConfig: {
+            aspectRatio: '16:9',
+            imageSize: '2K',
+          },
+        },
+      });
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    inline_data: {
+                      mime_type: 'image/png',
+                      data: PNG_BASE64,
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await generateMedia({
+      projectRoot,
+      projectsRoot,
+      projectId: 'project-1',
+      surface: 'image',
+      model: 'gemini-3-pro-image-preview',
+      prompt: 'Combine the character from ref1 with the outfit from ref2',
+      aspect: '16:9',
+      resolution: '2K',
+      image: 'ref1.png',
+      images: ['ref1.png', 'ref2.png'],
+      output: 'combined.png',
+    });
+
+    expect(result.name).toBe('combined.png');
+    expect(result.providerNote).toContain('nano-banana/gemini-3-pro-image-preview · 16:9 · 2K · i2i(2)');
+  });
 });

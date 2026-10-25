@@ -706,8 +706,16 @@ export async function generateMedia(args: {
       bytes = result.bytes;
       providerNote = result.providerNote;
       suggestedExt = result.suggestedExt;
-    } else if (def.provider === 'nanobanana' && surface === 'image') {
-      const result = await renderNanoBananaImage(ctx, credentials);
+    } else if (
+      (def.provider === 'nanobanana' ||
+        (def.provider === 'google' && ctx.model.startsWith('gemini-'))) &&
+      surface === 'image'
+    ) {
+      const effectiveCredentials =
+        credentials.apiKey || def.provider === 'nanobanana'
+          ? credentials
+          : await resolveProviderConfig(projectRoot, 'nanobanana');
+      const result = await renderNanoBananaImage(ctx, effectiveCredentials);
       bytes = result.bytes;
       providerNote = result.providerNote;
       suggestedExt = result.suggestedExt;
@@ -1951,6 +1959,43 @@ async function renderGrokImage(ctx: MediaContext, credentials: ProviderConfig): 
   };
 }
 
+function extractBase64FromDataUrl(dataUrl: string): string {
+  const commaIdx = dataUrl.indexOf(',');
+  return commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+}
+
+function geminiInlineImagePartsFromContext(
+  ctx: Pick<MediaContext, 'imageRef' | 'imageRefs'>,
+): Array<{ inlineData: { mimeType: string; data: string } }> {
+  const refs =
+    ctx.imageRefs && ctx.imageRefs.length > 0
+      ? ctx.imageRefs
+      : ctx.imageRef
+        ? [ctx.imageRef]
+        : [];
+  const parts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
+  for (const ref of refs) {
+    if (!ref?.dataUrl) continue;
+    const data = extractBase64FromDataUrl(ref.dataUrl);
+    if (!data) continue;
+    parts.push({
+      inlineData: {
+        mimeType: ref.mime || 'image/png',
+        data,
+      },
+    });
+  }
+  return parts;
+}
+
+function nanoBananaImageSizeFor(resolution?: string): string {
+  const trimmed = resolution?.trim();
+  if (trimmed && /^(1k|2k|4k)$/i.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+  return NANOBANANA_DEFAULT_IMAGE_SIZE;
+}
+
 async function renderNanoBananaImage(ctx: MediaContext, credentials: ProviderConfig): Promise<RenderResult> {
   const apiKey = credentials.apiKey;
   if (!apiKey) {
@@ -1961,17 +2006,22 @@ async function renderNanoBananaImage(ctx: MediaContext, credentials: ProviderCon
 
   const baseUrl = (credentials.baseUrl || NANOBANANA_DEFAULT_BASE_URL).replace(/\/$/, '');
   const wireModel = (credentials.model || ctx.wireModel || NANOBANANA_DEFAULT_MODEL).trim();
+  const imageSize = nanoBananaImageSizeFor(ctx.resolution);
+  const inlineImageParts = geminiInlineImagePartsFromContext(ctx);
   const body = {
     contents: [{
-      parts: [{
-        text: ctx.prompt || 'A high-quality reference image.',
-      }],
+      parts: [
+        {
+          text: ctx.prompt || 'A high-quality reference image.',
+        },
+        ...inlineImageParts,
+      ],
     }],
     generationConfig: {
       responseModalities: ['IMAGE'],
       imageConfig: {
         aspectRatio: nanoBananaAspectFor(ctx.aspect),
-        imageSize: NANOBANANA_DEFAULT_IMAGE_SIZE,
+        imageSize,
       },
     },
   };
@@ -1998,9 +2048,13 @@ async function renderNanoBananaImage(ctx: MediaContext, credentials: ProviderCon
     throw new Error(`nano-banana image non-JSON: ${truncate(text, 200)}`);
   }
   const bytes = inlineImageBytesFromGenerateContent(data);
+  const refNote =
+    inlineImageParts.length > 0
+      ? ` · i2i(${inlineImageParts.length})`
+      : '';
   return {
     bytes,
-    providerNote: `nano-banana/${wireModel} · ${nanoBananaAspectFor(ctx.aspect)} · ${NANOBANANA_DEFAULT_IMAGE_SIZE} · ${bytes.length} bytes`,
+    providerNote: `nano-banana/${wireModel} · ${nanoBananaAspectFor(ctx.aspect)} · ${imageSize}${refNote} · ${bytes.length} bytes`,
     suggestedExt: sniffImageExt(bytes),
   };
 }
@@ -2044,7 +2098,7 @@ function inlineImageBytesFromGenerateContent(data: any): Buffer {
   for (const candidate of candidates) {
     const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
     for (const part of parts) {
-      const inline = part?.inlineData;
+      const inline = part?.inlineData || part?.inline_data;
       if (typeof inline?.data === 'string' && inline.data) {
         return Buffer.from(inline.data, 'base64');
       }
@@ -3525,6 +3579,9 @@ async function renderAIHubMixGeminiImage(
     throw new Error(`no AIHubMix API key — configure it in ${SETTINGS_MEDIA_PROVIDERS_PATH} or set OD_AIHUBMIX_API_KEY`);
   }
   const aspect = ctx.aspect || '1:1';
+  const inlineImages = geminiInlineImagePartsFromContext(ctx).map(
+    (part) => part.inlineData,
+  );
   const bytes = await aihubmixGeminiImageBytes(
     {
       baseUrl,
@@ -3532,12 +3589,13 @@ async function renderAIHubMixGeminiImage(
       wireModel,
       prompt: ctx.prompt || 'A high-quality reference image.',
       aspect,
+      ...(inlineImages.length > 0 ? { inlineImages } : {}),
     },
     (url, init) => fetch(url, withMediaRequestInit(ctx, init)),
   );
   return {
     bytes,
-    providerNote: `aihubmix/${wireModel} · ${aspect} · ${bytes.length} bytes (gemini-native)`,
+    providerNote: `aihubmix/${wireModel} · ${aspect}${inlineImages.length > 0 ? ` · i2i(${inlineImages.length})` : ''} · ${bytes.length} bytes (gemini-native)`,
     suggestedExt: '.png',
   };
 }

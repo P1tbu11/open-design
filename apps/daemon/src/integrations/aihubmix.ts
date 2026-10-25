@@ -104,6 +104,7 @@ export interface AIHubMixGeminiImageRequest {
   prompt: string;
   /** Gemini aspectRatio string, e.g. "1:1" / "16:9". */
   aspect: string;
+  inlineImages?: ReadonlyArray<{ mimeType: string; data: string }>;
 }
 
 /**
@@ -124,6 +125,12 @@ export async function aihubmixGeminiImageBytes(
   doFetch: (url: string, init: RequestInit) => Promise<Response>,
 ): Promise<Buffer> {
   const url = aihubmixGeminiImageUrl(req.baseUrl, req.wireModel);
+  const inlineParts = (req.inlineImages ?? []).map((img) => ({
+    inlineData: {
+      mimeType: img.mimeType,
+      data: img.data,
+    },
+  }));
   const resp = await doFetch(url, {
     method: 'POST',
     redirect: 'error',
@@ -133,7 +140,12 @@ export async function aihubmixGeminiImageBytes(
       ...aihubmixAppCodeHeader(),
     },
     body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: req.prompt }] }],
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: req.prompt }, ...inlineParts],
+        },
+      ],
       generationConfig: {
         responseModalities: ['TEXT', 'IMAGE'],
         imageConfig: { aspectRatio: req.aspect },

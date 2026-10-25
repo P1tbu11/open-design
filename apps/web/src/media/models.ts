@@ -471,9 +471,9 @@ export const IMAGE_MODELS: MediaModel[] = [
   {
     id: 'gemini-3.1-flash-image-preview',
     label: 'nano-banana-2',
-    hint: 'Nano Banana · text-to-image',
+    hint: 'Nano Banana · text + image-to-image',
     provider: 'nanobanana',
-    caps: ['t2i'],
+    caps: ['t2i', 'i2i'],
   },
 
   // ImageRouter — OpenAI-compatible routed image models.
