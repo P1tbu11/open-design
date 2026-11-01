@@ -5,7 +5,7 @@ import { buildMcpInstallPayload, type McpInstallPayload } from './mcp-install-in
 import { installCodexMcp, probeCodexInstall, refreshOwnedCodexMcp, uninstallCodexMcp } from './codex-cli.js';
 import { isManagedMcpBootstrapEnv } from './mcp-bootstrap.js';
 import { isCodexRegistrationOwnedBy, managedMcpRegistrationEnv } from './mcp-managed-registration.js';
-import { MCP_TEMPLATES, buildAcpMcpServers, buildClaudeMcpJson, isManagedProjectCwd, readMcpConfig, writeMcpConfig } from './mcp-config.js';
+import { MCP_TEMPLATES, buildAcpMcpServers, buildClaudeMcpJson, isManagedProjectCwd, materializeMcpTemplates, readMcpConfig, writeMcpConfig } from './mcp-config.js';
 import { beginAuth, exchangeCodeForToken, refreshAccessToken } from './mcp-oauth.js';
 import { clearToken, getToken, isTokenExpired, readAllTokens, setToken } from './mcp-tokens.js';
 import type { RouteDeps } from './server-context.js';
@@ -17,7 +17,8 @@ const MCP_REGISTRATION_REFRESH_DELAY_MS = 5_000;
 
 export function registerMcpRoutes(app: Express, ctx: RegisterMcpRoutesDeps) {
   const { isLocalSameOrigin, resolvedPortRef, sendApiError } = ctx.http;
-  const { OD_BIN, RUNTIME_DATA_DIR, PROJECTS_DIR } = ctx.paths;
+  const { OD_BIN, RUNTIME_DATA_DIR, PROJECTS_DIR, PROJECT_ROOT } = ctx.paths;
+  const templatesForClient = () => materializeMcpTemplates(MCP_TEMPLATES, PROJECT_ROOT);
   const { pendingAuth, daemonUrlRef, inheritedEnvironment } = ctx.mcp;
   const getResolvedPort = () => resolvedPortRef.current;
   const getDaemonUrl = () => daemonUrlRef.current;
@@ -194,7 +195,7 @@ export function registerMcpRoutes(app: Express, ctx: RegisterMcpRoutesDeps) {
     }
     try {
       const cfg = await readMcpConfig(RUNTIME_DATA_DIR);
-      res.json({ servers: cfg.servers, templates: MCP_TEMPLATES });
+      res.json({ servers: cfg.servers, templates: templatesForClient() });
     } catch (err: any) {
       res
         .status(500)
@@ -208,7 +209,7 @@ export function registerMcpRoutes(app: Express, ctx: RegisterMcpRoutesDeps) {
     }
     try {
       const cfg = await writeMcpConfig(RUNTIME_DATA_DIR, req.body);
-      res.json({ servers: cfg.servers, templates: MCP_TEMPLATES });
+      res.json({ servers: cfg.servers, templates: templatesForClient() });
     } catch (err: any) {
       res
         .status(400)

@@ -1,0 +1,31 @@
+{
+  "name": "@open-design/agent-desktop-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Opt-in stdio MCP server that wraps the local agent-desktop CLI for accessibility-tree Computer Use.",
+  "bin": {
+    "agent-desktop-mcp": "./src/cli.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "node ./src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tests.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "cross-spawn": "7.0.6",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@typescript/native": "npm:typescript@7.0.2",
+    "@types/node": "20.19.39",
+    "vitest": "4.1.6"
+  },
+  "engines": {
+    "node": "~24"
+  }
+}

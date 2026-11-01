@@ -589,7 +589,34 @@ function joinPermissionGlob(dir: string, suffix: '*' | '**'): string {
 // Built-in templates surfaced in the Settings "Add MCP server" picker.
 // Picking one fills the form with defaults; the resulting McpServerConfig
 // flows through the same persistence path as a fully-custom entry.
+// Nothing in this list is written into mcp-config.json until the user adds
+// it. Agent Desktop stays off until that explicit opt-in.
 // ───────────────────────────────────────────────────────────────────────
+
+/** Repo-relative entry for the local agent-desktop MCP wrapper. The Settings
+ * payload rewrites this to an absolute path via `materializeMcpTemplates`. */
+export const AGENT_DESKTOP_MCP_TEMPLATE_ID = 'agent-desktop';
+export const AGENT_DESKTOP_MCP_ENTRY = 'packages/agent-desktop-mcp/src/cli.ts';
+
+/**
+ * Fill the Agent Desktop template with this machine's Node binary and the
+ * checkout path of the wrapper. Saved servers then spawn regardless of the
+ * project cwd. Other templates are returned unchanged.
+ */
+export function materializeMcpTemplates(
+  templates: readonly McpTemplate[],
+  projectRoot: string,
+): McpTemplate[] {
+  const entry = path.join(projectRoot, AGENT_DESKTOP_MCP_ENTRY);
+  return templates.map((tpl) => {
+    if (tpl.id !== AGENT_DESKTOP_MCP_TEMPLATE_ID) return tpl;
+    return {
+      ...tpl,
+      command: process.execPath,
+      args: [entry],
+    };
+  });
+}
 
 export const MCP_TEMPLATES: McpTemplate[] = [
   // ── image-generation ────────────────────────────────────────────────
@@ -1266,5 +1293,25 @@ export const MCP_TEMPLATES: McpTemplate[] = [
       'Test https://stripe.com against WCAG 2.1 AA at a 1280×800 viewport and list every violation grouped by impact.',
     command: 'npx',
     args: ['-y', 'a11y-mcp-server'],
+  },
+  {
+    id: AGENT_DESKTOP_MCP_TEMPLATE_ID,
+    label: 'Agent Desktop (Computer Use)',
+    description:
+      'Opt-in, local-only desktop Computer Use through the Vercel Labs agent-desktop CLI. The agent reads the OS accessibility tree and acts on element refs (snapshot, then click or type). This is not screenshot-based computer use, and it is not the unrelated agent-desktop.dev project. OpenDesign does not enable it until you add this server. Install the CLI on the same machine as the daemon (`npm i -g agent-desktop`) and, on macOS, grant Accessibility permission. A cloud VM cannot drive your desktop. See docs/agent-desktop-computer-use.md.',
+    transport: 'stdio',
+    category: 'utilities',
+    homepage: 'https://github.com/vercel-labs/agent-desktop',
+    example:
+      'List running desktop apps, snapshot Figma with interactive elements only, and click the layer named Hero using the ref from that snapshot. Verify with another snapshot. Do not drive the UI from screenshots.',
+    command: 'node',
+    args: [AGENT_DESKTOP_MCP_ENTRY],
+    envFields: [
+      {
+        key: 'AGENT_DESKTOP_BIN',
+        label: 'agent-desktop executable (optional override)',
+        placeholder: 'agent-desktop',
+      },
+    ],
   },
 ];

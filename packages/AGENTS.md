@@ -4,6 +4,7 @@ Follow the root `AGENTS.md` first. This file only records module-level boundarie
 
 ## Package responsibilities
 
+- `packages/agent-desktop-mcp`: stdio MCP server that wraps the local Vercel Labs `agent-desktop` CLI for opt-in accessibility-tree Computer Use. It does not enable itself and does not drive a GUI from a cloud VM. The host must have `agent-desktop` on PATH. Settings exposes it as a template; see `docs/agent-desktop-computer-use.md`.
 - `packages/agui-adapter`: pure TypeScript adapter between persisted OpenDesign agent/GenUI/plugin-pipeline events and the AG-UI event protocol. Keep transport and filesystem concerns out; daemon producers and web/CopilotKit consumers share this conversion boundary.
 - `packages/contracts`: web/daemon app contract layer. Keep it pure TypeScript; it must not depend on Next.js, Express, Node filesystem/process APIs, browser APIs, SQLite, daemon internals, or the sidecar control-plane protocol.
 - `packages/components`: shared React UI primitives and primitive CSS. It may depend on React types/runtime only; keep product workflows and app-specific layout/styling in the apps.
@@ -36,6 +37,8 @@ Follow the root `AGENTS.md` first. This file only records module-level boundarie
 ## Common package commands
 
 ```bash
+pnpm --filter @open-design/agent-desktop-mcp typecheck
+pnpm --filter @open-design/agent-desktop-mcp test
 pnpm --filter @open-design/agui-adapter typecheck
 pnpm --filter @open-design/agui-adapter test
 pnpm --filter @open-design/contracts typecheck
