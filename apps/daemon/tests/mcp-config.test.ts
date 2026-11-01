@@ -4,11 +4,13 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  AGENT_DESKTOP_MCP_ENTRY,
   MCP_TEMPLATES,
   buildAcpMcpServers,
   buildClaudeMcpJson,
   buildOpenCodeMcpConfigContent,
   isManagedProjectCwd,
+  materializeMcpTemplates,
   readMcpConfig,
   sanitizeMcpServer,
   writeMcpConfig,
@@ -28,6 +30,7 @@ describe('mcp-config storage', () => {
   it('returns empty servers when no config file exists', async () => {
     const cfg = await readMcpConfig(dataDir);
     expect(cfg).toEqual({ servers: [] });
+    expect(cfg.servers.some((server) => server.id === 'agent-desktop' || server.templateId === 'agent-desktop')).toBe(false);
   });
 
   it('returns empty config for a corrupt JSON file', async () => {
@@ -1259,5 +1262,34 @@ describe('MCP_TEMPLATES', () => {
     // GitHub repo slug). Getting this wrong silently 404s on the registry.
     expect(tpl?.args).toEqual(['-y', 'a11y-mcp-server']);
     expect(tpl?.envFields ?? []).toEqual([]);
+  });
+
+  it('offers Agent Desktop as an opt-in local utilities template', () => {
+    const tpl = MCP_TEMPLATES.find((t) => t.id === 'agent-desktop');
+    expect(tpl).toMatchObject({
+      label: 'Agent Desktop (Computer Use)',
+      transport: 'stdio',
+      category: 'utilities',
+      homepage: 'https://github.com/vercel-labs/agent-desktop',
+      command: 'node',
+      args: [AGENT_DESKTOP_MCP_ENTRY],
+    });
+    expect(tpl?.description).toContain('Opt-in');
+    expect(tpl?.description).toContain('Accessibility');
+    expect(tpl?.description.toLowerCase()).toContain('not screenshot');
+    expect(tpl?.description).toContain('npm i -g agent-desktop');
+    expect(tpl?.envFields?.map((field) => field.key)).toEqual(['AGENT_DESKTOP_BIN']);
+    expect(tpl?.envFields?.[0]?.required ?? false).toBe(false);
+    expect('enabled' in (tpl ?? {})).toBe(false);
+
+    const github = MCP_TEMPLATES.find((t) => t.id === 'github');
+    const materialized = materializeMcpTemplates(MCP_TEMPLATES, '/checkout/open-design');
+    expect(materialized.find((t) => t.id === 'github')).toBe(github);
+    const desktop = materialized.find((t) => t.id === 'agent-desktop');
+    expect(desktop?.command).toBe(process.execPath);
+    expect(desktop?.args).toEqual([
+      path.join('/checkout/open-design', AGENT_DESKTOP_MCP_ENTRY),
+    ]);
+    expect(path.isAbsolute(desktop?.args?.[0] ?? '')).toBe(true);
   });
 });

@@ -126,6 +126,10 @@ For DeepSeek Harness, install the official `dsh` CLI first, then select it in Op
 
 Runtime definitions live in [`apps/daemon/src/runtimes/defs/`](apps/daemon/src/runtimes/defs/), with registration and shared stream handling under [`apps/daemon/src/runtimes/`](apps/daemon/src/runtimes/). See [`docs/agent-adapters.md`](docs/agent-adapters.md) for the adapter contract.
 
+### Desktop Computer Use
+
+Designers can opt in to accessibility-tree Computer Use from **Settings → External MCP → Add server → Utilities → Agent Desktop (Computer Use)**. The server stays off until you add it. It wraps the [Vercel Labs `agent-desktop`](https://github.com/vercel-labs/agent-desktop) CLI on the same machine as the daemon: the agent snapshots an app such as Figma or Finder and clicks by element ref. This is not screenshot computer use. Install `agent-desktop` (`npm i -g agent-desktop`) and grant macOS Accessibility first. Full steps: [`docs/agent-desktop-computer-use.md`](docs/agent-desktop-computer-use.md).
+
 ---
 
 ## Demo
