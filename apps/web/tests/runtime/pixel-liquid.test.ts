@@ -5,8 +5,8 @@
  * 「画得漂不漂亮」在这里量不到。所以这个文件只钉两件事:
  *   ① `shade()` 是确定性的黑白有序抖动 —— 同一个 t 出同一帧、不同 t 出不同帧,
  *      像素只有「近黑墨点」和「全透明」两态,而且两种都有(不是铺一块实心,
- *      也不是绿色液体)。84×112 上窗框比四角密,孔比标题栏疏,
- *      而且上沿和底沿左右错开 —— 是斜着的窗,不是正对的矩形。
+ *      也不是绿色液体)。84×112 上标题栏比四角密、内页是空的,
+ *      右侧上沿比左侧更高 —— 软颗粒里的斜窗,不是正对的矩形。
  *   ② 调度器:一条共享 rAF、看不见就停、同时跑的实例有上限、释放后不空转。
  * 颗粒好不好看只能靠真浏览器。起本地 web 后,触发生图未完成的 ImageRow,
  * 或产物卡还在写的 FileOpsSummary,看格子里是不是黑白抖动而不是霓虹绿。
@@ -105,7 +105,7 @@ describe('shade() —— 黑白 4×4 Bayer 抖动', () => {
     expect(varied).toBeGreaterThan(4);
   });
 
-  it('84×112 上是斜着的浏览器窗:框比角密,孔比标题栏疏,上下边不对齐', () => {
+  it('84×112 上是软颗粒的斜窗:框比角密,内页更空,上沿是斜的', () => {
     const w = 84;
     const h = 112;
     const img = surface(w, h);
@@ -129,38 +129,27 @@ describe('shade() —— 黑白 4×4 Bayer 抖动', () => {
     };
 
     const corner = disk(4, 4, 3);
-    const bar = disk(layout.bar.x, layout.bar.y, 2.2);
+    const bar = disk(layout.bar.x, layout.bar.y, 2.4);
     const page = disk(layout.page.x, layout.page.y, 4);
     expect(corner).toBeLessThan(0.2);
-    expect(bar).toBeGreaterThan(0.8);
-    expect(bar).toBeGreaterThan(corner + 0.5);
-    expect(page).toBeLessThan(bar - 0.5);
+    expect(bar).toBeGreaterThan(0.35);
+    expect(bar).toBeGreaterThan(corner + 0.25);
+    expect(page).toBeLessThan(bar - 0.25);
 
-    for (const hole of layout.holes) {
-      const holeDensity = disk(hole.x, hole.y, Math.max(1.2, hole.r * 0.45));
-      expect(holeDensity).toBeLessThan(0.45);
-      expect(bar).toBeGreaterThan(holeDensity + 0.4);
-    }
+    const holes = layout.holes.map((hole) => disk(hole.x, hole.y, 2));
+    expect(Math.min(...holes)).toBeLessThan(bar - 0.1);
 
-    /* 透视:窗的上沿和底沿不是同一条竖边。正面矩形做不到这个差。 */
-    const rows: { left: number; width: number }[] = [];
-    for (let y = 0; y < h; y++) {
-      let left = -1;
-      let right = -1;
-      let count = 0;
-      for (let x = 0; x < w; x++) {
-        if (!img.data[(y * w + x) * 4 + 3]) continue;
-        if (left < 0) left = x;
-        right = x;
-        count += 1;
+    /* 透视:窗的右侧上沿比左侧更高。正对的矩形做不到这个差。 */
+    const ink = (x: number, y: number) => img.data[(y * w + x) * 4 + 3] > 0;
+    const firstSolid = (x0: number, x1: number): number => {
+      for (let y = 0; y < h - 1; y++) {
+        for (let x = x0; x < x1; x++) {
+          if (ink(x, y) && ink(x, y + 1)) return y;
+        }
       }
-      if (count >= 8) rows.push({ left, width: right - left });
-    }
-    expect(rows.length).toBeGreaterThan(20);
-    const top = rows[Math.floor(rows.length * 0.15)]!;
-    const bot = rows[Math.floor(rows.length * 0.85)]!;
-    expect(Math.abs(top.left - bot.left)).toBeGreaterThan(6);
-    expect(bot.width - top.width).toBeGreaterThan(8);
+      return h;
+    };
+    expect(firstSolid(8, 26) - firstSolid(58, 78)).toBeGreaterThan(6);
   });
 });
 

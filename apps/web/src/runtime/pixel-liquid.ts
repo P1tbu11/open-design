@@ -9,11 +9,11 @@
  *   · 墨色近黑、关掉的像素全透明(底下的 `--chat-bg-subtle` 透上来)。
  *   · 4×4 Bayer,17 级有序抖动(Paper Shaders / Codrops 那条矩阵)。
  *     低于 1/17 保持全空,高于 16/17 保持铺实,中间才进矩阵,平区不会发灰。
- *   · 矩阵按时间错一格(shimmer),边和内页的颗粒在跳,窗体本身不跟着漂。
- *   · 密度场是一扇浏览器窗,而且是斜着看的:和 mind 预览同一套
- *     圆角板 SDF,绕 yaw / pitch 转过再透视投影。看得到顶面和侧面的厚度,
- *     标题栏上三颗孔是打穿的,内页是透的。小卡上孔仍要认得出来,
- *     所以孔比预览里略大,相机角度固定,不跟着时间转。
+ *   · 矩阵按时间错一格(shimmer),中间调的颗粒在跳,窗体不跟着转。
+ *   · 密度场是 mind 预览那块浏览器板:圆角轮廓挤成有厚度的 SDF,
+ *     固定 yaw / pitch,透视光线行进,漫反射加边缘光得到连续亮度,
+ *     再进 Bayer。边是颗粒褪出去的,不是硬切的线框。
+ *     孔比预览略大,84px 上才打得穿。
  *
  * 画布按【CSS 像素】开,不乘 dpr。Bayer 取的是画布坐标;乘了 dpr,2× 屏上
  * 一格抖动只有半个 CSS 像素,再被放大就糊成灰。按 CSS 像素画,
@@ -74,18 +74,17 @@ export const FPS = 30;
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 /**
- * 相机。mind 预览里 yaw ≈ 0.55、pitch ≈ 0.42,物体在 z=0、相机在 z=3.3。
- * 这里角度取同一侧(右侧和顶面露出厚度),物体略放大,好让 84px 的孔还在。
- * 角度不跟时间走:小卡里窗要站得住。
+ * 相机。mind 预览 yaw ≈ 0.55、pitch ≈ 0.42、相机在 z=3.3。
+ * 这里同一侧、略拉近,让 84px 的窗还占得住格子。角度不跟时间走。
  */
-const YAW = 0.46;
-const PITCH = 0.34;
-const CAM_Y = 0.02;
-const CAM_Z = 2.85;
-const OBJ_SCALE = 1.28;
-const HOLE_R = 0.064;
-/** 板的半厚。太大时近侧面会盖住内页。 */
-const SLAB_Z = 0.08;
+const YAW = 0.42;
+const PITCH = 0.32;
+const CAM_Y = 0.04;
+const CAM_Z = 2.95;
+const OBJ_SCALE = 1.12;
+const HOLE_R = 0.1;
+/** 和预览一样:一块抖动格 = 2 CSS 像素,再 pixelated 放大。 */
+const DITHER_CELL = 2;
 
 const COS_YAW = Math.cos(YAW);
 const SIN_YAW = Math.sin(YAW);
@@ -102,6 +101,14 @@ const R20 = -SIN_YAW;
 const R21 = COS_YAW * SIN_PITCH;
 const R22 = COS_YAW * COS_PITCH;
 
+const LIGHT_X = -0.55;
+const LIGHT_Y = 0.85;
+const LIGHT_Z = 0.5;
+const LIGHT_LEN = Math.hypot(LIGHT_X, LIGHT_Y, LIGHT_Z);
+const LX = LIGHT_X / LIGHT_LEN;
+const LY = LIGHT_Y / LIGHT_LEN;
+const LZ = LIGHT_Z / LIGHT_LEN;
+
 function sdBox(px: number, py: number, bx: number, by: number): number {
   const dx = Math.abs(px) - bx;
   const dy = Math.abs(py) - by;
@@ -112,46 +119,27 @@ function sdRoundBox(px: number, py: number, bx: number, by: number, radius: numb
   return sdBox(px, py, bx - radius, by - radius) - radius;
 }
 
-/** 预览里的浏览器轮廓。y 向上。孔比预览的 0.028 大,否则 84px 上只剩一个点。 */
+/** 预览的浏览器轮廓。y 向上。孔比预览的 0.028 大,否则 84px 上打不穿。 */
 function browserShape(px: number, py: number): number {
-  let d = sdRoundBox(px, py - 0.02, 0.64, 0.48, 0.05);
-  d = Math.max(d, -sdRoundBox(px, py + 0.04, 0.5, 0.3, 0.03));
-  const chrome = sdRoundBox(px, py - 0.38, 0.64, 0.15, 0.05);
+  let d = sdRoundBox(px, py - 0.02, 0.62, 0.48, 0.04);
+  d = Math.max(d, -sdRoundBox(px, py + 0.02, 0.48, 0.3, 0.02));
+  const chrome = sdRoundBox(px, py - 0.4, 0.62, 0.16, 0.04);
   d = Math.min(d, chrome);
-  d = Math.max(d, -(Math.hypot(px + 0.42, py - 0.38) - HOLE_R));
-  d = Math.max(d, -(Math.hypot(px + 0.27, py - 0.38) - HOLE_R));
-  d = Math.max(d, -(Math.hypot(px + 0.12, py - 0.38) - HOLE_R));
+  d = Math.max(d, -(Math.hypot(px + 0.38, py - 0.4) - HOLE_R));
+  d = Math.max(d, -(Math.hypot(px + 0.14, py - 0.4) - HOLE_R));
+  d = Math.max(d, -(Math.hypot(px - 0.1, py - 0.4) - HOLE_R));
   return d;
 }
 
-function objectAt(rdx: number, rdy: number, rdz: number, dist: number): { x: number; y: number; z: number } {
-  const wx = rdx * dist;
-  const wy = CAM_Y + rdy * dist;
-  const wz = CAM_Z + rdz * dist;
-  return {
-    x: (R00 * wx + R01 * wy + R02 * wz) / OBJ_SCALE,
-    y: (R10 * wx + R11 * wy + R12 * wz) / OBJ_SCALE,
-    z: (R20 * wx + R21 * wy + R22 * wz) / OBJ_SCALE,
-  };
-}
-
-/** 物体坐标轴 = 常数 的平面,返回射线参数。分母太小就是擦着走,丢掉。 */
-function axisPlaneT(axis: 'x' | 'y' | 'z', value: number, rdx: number, rdy: number, rdz: number): number {
-  let denom = 0;
-  let shift = 0;
-  if (axis === 'x') {
-    denom = R00 * rdx + R01 * rdy + R02 * rdz;
-    shift = R01 * CAM_Y + R02 * CAM_Z;
-  } else if (axis === 'y') {
-    denom = R11 * rdy + R12 * rdz;
-    shift = R11 * CAM_Y + R12 * CAM_Z;
-  } else {
-    denom = R20 * rdx + R21 * rdy + R22 * rdz;
-    shift = R21 * CAM_Y + R22 * CAM_Z;
-  }
-  if (Math.abs(denom) < 1e-4) return Infinity;
-  const dist = (value * OBJ_SCALE - shift) / denom;
-  return dist > 0.02 ? dist : Infinity;
+/** 圆角板,和预览 slab() 同一条。 */
+function mapWorld(wx: number, wy: number, wz: number): number {
+  const px = (R00 * wx + R01 * wy + R02 * wz) / OBJ_SCALE;
+  const py = (R10 * wx + R11 * wy + R12 * wz) / OBJ_SCALE;
+  const pz = (R20 * wx + R21 * wy + R22 * wz) / OBJ_SCALE;
+  const qx = browserShape(px, py) + 0.03;
+  const qy = Math.abs(pz) - 0.12;
+  const outside = Math.hypot(Math.max(qx, 0), Math.max(qy, 0));
+  return (Math.min(Math.max(qx, qy), 0) + outside - 0.03) * OBJ_SCALE;
 }
 
 /** 物体坐标投到画布像素,y 向下。给测试量孔和标题栏用,和射线是同一套相机。 */
@@ -185,10 +173,10 @@ export interface BrowserChromeLayout {
 }
 
 export function browserChromeLayout(w: number, h: number): BrowserChromeLayout {
-  const front = SLAB_Z;
-  const holes = [-0.42, -0.27, -0.12].map((hx) => {
-    const center = projectObject(hx, 0.38, front, w, h);
-    const edge = projectObject(hx + HOLE_R, 0.38, front, w, h);
+  const front = 0.02;
+  const holes = [-0.38, -0.14, 0.1].map((hx) => {
+    const center = projectObject(hx, 0.4, front, w, h);
+    const edge = projectObject(hx + HOLE_R, 0.4, front, w, h);
     return {
       x: center.x,
       y: center.y,
@@ -197,15 +185,15 @@ export function browserChromeLayout(w: number, h: number): BrowserChromeLayout {
   });
   return {
     holes,
-    bar: projectObject(0.28, 0.38, front, w, h),
+    bar: projectObject(0.36, 0.4, front, w, h),
     page: projectObject(0.02, -0.08, 0, w, h),
   };
 }
 
 /**
- * 一个像素的密度。不做逐步光线行进(小卡上太贵),改成打三块朝向相机的面:
- * 正面、顶面、近侧面。正面用轮廓 SDF,孔和内页是空的;顶面和侧面是板的厚度,
- * 亮度比正面稀一档,Bayer 之后能看出是另一块平面。最近的一块赢。
+ * 一个抖动格的连续亮度。射线打进圆角板,用漫反射 + 边缘光收成 0..1,
+ * 和预览着色器同一条式子。打不中可以留下很淡的地面影子。
+ * Bayer 在这之后才决定墨点,所以边是颗粒,不是硬边。
  */
 function browserTone(x: number, y: number, w: number, h: number): number {
   const uvx = (x - w * 0.5) / (h * 0.5);
@@ -218,41 +206,63 @@ function browserTone(x: number, y: number, w: number, h: number): number {
   rdy *= inv;
   rdz *= inv;
 
-  let best = Infinity;
-  let tone = 0;
+  const b = CAM_Y * rdy + CAM_Z * rdz;
+  const c = CAM_Y * CAM_Y + CAM_Z * CAM_Z - 1.7 * 1.7;
+  const disc = b * b - c;
+  if (disc <= 0) return 0;
+  const reach = Math.sqrt(disc);
+  let dist = Math.max(-b - reach, 0);
+  const tmax = -b + reach;
 
-  const frontT = axisPlaneT('z', SLAB_Z, rdx, rdy, rdz);
-  if (frontT < best) {
-    const p = objectAt(rdx, rdy, rdz, frontT);
-    const d = browserShape(p.x, p.y);
-    if (d < 0) {
-      best = frontT;
-      /* 框心铺实,贴边退进抖动带。d>0 是孔和内页,这里不画。 */
-      const edge = clamp01(-d / 0.05);
-      tone = 0.5 + 0.48 * edge;
+  let hit = false;
+  for (let i = 0; i < 28; i++) {
+    const d = mapWorld(rdx * dist, CAM_Y + rdy * dist, CAM_Z + rdz * dist);
+    if (d < 0.004) {
+      hit = true;
+      break;
     }
+    dist += d;
+    if (dist > tmax) break;
   }
 
-  const topT = axisPlaneT('y', 0.5, rdx, rdy, rdz);
-  if (topT < best) {
-    const p = objectAt(rdx, rdy, rdz, topT);
-    if (Math.abs(p.x) < 0.66 && p.z > -SLAB_Z - 0.02 && p.z < SLAB_Z + 0.04 && browserShape(p.x, 0.47) < 0.02) {
-      best = topT;
-      tone = 0.5;
-    }
+  if (!hit) {
+    if (rdy >= 0) return 0;
+    const tg = (-0.78 - CAM_Y) / rdy;
+    if (tg <= 0) return 0;
+    const gx = (rdx * tg) / OBJ_SCALE;
+    const gz = (CAM_Z + rdz * tg) / OBJ_SCALE;
+    const fall = Math.hypot(gx - 0.05, (gz - 0.15) * 1.35);
+    if (fall > 0.95) return 0;
+    const t = fall / 0.95;
+    const sh = 1 - t * t * (3 - 2 * t);
+    return sh * 0.16;
   }
 
-  /* 近侧是 -x:正 yaw 把 -x 转向相机。 */
-  const sideT = axisPlaneT('x', -0.64, rdx, rdy, rdz);
-  if (sideT < best) {
-    const p = objectAt(rdx, rdy, rdz, sideT);
-    if (p.y > -0.46 && p.y < 0.5 && p.z > -SLAB_Z && p.z < SLAB_Z + 0.02 && browserShape(-0.55, p.y) < 0.04) {
-      best = sideT;
-      tone = 0.72;
-    }
-  }
+  const wx = rdx * dist;
+  const wy = CAM_Y + rdy * dist;
+  const wz = CAM_Z + rdz * dist;
+  const e = 0.01;
+  const n1 = mapWorld(wx + e, wy - e, wz - e);
+  const n2 = mapWorld(wx - e, wy - e, wz + e);
+  const n3 = mapWorld(wx - e, wy + e, wz - e);
+  const n4 = mapWorld(wx + e, wy + e, wz + e);
+  let nx = n1 - n2 - n3 + n4;
+  let ny = -n1 - n2 + n3 + n4;
+  let nz = -n1 + n2 - n3 + n4;
+  const nlen = Math.hypot(nx, ny, nz) || 1;
+  nx /= nlen;
+  ny /= nlen;
+  nz /= nlen;
 
-  return tone;
+  const dif = Math.max(nx * LX + ny * LY + nz * LZ, 0);
+  const ndv = Math.max(-(nx * rdx + ny * rdy + nz * rdz), 0);
+  const shade = 1 - ndv;
+  const rim = shade * shade * shade * 0.25;
+  const lit = clamp01(0.18 + 0.82 * dif + rim);
+  /* 预览的亮度在受光处会稀到几乎消失。小卡上把这段压进
+     仍能认得出窗的颗粒带:受光面约一半墨点,背光面接近铺实。 */
+  const raw = 0.12 + 0.82 * (1 - lit);
+  return clamp01(0.34 + 0.58 * raw);
 }
 
 /** `shade()` 只需要拿到那条字节流 —— 传 `ImageData` 或测试里的替身都行。 */
@@ -261,44 +271,47 @@ export interface LiquidPixels {
 }
 
 /**
- * 把一帧画进 ImageData。每个 CSS 像素要么是近黑墨点,要么全透明。
+ * 把一帧画进 ImageData。每个抖动格要么是近黑墨点,要么全透明。
  *
- * 抖动格锁在 1 CSS 像素。`pixel`(旧液体方格,84px 上是 6)如果拿来当墨点,
- * 标题栏上的交通灯孔在小卡里会被一格吃掉。非有限的尺寸直接不画;
- * 有限的 `pixel` 也不再把抖动格放大到那个边长。
+ * 一格 2 CSS 像素,和预览的 `CELL` 一样:亮度在格心采样一次,Bayer 也按格取。
+ * `pixel` 仍是调用约定里的旧方格边长;非有限尺寸不画,有限值也不再把格放大。
  */
 export function shade(img: LiquidPixels, w: number, h: number, t: number, pixel: number): void {
   if (!Number.isFinite(pixel) || !Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
   const data = img.data;
-  /* 1 CSS 像素。`pixel` 是旧液体方格(84px 上为 6);把它当成墨点,孔就没了。 */
-  const cell = 1;
-  /* 矩阵约每秒错 7 次。窗框中心超过 16/17,错位碰不到它;
-     边和内页还在抖动带里,会跟着跳。 */
+  const cell = DITHER_CELL;
+  /* 矩阵约每秒错 7 次。只有落在 1/17..16/17 的亮度会跟着跳。 */
   const shimmer = Math.floor(t * 7);
   const inv17 = 1 / 17;
 
   for (let y = 0; y < h; y += cell) {
-    const qy = (y + shimmer * 3) & 3;
-    const cy = y + 0.5;
+    const qy = ((y / cell) + shimmer * 3) & 3;
+    const cy = y + cell * 0.5;
+    const y1 = Math.min(y + cell, h);
     for (let x = 0; x < w; x += cell) {
-      const tone = browserTone(x + 0.5, cy, w, h);
+      const tone = browserTone(x + cell * 0.5, cy, w, h);
       let on = false;
       if (tone > 16 * inv17) on = true;
       else if (tone >= inv17) {
-        const threshold = (BAYER4[qy * 4 + ((x + shimmer) & 3)]! + 1) * inv17;
+        const threshold = (BAYER4[qy * 4 + (((x / cell) + shimmer) & 3)]! + 1) * inv17;
         on = tone >= threshold;
       }
-      const p = (y * w + x) * 4;
-      if (on) {
-        data[p] = INK_R;
-        data[p + 1] = INK_G;
-        data[p + 2] = INK_B;
-        data[p + 3] = 255;
-      } else {
-        data[p] = 0;
-        data[p + 1] = 0;
-        data[p + 2] = 0;
-        data[p + 3] = 0;
+      const x1 = Math.min(x + cell, w);
+      for (let yy = y; yy < y1; yy++) {
+        let p = (yy * w + x) * 4;
+        for (let xx = x; xx < x1; xx++, p += 4) {
+          if (on) {
+            data[p] = INK_R;
+            data[p + 1] = INK_G;
+            data[p + 2] = INK_B;
+            data[p + 3] = 255;
+          } else {
+            data[p] = 0;
+            data[p + 1] = 0;
+            data[p + 2] = 0;
+            data[p + 3] = 0;
+          }
+        }
       }
     }
   }
