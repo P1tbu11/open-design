@@ -5,8 +5,8 @@
  * 「画得漂不漂亮」在这里量不到。所以这个文件只钉两件事:
  *   ① `shade()` 是确定性的黑白有序抖动 —— 同一个 t 出同一帧、不同 t 出不同帧,
  *      像素只有「近黑墨点」和「全透明」两态,而且两种都有(不是铺一块实心,
- *      也不是绿色液体)。84×112 上窗框比四角密,标题栏的孔比框疏 ——
- *      认得出是一扇浏览器窗。
+ *      也不是绿色液体)。84×112 上窗框比四角密,孔比标题栏疏,
+ *      而且上沿和底沿左右错开 —— 是斜着的窗,不是正对的矩形。
  *   ② 调度器:一条共享 rAF、看不见就停、同时跑的实例有上限、释放后不空转。
  * 颗粒好不好看只能靠真浏览器。起本地 web 后,触发生图未完成的 ImageRow,
  * 或产物卡还在写的 FileOpsSummary,看格子里是不是黑白抖动而不是霓虹绿。
@@ -105,18 +105,22 @@ describe('shade() —— 黑白 4×4 Bayer 抖动', () => {
     expect(varied).toBeGreaterThan(4);
   });
 
-  it('84×112 上是一扇浏览器窗:框比四角密,孔比标题栏疏', () => {
+  it('84×112 上是斜着的浏览器窗:框比角密,孔比标题栏疏,上下边不对齐', () => {
     const w = 84;
     const h = 112;
     const img = surface(w, h);
     shade(img, w, h, 1.2, 6);
     const layout = browserChromeLayout(w, h);
 
-    const density = (x0: number, y0: number, x1: number, y1: number): number => {
+    const disk = (cx: number, cy: number, r: number): number => {
       let n = 0;
       let on = 0;
-      for (let y = Math.max(0, Math.floor(y0)); y < Math.min(h, Math.ceil(y1)); y++) {
-        for (let x = Math.max(0, Math.floor(x0)); x < Math.min(w, Math.ceil(x1)); x++) {
+      for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
+        for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const dx = x + 0.5 - cx;
+          const dy = y + 0.5 - cy;
+          if (dx * dx + dy * dy > r * r) continue;
           n += 1;
           if (img.data[(y * w + x) * 4 + 3]) on += 1;
         }
@@ -124,42 +128,39 @@ describe('shade() —— 黑白 4×4 Bayer 抖动', () => {
       return n === 0 ? 0 : on / n;
     };
 
-    const corner = density(0, 0, 8, 8);
-    const bar = density(
-      layout.left + layout.width * 0.62,
-      layout.top + 2,
-      layout.left + layout.width - layout.frame - 1,
-      layout.top + layout.barHeight - 2,
-    );
-    const page = density(
-      layout.left + layout.frame + 4,
-      layout.top + layout.barHeight + 6,
-      layout.left + layout.width - layout.frame - 4,
-      layout.top + layout.height - layout.frame - 4,
-    );
-
+    const corner = disk(4, 4, 3);
+    const bar = disk(layout.bar.x, layout.bar.y, 2.2);
+    const page = disk(layout.page.x, layout.page.y, 4);
     expect(corner).toBeLessThan(0.2);
-    expect(bar).toBeGreaterThan(0.7);
-    expect(bar).toBeGreaterThan(corner + 0.45);
-    expect(page).toBeLessThan(bar - 0.2);
+    expect(bar).toBeGreaterThan(0.8);
+    expect(bar).toBeGreaterThan(corner + 0.5);
+    expect(page).toBeLessThan(bar - 0.5);
 
     for (const hole of layout.holes) {
-      const r = hole.r * 0.6;
-      let n = 0;
-      let on = 0;
-      for (let y = Math.floor(hole.y - r); y <= Math.ceil(hole.y + r); y++) {
-        for (let x = Math.floor(hole.x - r); x <= Math.ceil(hole.x + r); x++) {
-          const dx = x + 0.5 - hole.x;
-          const dy = y + 0.5 - hole.y;
-          if (dx * dx + dy * dy > r * r) continue;
-          n += 1;
-          if (img.data[(y * w + x) * 4 + 3]) on += 1;
-        }
-      }
-      expect(n).toBeGreaterThan(3);
-      expect(on / n).toBeLessThan(0.25);
-      expect(bar).toBeGreaterThan(on / n + 0.45);
+      const holeDensity = disk(hole.x, hole.y, Math.max(1.2, hole.r * 0.45));
+      expect(holeDensity).toBeLessThan(0.45);
+      expect(bar).toBeGreaterThan(holeDensity + 0.4);
     }
+
+    /* 透视:窗的上沿和底沿不是同一条竖边。正面矩形做不到这个差。 */
+    const rows: { left: number; width: number }[] = [];
+    for (let y = 0; y < h; y++) {
+      let left = -1;
+      let right = -1;
+      let count = 0;
+      for (let x = 0; x < w; x++) {
+        if (!img.data[(y * w + x) * 4 + 3]) continue;
+        if (left < 0) left = x;
+        right = x;
+        count += 1;
+      }
+      if (count >= 8) rows.push({ left, width: right - left });
+    }
+    expect(rows.length).toBeGreaterThan(20);
+    const top = rows[Math.floor(rows.length * 0.15)]!;
+    const bot = rows[Math.floor(rows.length * 0.85)]!;
+    expect(Math.abs(top.left - bot.left)).toBeGreaterThan(6);
+    expect(bot.width - top.width).toBeGreaterThan(8);
   });
 });
 

@@ -10,9 +10,10 @@
  *   · 4×4 Bayer,17 级有序抖动(Paper Shaders / Codrops 那条矩阵)。
  *     低于 1/17 保持全空,高于 16/17 保持铺实,中间才进矩阵,平区不会发灰。
  *   · 矩阵按时间错一格(shimmer),边和内页的颗粒在跳,窗体本身不跟着漂。
- *   · 密度场是一扇浏览器窗:圆角外框、顶上的标题栏、标题栏里三颗打穿的
- *     交通灯孔。小卡(84×112)上也要认得出这是一扇窗,所以笔画按像素锁,
- *     不走 3D 形变。四角比窗框稀,孔比标题栏稀。
+ *   · 密度场是一扇浏览器窗,而且是斜着看的:和 mind 预览同一套
+ *     圆角板 SDF,绕 yaw / pitch 转过再透视投影。看得到顶面和侧面的厚度,
+ *     标题栏上三颗孔是打穿的,内页是透的。小卡上孔仍要认得出来,
+ *     所以孔比预览里略大,相机角度固定,不跟着时间转。
  *
  * 画布按【CSS 像素】开,不乘 dpr。Bayer 取的是画布坐标;乘了 dpr,2× 屏上
  * 一格抖动只有半个 CSS 像素,再被放大就糊成灰。按 CSS 像素画,
@@ -71,122 +72,187 @@ const INK_B = 13;
 export const FPS = 30;
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
-const fract = (v: number): number => v - Math.floor(v);
-
-/** 与上游 hash 同一条式子。密度场和闪点表都用它,帧与帧之间才是确定的。 */
-const hash = (x: number, y: number): number => fract(Math.sin(x * 127.1 + y * 311.7) * 43758.5453);
-
-function noise(x: number, y: number): number {
-  const ix = Math.floor(x);
-  const iy = Math.floor(y);
-  const fx = x - ix;
-  const fy = y - iy;
-  const ux = fx * fx * (3 - 2 * fx);
-  const uy = fy * fy * (3 - 2 * fy);
-  const a = hash(ix, iy);
-  const b = hash(ix + 1, iy);
-  const c = hash(ix, iy + 1);
-  const d = hash(ix + 1, iy + 1);
-  return (a + (b - a) * ux) + ((c + (d - c) * ux) - (a + (b - a) * ux)) * uy;
-}
-
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = clamp01((x - edge0) / (edge1 - edge0));
-  return t * t * (3 - 2 * t);
-}
-
-/** 圆角矩形 SDF。`hx` / `hy` 是半宽半高,原点在矩形中心。 */
-function sdRoundBox(px: number, py: number, hx: number, hy: number, radius: number): number {
-  const r = Math.min(Math.max(radius, 0), hx, hy);
-  const qx = Math.abs(px) - (hx - r);
-  const qy = Math.abs(py) - (hy - r);
-  return Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - r;
-}
 
 /**
- * 浏览器窗在这一格里的几何,单位是 CSS 像素,y 向下。
- * 跟 `shade()` 用的是同一套数,测试靠它量「框比角密、孔比标题栏疏」。
- * 位置不随时间变 —— 窗要站得住,动的只是抖动和内页里的扫光。
+ * 相机。mind 预览里 yaw ≈ 0.55、pitch ≈ 0.42,物体在 z=0、相机在 z=3.3。
+ * 这里角度取同一侧(右侧和顶面露出厚度),物体略放大,好让 84px 的孔还在。
+ * 角度不跟时间走:小卡里窗要站得住。
  */
-export interface BrowserChromeLayout {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  /** 标题栏高度,从 `top` 往下 */
-  barHeight: number;
-  /** 左右和底边的框宽 */
-  frame: number;
-  /** 标题栏左侧三颗交通灯孔,圆心 + 半径 */
-  holes: ReadonlyArray<{ x: number; y: number; r: number }>;
+const YAW = 0.46;
+const PITCH = 0.34;
+const CAM_Y = 0.02;
+const CAM_Z = 2.85;
+const OBJ_SCALE = 1.28;
+const HOLE_R = 0.064;
+/** 板的半厚。太大时近侧面会盖住内页。 */
+const SLAB_Z = 0.08;
+
+const COS_YAW = Math.cos(YAW);
+const SIN_YAW = Math.sin(YAW);
+const COS_PITCH = Math.cos(PITCH);
+const SIN_PITCH = Math.sin(PITCH);
+/** R = RY * RX,和预览着色器同一套。 */
+const R00 = COS_YAW;
+const R01 = SIN_YAW * SIN_PITCH;
+const R02 = SIN_YAW * COS_PITCH;
+const R10 = 0;
+const R11 = COS_PITCH;
+const R12 = -SIN_PITCH;
+const R20 = -SIN_YAW;
+const R21 = COS_YAW * SIN_PITCH;
+const R22 = COS_YAW * COS_PITCH;
+
+function sdBox(px: number, py: number, bx: number, by: number): number {
+  const dx = Math.abs(px) - bx;
+  const dy = Math.abs(py) - by;
+  return Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0);
 }
 
-export function browserChromeLayout(w: number, h: number): BrowserChromeLayout {
-  const winW = Math.min(w * 0.88, h * 0.78);
-  const winH = Math.min(winW * 0.82, h * 0.86);
-  const left = (w - winW) / 2;
-  const top = (h - winH) / 2;
-  const frame = Math.max(4, winW * 0.085);
-  const barHeight = Math.max(frame * 2.15, winH * 0.26);
-  const holeR = Math.max(2.6, barHeight * 0.2);
-  const gap = holeR * 2.45;
-  const holeX0 = left + frame + holeR * 0.35;
-  const holeY = top + barHeight * 0.5;
+function sdRoundBox(px: number, py: number, bx: number, by: number, radius: number): number {
+  return sdBox(px, py, bx - radius, by - radius) - radius;
+}
+
+/** 预览里的浏览器轮廓。y 向上。孔比预览的 0.028 大,否则 84px 上只剩一个点。 */
+function browserShape(px: number, py: number): number {
+  let d = sdRoundBox(px, py - 0.02, 0.64, 0.48, 0.05);
+  d = Math.max(d, -sdRoundBox(px, py + 0.04, 0.5, 0.3, 0.03));
+  const chrome = sdRoundBox(px, py - 0.38, 0.64, 0.15, 0.05);
+  d = Math.min(d, chrome);
+  d = Math.max(d, -(Math.hypot(px + 0.42, py - 0.38) - HOLE_R));
+  d = Math.max(d, -(Math.hypot(px + 0.27, py - 0.38) - HOLE_R));
+  d = Math.max(d, -(Math.hypot(px + 0.12, py - 0.38) - HOLE_R));
+  return d;
+}
+
+function objectAt(rdx: number, rdy: number, rdz: number, dist: number): { x: number; y: number; z: number } {
+  const wx = rdx * dist;
+  const wy = CAM_Y + rdy * dist;
+  const wz = CAM_Z + rdz * dist;
   return {
-    left,
-    top,
-    width: winW,
-    height: winH,
-    barHeight,
-    frame,
-    holes: [0, 1, 2].map((i) => ({ x: holeX0 + i * gap, y: holeY, r: holeR })),
+    x: (R00 * wx + R01 * wy + R02 * wz) / OBJ_SCALE,
+    y: (R10 * wx + R11 * wy + R12 * wz) / OBJ_SCALE,
+    z: (R20 * wx + R21 * wy + R22 * wz) / OBJ_SCALE,
+  };
+}
+
+/** 物体坐标轴 = 常数 的平面,返回射线参数。分母太小就是擦着走,丢掉。 */
+function axisPlaneT(axis: 'x' | 'y' | 'z', value: number, rdx: number, rdy: number, rdz: number): number {
+  let denom = 0;
+  let shift = 0;
+  if (axis === 'x') {
+    denom = R00 * rdx + R01 * rdy + R02 * rdz;
+    shift = R01 * CAM_Y + R02 * CAM_Z;
+  } else if (axis === 'y') {
+    denom = R11 * rdy + R12 * rdz;
+    shift = R11 * CAM_Y + R12 * CAM_Z;
+  } else {
+    denom = R20 * rdx + R21 * rdy + R22 * rdz;
+    shift = R21 * CAM_Y + R22 * CAM_Z;
+  }
+  if (Math.abs(denom) < 1e-4) return Infinity;
+  const dist = (value * OBJ_SCALE - shift) / denom;
+  return dist > 0.02 ? dist : Infinity;
+}
+
+/** 物体坐标投到画布像素,y 向下。给测试量孔和标题栏用,和射线是同一套相机。 */
+function projectObject(px: number, py: number, pz: number, w: number, h: number): { x: number; y: number } {
+  const ox = px * OBJ_SCALE;
+  const oy = py * OBJ_SCALE;
+  const oz = pz * OBJ_SCALE;
+  const wx = R00 * ox + R10 * oy + R20 * oz;
+  const wy = R01 * ox + R11 * oy + R21 * oz;
+  const wz = R02 * ox + R12 * oy + R22 * oz;
+  const denom = (wz - CAM_Z) / -2.6;
+  if (denom <= 1e-4) return { x: -1, y: -1 };
+  const uvx = (wx / denom) / 0.92;
+  const uvy = ((wy - CAM_Y) / denom) / 0.92;
+  return {
+    x: uvx * (h * 0.5) + w * 0.5,
+    y: h * 0.5 - uvy * (h * 0.5),
   };
 }
 
 /**
- * 一个采样点的密度。窗框和标题栏靠近 1(Bayer 后接近铺实,轮廓才站得住),
- * 边缘退进抖动带,内页只有一层淡扫光,孔和四角是 0。
+ * 透视之后的采样点。孔心在板的正面附近,标题栏取样躲开三颗孔,
+ * 内页取样在挖空的那一块中间。
  */
-function browserTone(x: number, y: number, w: number, h: number, t: number): number {
-  const layout = browserChromeLayout(w, h);
-  const cx = layout.left + layout.width / 2;
-  const cy = layout.top + layout.height / 2;
-  const radius = Math.max(5, layout.width * 0.1);
-  const outer = sdRoundBox(x - cx, y - cy, layout.width / 2, layout.height / 2, radius);
+export interface BrowserChromeLayout {
+  holes: ReadonlyArray<{ x: number; y: number; r: number }>;
+  /** 标题栏右侧,应该是实的框 */
+  bar: { x: number; y: number };
+  /** 内页开口的中间,应该比框疏 */
+  page: { x: number; y: number };
+}
 
-  const pageTop = layout.top + layout.barHeight;
-  const pageH = Math.max(2, layout.height - layout.barHeight - layout.frame);
-  const pageCy = pageTop + pageH / 2;
-  const page = sdRoundBox(
-    x - cx,
-    y - pageCy,
-    Math.max(1, layout.width / 2 - layout.frame),
-    pageH / 2,
-    Math.max(2, radius - layout.frame),
-  );
+export function browserChromeLayout(w: number, h: number): BrowserChromeLayout {
+  const front = SLAB_Z;
+  const holes = [-0.42, -0.27, -0.12].map((hx) => {
+    const center = projectObject(hx, 0.38, front, w, h);
+    const edge = projectObject(hx + HOLE_R, 0.38, front, w, h);
+    return {
+      x: center.x,
+      y: center.y,
+      r: Math.max(1.5, Math.hypot(edge.x - center.x, edge.y - center.y)),
+    };
+  });
+  return {
+    holes,
+    bar: projectObject(0.28, 0.38, front, w, h),
+    page: projectObject(0.02, -0.08, 0, w, h),
+  };
+}
 
-  let hole = 1e3;
-  for (const dot of layout.holes) hole = Math.min(hole, Math.hypot(x - dot.x, y - dot.y) - dot.r);
+/**
+ * 一个像素的密度。不做逐步光线行进(小卡上太贵),改成打三块朝向相机的面:
+ * 正面、顶面、近侧面。正面用轮廓 SDF,孔和内页是空的;顶面和侧面是板的厚度,
+ * 亮度比正面稀一档,Bayer 之后能看出是另一块平面。最近的一块赢。
+ */
+function browserTone(x: number, y: number, w: number, h: number): number {
+  const uvx = (x - w * 0.5) / (h * 0.5);
+  const uvy = (h * 0.5 - y) / (h * 0.5);
+  let rdx = uvx * 0.92;
+  let rdy = uvy * 0.92;
+  let rdz = -2.6;
+  const inv = 1 / Math.hypot(rdx, rdy, rdz);
+  rdx *= inv;
+  rdy *= inv;
+  rdz *= inv;
 
-  if (hole < 0) return 0;
-  if (outer > 0) {
-    /* 窗外只留一圈窄的抖动边,角上是空的。 */
-    if (outer > 3) return 0;
-    return (1 - smoothstep(0, 3, outer)) * 0.5;
+  let best = Infinity;
+  let tone = 0;
+
+  const frontT = axisPlaneT('z', SLAB_Z, rdx, rdy, rdz);
+  if (frontT < best) {
+    const p = objectAt(rdx, rdy, rdz, frontT);
+    const d = browserShape(p.x, p.y);
+    if (d < 0) {
+      best = frontT;
+      /* 框心铺实,贴边退进抖动带。d>0 是孔和内页,这里不画。 */
+      const edge = clamp01(-d / 0.05);
+      tone = 0.5 + 0.48 * edge;
+    }
   }
-  if (page < 0) {
-    const scan = (y - pageTop) / pageH;
-    const sweep = fract(t * 0.22);
-    const delta = (scan - sweep) * 5;
-    const band = Math.exp(-(delta * delta)) * 0.4;
-    const n = noise(x * 0.08 + t * 0.15, y * 0.08 - t * 0.05);
-    return clamp01(0.04 + n * 0.08 + band);
+
+  const topT = axisPlaneT('y', 0.5, rdx, rdy, rdz);
+  if (topT < best) {
+    const p = objectAt(rdx, rdy, rdz, topT);
+    if (Math.abs(p.x) < 0.66 && p.z > -SLAB_Z - 0.02 && p.z < SLAB_Z + 0.04 && browserShape(p.x, 0.47) < 0.02) {
+      best = topT;
+      tone = 0.5;
+    }
   }
 
-  /* 框和标题栏。离边 2.5px 以内进抖动带,再往里就超过 16/17,铺成近黑。 */
-  const inset = Math.min(-outer, hole);
-  const body = y < layout.top + layout.barHeight ? 0.99 : 0.96;
-  return clamp01(body - (1 - smoothstep(0, 2.5, inset)) * 0.42);
+  /* 近侧是 -x:正 yaw 把 -x 转向相机。 */
+  const sideT = axisPlaneT('x', -0.64, rdx, rdy, rdz);
+  if (sideT < best) {
+    const p = objectAt(rdx, rdy, rdz, sideT);
+    if (p.y > -0.46 && p.y < 0.5 && p.z > -SLAB_Z && p.z < SLAB_Z + 0.02 && browserShape(-0.55, p.y) < 0.04) {
+      best = sideT;
+      tone = 0.72;
+    }
+  }
+
+  return tone;
 }
 
 /** `shade()` 只需要拿到那条字节流 —— 传 `ImageData` 或测试里的替身都行。 */
@@ -215,7 +281,7 @@ export function shade(img: LiquidPixels, w: number, h: number, t: number, pixel:
     const qy = (y + shimmer * 3) & 3;
     const cy = y + 0.5;
     for (let x = 0; x < w; x += cell) {
-      const tone = browserTone(x + 0.5, cy, w, h, t);
+      const tone = browserTone(x + 0.5, cy, w, h);
       let on = false;
       if (tone > 16 * inv17) on = true;
       else if (tone >= inv17) {
