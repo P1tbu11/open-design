@@ -9,10 +9,10 @@
  *   · 墨色近黑、关掉的像素全透明(底下的 `--chat-bg-subtle` 透上来)。
  *   · 4×4 Bayer,17 级有序抖动(Paper Shaders / Codrops 那条矩阵)。
  *     低于 1/17 保持全空,高于 16/17 保持铺实,中间才进矩阵,平区不会发灰。
- *   · 矩阵按时间错一格(shimmer),颗粒自己在跳。
- *   · 密度场是慢慢旋转的点云:几团漂移的核,加上稀疏的闪点。
- *     小卡里不画 3D SDF 形变 —— 格子只有几十像素,形读不出来,
- *     要的是抖动颗粒、闪烁和点的漂移。
+ *   · 矩阵按时间错一格(shimmer),边和内页的颗粒在跳,窗体本身不跟着漂。
+ *   · 密度场是一扇浏览器窗:圆角外框、顶上的标题栏、标题栏里三颗打穿的
+ *     交通灯孔。小卡(84×112)上也要认得出这是一扇窗,所以笔画按像素锁,
+ *     不走 3D 形变。四角比窗框稀,孔比标题栏稀。
  *
  * 画布按【CSS 像素】开,不乘 dpr。Bayer 取的是画布坐标;乘了 dpr,2× 屏上
  * 一格抖动只有半个 CSS 像素,再被放大就糊成灰。按 CSS 像素画,
@@ -95,62 +95,98 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/**
- * 闪点表。参考实现是每像素 `hash(cell + floor(time))`;这里烤成 64×64,
- * 每拍只挪读指针。白噪声挪过之后还是白噪声,但省掉逐像素的 sin。
- */
-const SPECK_N = 64;
-const SPECK = (() => {
-  const g = new Float32Array(SPECK_N * SPECK_N);
-  for (let i = 0; i < g.length; i++) g[i] = hash(i % SPECK_N, Math.floor(i / SPECK_N));
-  return g;
-})();
+/** 圆角矩形 SDF。`hx` / `hy` 是半宽半高,原点在矩形中心。 */
+function sdRoundBox(px: number, py: number, hx: number, hy: number, radius: number): number {
+  const r = Math.min(Math.max(radius, 0), hx, hy);
+  const qx = Math.abs(px) - (hx - r);
+  const qy = Math.abs(py) - (hy - r);
+  return Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - r;
+}
 
 /**
- * 一块采样点上的密度。
- *
- * 坐标先收成以格子中心为原点、按高归一的平面,这样竖的生图格和横的产物卡
- * 看到的是同一团圆云,而不是被拉成一条。云本身慢慢转;几团核在里面公转,
- * 是点状漂移的来源。噪声取平方,把能量压成一团团,而不是铺一层均匀的雾。
- * `fall` 是软圆边,角上留空,抖动才不会顶着方框变成一块矩形。
+ * 浏览器窗在这一格里的几何,单位是 CSS 像素,y 向下。
+ * 跟 `shade()` 用的是同一套数,测试靠它量「框比角密、孔比标题栏疏」。
+ * 位置不随时间变 —— 窗要站得住,动的只是抖动和内页里的扫光。
  */
-function sampleField(ux: number, uy: number, t: number, aspect: number): { lum: number; wide: number } {
-  const nx = (ux - 0.5) * 2 * aspect;
-  const ny = (uy - 0.5) * 2;
-  const rad = Math.hypot(nx, ny);
-  const ang = Math.atan2(ny, nx);
-  const sedge = 0.92 + 0.1 * Math.sin(ang * 3 + t * 0.55) + 0.06 * Math.sin(ang * 5 - t * 0.8);
-  /* 软圆边。中心留在抖动带里,不要顶满 1 —— 顶满会被 16/17 那条规则铺成实心黑。 */
-  const fall = 1 - smoothstep(sedge - 0.55, sedge + 0.18, rad);
-  const wide = 1 - smoothstep(1.05, 1.45, rad);
+export interface BrowserChromeLayout {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  /** 标题栏高度,从 `top` 往下 */
+  barHeight: number;
+  /** 左右和底边的框宽 */
+  frame: number;
+  /** 标题栏左侧三颗交通灯孔,圆心 + 半径 */
+  holes: ReadonlyArray<{ x: number; y: number; r: number }>;
+}
 
-  const swirl = t * 0.22;
-  const cs = Math.cos(swirl);
-  const sn = Math.sin(swirl);
-  const sx = nx * cs - ny * sn;
-  const sy = nx * sn + ny * cs;
-  const n1 = noise(sx * 1.6 + 1.3, sy * 1.6 - t * 0.05);
-  const n2 = noise(sx * 3.2 + t * 0.08, sy * 3.2 + 0.7);
-  /* 增益停在 16/17 以下。再高,核心会被那条「铺实」规则吃成一块实心黑,
-     抖动颗粒就没了。两团核叠在一起也仍然落在抖动带里。 */
-  let lum = fall * (0.015 + 0.16 * n1 * n1 + 0.08 * n2 * n2);
+export function browserChromeLayout(w: number, h: number): BrowserChromeLayout {
+  const winW = Math.min(w * 0.88, h * 0.78);
+  const winH = Math.min(winW * 0.82, h * 0.86);
+  const left = (w - winW) / 2;
+  const top = (h - winH) / 2;
+  const frame = Math.max(4, winW * 0.085);
+  const barHeight = Math.max(frame * 2.15, winH * 0.26);
+  const holeR = Math.max(2.6, barHeight * 0.2);
+  const gap = holeR * 2.45;
+  const holeX0 = left + frame + holeR * 0.35;
+  const holeY = top + barHeight * 0.5;
+  return {
+    left,
+    top,
+    width: winW,
+    height: winH,
+    barHeight,
+    frame,
+    holes: [0, 1, 2].map((i) => ({ x: holeX0 + i * gap, y: holeY, r: holeR })),
+  };
+}
 
-  for (let i = 0; i < 7; i++) {
-    const a = t * (0.55 + i * 0.09) + i * 0.9;
-    const orbit = 0.12 + 0.32 * (0.5 + 0.5 * Math.sin(t * 0.23 + i));
-    const px = Math.cos(a) * orbit;
-    const py = Math.sin(a * 0.77) * orbit * 0.85;
-    const dx = nx - px;
-    const dy = ny - py;
-    lum += Math.exp(-(dx * dx + dy * dy) * 36) * 0.34 * fall;
+/**
+ * 一个采样点的密度。窗框和标题栏靠近 1(Bayer 后接近铺实,轮廓才站得住),
+ * 边缘退进抖动带,内页只有一层淡扫光,孔和四角是 0。
+ */
+function browserTone(x: number, y: number, w: number, h: number, t: number): number {
+  const layout = browserChromeLayout(w, h);
+  const cx = layout.left + layout.width / 2;
+  const cy = layout.top + layout.height / 2;
+  const radius = Math.max(5, layout.width * 0.1);
+  const outer = sdRoundBox(x - cx, y - cy, layout.width / 2, layout.height / 2, radius);
+
+  const pageTop = layout.top + layout.barHeight;
+  const pageH = Math.max(2, layout.height - layout.barHeight - layout.frame);
+  const pageCy = pageTop + pageH / 2;
+  const page = sdRoundBox(
+    x - cx,
+    y - pageCy,
+    Math.max(1, layout.width / 2 - layout.frame),
+    pageH / 2,
+    Math.max(2, radius - layout.frame),
+  );
+
+  let hole = 1e3;
+  for (const dot of layout.holes) hole = Math.min(hole, Math.hypot(x - dot.x, y - dot.y) - dot.r);
+
+  if (hole < 0) return 0;
+  if (outer > 0) {
+    /* 窗外只留一圈窄的抖动边,角上是空的。 */
+    if (outer > 3) return 0;
+    return (1 - smoothstep(0, 3, outer)) * 0.5;
+  }
+  if (page < 0) {
+    const scan = (y - pageTop) / pageH;
+    const sweep = fract(t * 0.22);
+    const delta = (scan - sweep) * 5;
+    const band = Math.exp(-(delta * delta)) * 0.4;
+    const n = noise(x * 0.08 + t * 0.15, y * 0.08 - t * 0.05);
+    return clamp01(0.04 + n * 0.08 + band);
   }
 
-  /*
-   * 叠加上限停在 0.58。4×4 矩阵里有几格阈值高于这数(10、12、14、15),
-   * 所以最密的核心仍然是颗粒,不是一整行实心黑。再往上,某一整行 Bayer
-   * 会同时通过,小卡里就糊成墨块。
-   */
-  return { lum: Math.min(lum, 0.58), wide };
+  /* 框和标题栏。离边 2.5px 以内进抖动带,再往里就超过 16/17,铺成近黑。 */
+  const inset = Math.min(-outer, hole);
+  const body = y < layout.top + layout.barHeight ? 0.99 : 0.96;
+  return clamp01(body - (1 - smoothstep(0, 2.5, inset)) * 0.42);
 }
 
 /** `shade()` 只需要拿到那条字节流 —— 传 `ImageData` 或测试里的替身都行。 */
@@ -159,62 +195,44 @@ export interface LiquidPixels {
 }
 
 /**
- * 把一帧画进 ImageData。每个抖动格要么是近黑墨点,要么全透明。
+ * 把一帧画进 ImageData。每个 CSS 像素要么是近黑墨点,要么全透明。
  *
- * 抖动格固定 2 CSS 像素(和参考预览的 `CELL` 一样),并且不超过调用方传入的
- * `pixel`。密度场如果仍按 `pixelSizeFor` 的步长取 —— 宽卡上会到 16px ——
- * 圆云会被切成实心十字。墨点大小不跟卡片变,变的是格子里能放下多少点。
+ * 抖动格锁在 1 CSS 像素。`pixel`(旧液体方格,84px 上是 6)如果拿来当墨点,
+ * 标题栏上的交通灯孔在小卡里会被一格吃掉。非有限的尺寸直接不画;
+ * 有限的 `pixel` 也不再把抖动格放大到那个边长。
  */
 export function shade(img: LiquidPixels, w: number, h: number, t: number, pixel: number): void {
+  if (!Number.isFinite(pixel) || !Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
   const data = img.data;
-  const cell = Math.max(1, Math.min(2, pixel > 0 ? pixel : 2));
-  const cols = Math.max(1, Math.ceil(w / cell));
-  const rows = Math.max(1, Math.ceil(h / cell));
-  const aspect = w / Math.max(h, 1);
-  /* 矩阵约每秒错 7 次;闪点表约每秒挪 5 次。两者都量化到整数拍,
-     颗粒是「跳」,不是每一帧都重抽一张噪声。 */
+  /* 1 CSS 像素。`pixel` 是旧液体方格(84px 上为 6);把它当成墨点,孔就没了。 */
+  const cell = 1;
+  /* 矩阵约每秒错 7 次。窗框中心超过 16/17,错位碰不到它;
+     边和内页还在抖动带里,会跟着跳。 */
   const shimmer = Math.floor(t * 7);
-  const flick = Math.floor(t * 5);
   const inv17 = 1 / 17;
 
-  for (let by = 0; by < rows; by++) {
-    const uy = (by + 0.5) / rows;
-    const qy = (by + shimmer * 3) & 3;
-    for (let bx = 0; bx < cols; bx++) {
-      const ux = (bx + 0.5) / cols;
-      const field = sampleField(ux, uy, t, aspect);
-      let tone = field.lum;
-      const speck = SPECK[((by + flick * 3) & (SPECK_N - 1)) * SPECK_N + ((bx + flick) & (SPECK_N - 1))]!;
-      /* 参考实现里空区的能量闪点。抬到抖动带上沿,矩阵一错位它们就闪。 */
-      if (speck > 0.992) tone = Math.max(tone, 0.78 * field.wide);
-      tone = clamp01(tone);
-
+  for (let y = 0; y < h; y += cell) {
+    const qy = (y + shimmer * 3) & 3;
+    const cy = y + 0.5;
+    for (let x = 0; x < w; x += cell) {
+      const tone = browserTone(x + 0.5, cy, w, h, t);
       let on = false;
       if (tone > 16 * inv17) on = true;
       else if (tone >= inv17) {
-        const threshold = (BAYER4[qy * 4 + ((bx + shimmer) & 3)]! + 1) * inv17;
+        const threshold = (BAYER4[qy * 4 + ((x + shimmer) & 3)]! + 1) * inv17;
         on = tone >= threshold;
       }
-
-      const x0 = bx * cell;
-      const x1 = Math.min(x0 + cell, w);
-      const y0 = by * cell;
-      const y1 = Math.min(y0 + cell, h);
-      for (let y = y0; y < y1; y++) {
-        let p = (y * w + x0) * 4;
-        for (let x = x0; x < x1; x++, p += 4) {
-          if (on) {
-            data[p] = INK_R;
-            data[p + 1] = INK_G;
-            data[p + 2] = INK_B;
-            data[p + 3] = 255;
-          } else {
-            data[p] = 0;
-            data[p + 1] = 0;
-            data[p + 2] = 0;
-            data[p + 3] = 0;
-          }
-        }
+      const p = (y * w + x) * 4;
+      if (on) {
+        data[p] = INK_R;
+        data[p + 1] = INK_G;
+        data[p + 2] = INK_B;
+        data[p + 3] = 255;
+      } else {
+        data[p] = 0;
+        data[p + 1] = 0;
+        data[p + 2] = 0;
+        data[p + 3] = 0;
       }
     }
   }

@@ -5,7 +5,8 @@
  * 「画得漂不漂亮」在这里量不到。所以这个文件只钉两件事:
  *   ① `shade()` 是确定性的黑白有序抖动 —— 同一个 t 出同一帧、不同 t 出不同帧,
  *      像素只有「近黑墨点」和「全透明」两态,而且两种都有(不是铺一块实心,
- *      也不是绿色液体)。
+ *      也不是绿色液体)。84×112 上窗框比四角密,标题栏的孔比框疏 ——
+ *      认得出是一扇浏览器窗。
  *   ② 调度器:一条共享 rAF、看不见就停、同时跑的实例有上限、释放后不空转。
  * 颗粒好不好看只能靠真浏览器。起本地 web 后,触发生图未完成的 ImageRow,
  * 或产物卡还在写的 FileOpsSummary,看格子里是不是黑白抖动而不是霓虹绿。
@@ -15,6 +16,7 @@ import {
   DESIGN_CELL_PX,
   DESIGN_PIXEL,
   TARGET_COLS,
+  browserChromeLayout,
   pixelSizeFor,
   shade,
 } from '../../src/runtime/pixel-liquid';
@@ -101,6 +103,63 @@ describe('shade() —— 黑白 4×4 Bayer 抖动', () => {
       if (img.data[p] !== img.data[p + 4]) varied += 1;
     }
     expect(varied).toBeGreaterThan(4);
+  });
+
+  it('84×112 上是一扇浏览器窗:框比四角密,孔比标题栏疏', () => {
+    const w = 84;
+    const h = 112;
+    const img = surface(w, h);
+    shade(img, w, h, 1.2, 6);
+    const layout = browserChromeLayout(w, h);
+
+    const density = (x0: number, y0: number, x1: number, y1: number): number => {
+      let n = 0;
+      let on = 0;
+      for (let y = Math.max(0, Math.floor(y0)); y < Math.min(h, Math.ceil(y1)); y++) {
+        for (let x = Math.max(0, Math.floor(x0)); x < Math.min(w, Math.ceil(x1)); x++) {
+          n += 1;
+          if (img.data[(y * w + x) * 4 + 3]) on += 1;
+        }
+      }
+      return n === 0 ? 0 : on / n;
+    };
+
+    const corner = density(0, 0, 8, 8);
+    const bar = density(
+      layout.left + layout.width * 0.62,
+      layout.top + 2,
+      layout.left + layout.width - layout.frame - 1,
+      layout.top + layout.barHeight - 2,
+    );
+    const page = density(
+      layout.left + layout.frame + 4,
+      layout.top + layout.barHeight + 6,
+      layout.left + layout.width - layout.frame - 4,
+      layout.top + layout.height - layout.frame - 4,
+    );
+
+    expect(corner).toBeLessThan(0.2);
+    expect(bar).toBeGreaterThan(0.7);
+    expect(bar).toBeGreaterThan(corner + 0.45);
+    expect(page).toBeLessThan(bar - 0.2);
+
+    for (const hole of layout.holes) {
+      const r = hole.r * 0.6;
+      let n = 0;
+      let on = 0;
+      for (let y = Math.floor(hole.y - r); y <= Math.ceil(hole.y + r); y++) {
+        for (let x = Math.floor(hole.x - r); x <= Math.ceil(hole.x + r); x++) {
+          const dx = x + 0.5 - hole.x;
+          const dy = y + 0.5 - hole.y;
+          if (dx * dx + dy * dy > r * r) continue;
+          n += 1;
+          if (img.data[(y * w + x) * 4 + 3]) on += 1;
+        }
+      }
+      expect(n).toBeGreaterThan(3);
+      expect(on / n).toBeLessThan(0.25);
+      expect(bar).toBeGreaterThan(on / n + 0.45);
+    }
   });
 });
 
