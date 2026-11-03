@@ -1,166 +1,157 @@
 /**
- * 像素液体 —— 「还没出来的那一格里流动的东西」。
+ * 待生成格子里的黑白 Bayer 抖动场。
  * ------------------------------------------------------------
- * 取自 21st.dev 的 pixel-liquid-bg(@unlumen),经交付稿
- * `docs/design/chat-matrix/matrix-82.html`(pixel-liquid.js)移植过来。
- * 下面这段搬法与取舍是设计稿原文,一并抄进来 —— 它解释了每个常量为什么是这个数,
- * 少了它下一个人只会看到一堆魔法数字。
+ * 这一格从前是绿色像素液体:调色板 `#EAFFEB → #00FF04`,速度场用 curl noise
+ * 顶替上游 Navier-Stokes,再按 color_frag 做软 alpha。观感是一整片霓虹绿。
  *
- * 上游是 three.js 上的一整套 Navier-Stokes:advect → 外力 → divergence →
- * Poisson 迭代 → 投影,速度场留在一串 render target 里滚动,最后一支
- * color_frag 把它像素化、抖动、上色。
+ * 现在改成 visual-agent-chat / Bayer mind 那套平面抖动,仍走 Canvas2D,
+ * 不给每一格开 WebGL:
+ *   · 墨色近黑、关掉的像素全透明(底下的 `--chat-bg-subtle` 透上来)。
+ *   · 4×4 Bayer,17 级有序抖动(Paper Shaders / Codrops 那条矩阵)。
+ *     低于 1/17 保持全空,高于 16/17 保持铺实,中间才进矩阵,平区不会发灰。
+ *   · 矩阵按时间错一格(shimmer),颗粒自己在跳。
+ *   · 密度场是慢慢旋转的点云:几团漂移的核,加上稀疏的闪点。
+ *     小卡里不画 3D SDF 形变 —— 格子只有几十像素,形读不出来,
+ *     要的是抖动颗粒、闪烁和点的漂移。
  *
- * 这里搬的是【最后那一支】,前面那一套没搬,三个理由:
- *   ① 它要 three.js(约 600KB)。
- *   ② 一个实例 = 一个 WebGL context + 八张 render target。生图格是四格一排,
- *      而浏览器同时活着的 context 上限是 8~16,开不起。
- *   ③ 格子只有 84px 宽。解算网格会比 128×128 还小,解出来的涡量落到 14 列
- *      像素里根本读不出「流体」的意思 —— 那一套的精度在这个尺寸上是浪费的。
- *
- * 所以速度场换成【curl noise】:对一个随时间漂移的标量势 ψ 取旋度,
- *   v = (∂ψ/∂y, -∂ψ/∂x)
- * 这样得到的场天然无散度 —— 而无散度正是上游那一串 Poisson 迭代最后要保证的
- * 性质。省掉的是「把一个乱场解成无散度场」的过程,不是这个性质本身,所以看上去
- * 仍然是液体在推,不是噪声在闪。
- *
- * color_frag 里那几行(像素化、4×4 Bayer 抖动、噪声、调色板、颗粒、alpha)
- * 一字未改地翻成了 JS,见 `shade()`。
- *
- * 画布按【CSS 像素】开,不乘 dpr:上游的 Bayer 是按 gl_FragCoord(设备像素)
- * 取的,在 2× 屏上一格抖动只有半个 CSS 像素,这里的格子本来就小,再切一半就
- * 糊成灰。按 CSS 像素画 + `image-rendering: pixelated`,抖动的方格是实的,
- * 代价是 2× 屏上每个方格由 2×2 设备像素拼成 —— 对「像素液体」来说不算代价。
+ * 画布按【CSS 像素】开,不乘 dpr。Bayer 取的是画布坐标;乘了 dpr,2× 屏上
+ * 一格抖动只有半个 CSS 像素,再被放大就糊成灰。按 CSS 像素画,
+ * 配 `image-rendering: pixelated`,抖动的点是实的。
  */
 
 /** 交付稿那一格的宽度。`DESIGN_PIXEL` 的标定就是在这个尺寸上量出来的。 */
 export const DESIGN_CELL_PX = 84;
 
 /**
- * 上游 pixelSize 默认 18,配的是整屏宽的背景(约 80 列)。交付稿一格 84px,
- * 照抄 18 只剩 4 列,读不出流动;取 6 —— 14 列,和上游的列数量级对得上,
- * 方格也还看得出是方格。**列数比方格边长更决定它像不像「像素液体」。**
+ * 旧像素液体在 84px 上取 6,得到约 14 列方格。这个数仍然是 `pixelSizeFor`
+ * 的标定:再小的采样格会把场切成噪点。Bayer 墨点本身不跟这个步长放大
+ * (见 `shade`),否则宽产物卡的圆云会被切成十字色块。
  */
 export const DESIGN_PIXEL = 6;
 
 /**
- * 于是产品里的取法就从上面那句推出来:守住**列数**,让方格边长跟着宽度走。
+ * 于是产品里的取法就从上面那句推出来:守住**列数**,让采样步长跟着宽度走。
  * 84 / 6 = 14 —— 稿子写死的 6 正是这条式子在 84px 上的解,所以生图格拿到的
  * 仍然是稿子那个数,而更宽的产物卡不会退化成一片细噪点。
  */
 export const TARGET_COLS = Math.round(DESIGN_CELL_PX / DESIGN_PIXEL);
 
-/** 再小的格子也不让方格塌到 1~3px:那时候抖动就不是抖动,是噪点。 */
+/** 再小的格子也不让采样步长塌到 1~3px:那时候场和抖动叠在一起,只剩噪点。 */
 const MIN_PIXEL = 4;
 
-/** 按容器宽度重算方格边长(见 `TARGET_COLS`)。 */
+/**
+ * 按容器宽度重算旧液体方格的边长(见 `TARGET_COLS`)。
+ * `shade` 把它当作抖动格的上限,实际墨点停在 2 CSS 像素。
+ */
 export function pixelSizeFor(width: number): number {
   if (!Number.isFinite(width) || width <= 0) return MIN_PIXEL;
   return Math.max(MIN_PIXEL, Math.round(width / TARGET_COLS));
 }
 
 /**
- * 上游 makeBayerTexture() 里那 16 个数,原样。除以 255 是上游在 shader 里
- * 取纹理时做的(纹素是 0~255 的字节,采样出来是 0~1)。
+ * 4×4 Bayer,顺序与 visual-agent-chat / Paper Shaders 一致。
+ * 阈值是 `(value + 1) / 17`,17 级里两头留给纯空和纯实。
  */
-const BAYER = [
-  0, 136, 34, 170,
-  204, 68, 238, 102,
-  51, 187, 17, 153,
-  255, 119, 221, 85,
-].map((v) => v / 255);
-
-/** 产品指定的两支色。上游默认是五支的粉色系,这里换成两支绿。 */
-const STOPS = ['#EAFFEB', '#00FF04'];
+const BAYER4 = [
+  0, 8, 2, 10,
+  12, 4, 14, 6,
+  3, 11, 1, 9,
+  15, 7, 13, 5,
+];
 
 /**
- * 上游 light 模式的 bgColor 是 vec4(1,1,1,0) —— 白、且 alpha 为 0。
- * alpha 0 的意思是「没有流体的地方完全透出底下」,格子自己的底色因此还在。
+ * 预览着色器里的 `uFront`(0.05, 0.05, 0.05)。近黑,三个通道一样,
+ * 这样格子里不会再冒出绿色。
  */
-const BG = [255, 255, 255];
+const INK_R = 13;
+const INK_G = 13;
+const INK_B = 13;
 
-/**
- * curl noise 的增益。上游那行是 len = clamp(length(vel) * 2.2, 0, 1),
- * 2.2 配的是它自己解出来的速度量纲;这里的场是旋度,量纲不同,先用 GAIN
- * 折算到同一区间,再原样乘 2.2 —— 这样上游那行不用改。
- * 0.18 是量出来的:这个旋度场的速度中位数约 1.12,乘完 0.18×2.2 落在 0.44,
- * 于是【一格里多数方格是淡的、涡走过的那几条才吃满绿】。调大到 0.4 以上,
- * 整格会糊成一块实心绿,液体的形状就没了。
- */
-const GAIN = 0.18;
-
-/** 30 帧够看:方格本来就在跳,60 帧只是多烧一倍 CPU。 */
+/** 30 帧够看:抖动本身就在跳,60 帧只是多烧一倍 CPU。 */
 export const FPS = 30;
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 const fract = (v: number): number => v - Math.floor(v);
 
-/** 上游 color_frag 里的 hash / noise,一字未改(GLSL → JS)。 */
+/** 与上游 hash 同一条式子。密度场和闪点表都用它,帧与帧之间才是确定的。 */
 const hash = (x: number, y: number): number => fract(Math.sin(x * 127.1 + y * 311.7) * 43758.5453);
 
 function noise(x: number, y: number): number {
-  const ix = Math.floor(x), iy = Math.floor(y);
-  const fx = x - ix, fy = y - iy;
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  const fx = x - ix;
+  const fy = y - iy;
   const ux = fx * fx * (3 - 2 * fx);
   const uy = fy * fy * (3 - 2 * fy);
-  const a = hash(ix, iy), b = hash(ix + 1, iy);
-  const c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+  const a = hash(ix, iy);
+  const b = hash(ix + 1, iy);
+  const c = hash(ix, iy + 1);
+  const d = hash(ix + 1, iy + 1);
   return (a + (b - a) * ux) + ((c + (d - c) * ux) - (a + (b - a) * ux)) * uy;
 }
 
-/**
- * 标量势:两层随时间反向漂移的 value noise。两层的方向相反,涡才会互相
- * 挤压、拉长,而不是整块平移过去。
- */
-function psi(x: number, y: number, t: number): number {
-  return noise(x * 1.6 + t * 0.20, y * 1.6 - t * 0.14)
-       + noise(x * 3.1 - t * 0.11, y * 3.1 + t * 0.17) * 0.5;
-}
-
-/** v = (∂ψ/∂y, -∂ψ/∂x),中心差分。 */
-function speed(x: number, y: number, t: number): number {
-  const e = 0.035;
-  const vx = (psi(x, y + e, t) - psi(x, y - e, t)) / (2 * e);
-  const vy = -(psi(x + e, y, t) - psi(x - e, y, t)) / (2 * e);
-  return Math.hypot(vx, vy);
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = clamp01((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
 }
 
 /**
- * 调色板查表。上游是一张 w=STOPS.length 的 DataTexture,LinearFilter +
- * ClampToEdge,按 vec2(t, 0.5) 采样 —— 也就是纹素坐标 t*w-0.5、两端夹住。
- * 这里把同一条公式烤成 256 级查表,省掉每像素的插值。
+ * 闪点表。参考实现是每像素 `hash(cell + floor(time))`;这里烤成 64×64,
+ * 每拍只挪读指针。白噪声挪过之后还是白噪声,但省掉逐像素的 sin。
  */
-function buildPalette(): Uint8Array {
-  const rgb = STOPS.map((h) => [
-    parseInt(h.slice(1, 3), 16),
-    parseInt(h.slice(3, 5), 16),
-    parseInt(h.slice(5, 7), 16),
-  ]);
-  const w = rgb.length;
-  const lut = new Uint8Array(256 * 3);
-  for (let i = 0; i < 256; i++) {
-    const x = (i / 255) * w - 0.5;
-    const i0 = Math.min(Math.max(Math.floor(x), 0), w - 1);
-    const i1 = Math.min(i0 + 1, w - 1);
-    const f = Math.min(Math.max(x - Math.floor(x), 0), 1);
-    for (let k = 0; k < 3; k++) {
-      lut[i * 3 + k] = Math.round((rgb[i0] as number[])[k]! + ((rgb[i1] as number[])[k]! - (rgb[i0] as number[])[k]!) * f);
-    }
-  }
-  return lut;
-}
-const PALETTE = buildPalette();
-
-/**
- * 颗粒。上游是每像素每帧 hash(gl_FragCoord + time*137, time*91) —— 一秒
- * 几百万次 sin。这里烤成一张 64×64 的白噪表,每帧整体位移一次读:白噪声
- * 位移之后还是白噪声,肉眼分不出,但省掉了那几百万次。
- */
-const GRAIN_N = 64;
-const GRAIN = (() => {
-  const g = new Float32Array(GRAIN_N * GRAIN_N);
-  for (let i = 0; i < g.length; i++) g[i] = hash(i % GRAIN_N, Math.floor(i / GRAIN_N));
+const SPECK_N = 64;
+const SPECK = (() => {
+  const g = new Float32Array(SPECK_N * SPECK_N);
+  for (let i = 0; i < g.length; i++) g[i] = hash(i % SPECK_N, Math.floor(i / SPECK_N));
   return g;
 })();
+
+/**
+ * 一块采样点上的密度。
+ *
+ * 坐标先收成以格子中心为原点、按高归一的平面,这样竖的生图格和横的产物卡
+ * 看到的是同一团圆云,而不是被拉成一条。云本身慢慢转;几团核在里面公转,
+ * 是点状漂移的来源。噪声取平方,把能量压成一团团,而不是铺一层均匀的雾。
+ * `fall` 是软圆边,角上留空,抖动才不会顶着方框变成一块矩形。
+ */
+function sampleField(ux: number, uy: number, t: number, aspect: number): { lum: number; wide: number } {
+  const nx = (ux - 0.5) * 2 * aspect;
+  const ny = (uy - 0.5) * 2;
+  const rad = Math.hypot(nx, ny);
+  const ang = Math.atan2(ny, nx);
+  const sedge = 0.92 + 0.1 * Math.sin(ang * 3 + t * 0.55) + 0.06 * Math.sin(ang * 5 - t * 0.8);
+  /* 软圆边。中心留在抖动带里,不要顶满 1 —— 顶满会被 16/17 那条规则铺成实心黑。 */
+  const fall = 1 - smoothstep(sedge - 0.55, sedge + 0.18, rad);
+  const wide = 1 - smoothstep(1.05, 1.45, rad);
+
+  const swirl = t * 0.22;
+  const cs = Math.cos(swirl);
+  const sn = Math.sin(swirl);
+  const sx = nx * cs - ny * sn;
+  const sy = nx * sn + ny * cs;
+  const n1 = noise(sx * 1.6 + 1.3, sy * 1.6 - t * 0.05);
+  const n2 = noise(sx * 3.2 + t * 0.08, sy * 3.2 + 0.7);
+  /* 增益停在 16/17 以下。再高,核心会被那条「铺实」规则吃成一块实心黑,
+     抖动颗粒就没了。两团核叠在一起也仍然落在抖动带里。 */
+  let lum = fall * (0.015 + 0.16 * n1 * n1 + 0.08 * n2 * n2);
+
+  for (let i = 0; i < 7; i++) {
+    const a = t * (0.55 + i * 0.09) + i * 0.9;
+    const orbit = 0.12 + 0.32 * (0.5 + 0.5 * Math.sin(t * 0.23 + i));
+    const px = Math.cos(a) * orbit;
+    const py = Math.sin(a * 0.77) * orbit * 0.85;
+    const dx = nx - px;
+    const dy = ny - py;
+    lum += Math.exp(-(dx * dx + dy * dy) * 36) * 0.34 * fall;
+  }
+
+  /*
+   * 叠加上限停在 0.58。4×4 矩阵里有几格阈值高于这数(10、12、14、15),
+   * 所以最密的核心仍然是颗粒,不是一整行实心黑。再往上,某一整行 Bayer
+   * 会同时通过,小卡里就糊成墨块。
+   */
+  return { lum: Math.min(lum, 0.58), wide };
+}
 
 /** `shade()` 只需要拿到那条字节流 —— 传 `ImageData` 或测试里的替身都行。 */
 export interface LiquidPixels {
@@ -168,51 +159,61 @@ export interface LiquidPixels {
 }
 
 /**
- * 把一帧画进 ImageData。上游 color_frag 的主体,逐行对应。
+ * 把一帧画进 ImageData。每个抖动格要么是近黑墨点,要么全透明。
  *
- * `pixel` 是方格边长:稿子里是写死的 6(84px 一格),产品里按容器宽度走
- * `pixelSizeFor()` —— 唯一跟尺寸有关的数就是它,别的都在 UV 空间里,自己缩放。
+ * 抖动格固定 2 CSS 像素(和参考预览的 `CELL` 一样),并且不超过调用方传入的
+ * `pixel`。密度场如果仍按 `pixelSizeFor` 的步长取 —— 宽卡上会到 16px ——
+ * 圆云会被切成实心十字。墨点大小不跟卡片变,变的是格子里能放下多少点。
  */
 export function shade(img: LiquidPixels, w: number, h: number, t: number, pixel: number): void {
   const data = img.data;
-  const cols = Math.ceil(w / pixel);
-  const rows = Math.ceil(h / pixel);
-  const gx = Math.floor(t * 137) % GRAIN_N;
-  const gy = Math.floor(t * 91) % GRAIN_N;
+  const cell = Math.max(1, Math.min(2, pixel > 0 ? pixel : 2));
+  const cols = Math.max(1, Math.ceil(w / cell));
+  const rows = Math.max(1, Math.ceil(h / cell));
+  const aspect = w / Math.max(h, 1);
+  /* 矩阵约每秒错 7 次;闪点表约每秒挪 5 次。两者都量化到整数拍,
+     颗粒是「跳」,不是每一帧都重抽一张噪声。 */
+  const shimmer = Math.floor(t * 7);
+  const flick = Math.floor(t * 5);
+  const inv17 = 1 / 17;
 
   for (let by = 0; by < rows; by++) {
+    const uy = (by + 0.5) / rows;
+    const qy = (by + shimmer * 3) & 3;
     for (let bx = 0; bx < cols; bx++) {
-      /* pixUV = (floor(uv * pixGrid) + 0.5) / pixGrid —— 方格中心 */
       const ux = (bx + 0.5) / cols;
-      const uy = (by + 0.5) / rows;
+      const field = sampleField(ux, uy, t, aspect);
+      let tone = field.lum;
+      const speck = SPECK[((by + flick * 3) & (SPECK_N - 1)) * SPECK_N + ((bx + flick) & (SPECK_N - 1))]!;
+      /* 参考实现里空区的能量闪点。抬到抖动带上沿,矩阵一错位它们就闪。 */
+      if (speck > 0.992) tone = Math.max(tone, 0.78 * field.wide);
+      tone = clamp01(tone);
 
-      /* len = clamp(length(vel) * 2.2, 0, 1) */
-      const len = clamp01(speed(ux, uy, t) * GAIN * 2.2);
+      let on = false;
+      if (tone > 16 * inv17) on = true;
+      else if (tone >= inv17) {
+        const threshold = (BAYER4[qy * 4 + ((bx + shimmer) & 3)]! + 1) * inv17;
+        on = tone >= threshold;
+      }
 
-      /* noiseVal = noise(uv * 6 + uTime * 0.15) * 0.06 - 0.03
-         上游按像素算,这里按方格算:uv*6 在一格 84px 上是 14px 一个周期,
-         恰好一个方格,格内那点差别看不出来。 */
-      const nv = noise(ux * 6 + t * 0.15, uy * 6 + t * 0.15) * 0.06 - 0.03;
-
-      const x0 = bx * pixel, x1 = Math.min(x0 + pixel, w);
-      const y0 = by * pixel, y1 = Math.min(y0 + pixel, h);
+      const x0 = bx * cell;
+      const x1 = Math.min(x0 + cell, w);
+      const y0 = by * cell;
+      const y1 = Math.min(y0 + cell, h);
       for (let y = y0; y < y1; y++) {
-        const grainRow = ((y + gy) % GRAIN_N) * GRAIN_N;
-        const bayerRow = (y & 3) * 4;
         let p = (y * w + x0) * 4;
         for (let x = x0; x < x1; x++, p += 4) {
-          /* dither = bayer - 0.5;  t = clamp(len + dither*0.12 + noiseVal, 0, 1) */
-          const dither = BAYER[bayerRow + (x & 3)]! - 0.5;
-          const tv = clamp01(len + dither * 0.12 + nv);
-
-          /* col = mix(bgColor.rgb, palette(t), t);  再加颗粒 */
-          const q = (tv * 255) | 0;
-          const grain = (GRAIN[grainRow + ((x + gx) % GRAIN_N)]! - 0.5) * 0.085 * 255;
-          data[p]     = clamp01((BG[0]! + (PALETTE[q * 3]!     - BG[0]!) * tv + grain) / 255) * 255;
-          data[p + 1] = clamp01((BG[1]! + (PALETTE[q * 3 + 1]! - BG[1]!) * tv + grain) / 255) * 255;
-          data[p + 2] = clamp01((BG[2]! + (PALETTE[q * 3 + 2]! - BG[2]!) * tv + grain) / 255) * 255;
-          /* alpha = mix(bgColor.a, 1.0, t),而 light 下 bgColor.a = 0 */
-          data[p + 3] = tv * 255;
+          if (on) {
+            data[p] = INK_R;
+            data[p + 1] = INK_G;
+            data[p + 2] = INK_B;
+            data[p + 3] = 255;
+          } else {
+            data[p] = 0;
+            data[p + 1] = 0;
+            data[p + 2] = 0;
+            data[p + 3] = 0;
+          }
         }
       }
     }

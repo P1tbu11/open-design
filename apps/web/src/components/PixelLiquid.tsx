@@ -1,5 +1,5 @@
 /**
- * 「还没出来」的那一格里流动的东西 —— 交付稿的像素液体。
+ * 「还没出来」那一格的占位 —— 黑白 Bayer 抖动场。
  *
  * 产品口径(设计同学 2026-08-26):图片的 loading 态,不管是下载还是生成期间,
  * **占位不许用灰色那一块**;产物卡加载期间同理。所以这颗东西只用在
@@ -11,7 +11,7 @@
  * 挂画布、量尺寸、进出视口、卸载时收干净。
  *
  * 轮次级别的「进行中」是 `Orb`(thinking-orbs),那是另一回事:orb 说的是
- * 「这一轮在跑」,液体说的是「这一格里的东西还在长」。不要互相顶替。
+ * 「这一轮在跑」,这里说的是「这一格里的东西还在长」。不要互相顶替。
  */
 import { useEffect, useRef, type ReactElement } from 'react';
 import { PHASE_STEP, pixelSizeFor, shade } from '../runtime/pixel-liquid';
