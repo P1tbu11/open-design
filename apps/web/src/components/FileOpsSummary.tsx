@@ -616,7 +616,7 @@ function ArtifactCard({
     >
       <span className="artifact-card-thumb">
         {pending ? (
-          /* 还在写:占位不是一块灰,是像素液体(产品 2026-08-26)。
+          /* 还在写:占位不是一块灰,是黑白 Bayer 抖动(产品 2026-08-26 不许用灰卡)。
              壳子仍是 `.artifact-card-mini`,竖片卡的 9/16 letterbox 才不会走样。 */
           <span className="artifact-card-mini is-loading">
             <PixelLiquid />
