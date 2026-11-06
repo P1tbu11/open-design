@@ -960,6 +960,13 @@ else { process.stderr.write("unexpected gh call: " + args + "\\n"); process.exit
     expect(workflow).toContain("--squash");
     expect(workflow).toContain("--delete-branch");
 
+    const velaGate = sectionBetween(workflow, "Check stable Vela CLI version before backport auto-merge", "Approve the clean backport");
+    expect(velaGate).toContain('steps.pr.outputs.head_oid == github.event.workflow_run.head_sha');
+    expect(velaGate).toContain('git show "$HEAD_SHA:tools/pack/package.json"');
+    expect(velaGate).toContain('git show "$HEAD_SHA:pnpm-lock.yaml"');
+    expect(velaGate).toContain('.github/scripts/release/vela-version.ts');
+    expect(workflow.indexOf("Check stable Vela CLI version before backport auto-merge")).toBeLessThan(workflow.indexOf("Approve the clean backport"));
+
     // To satisfy release/v*'s one-approval rule, the bot's own clean backport is auto-approved by
     // github-actions[bot] (pull-requests: write) — under the same author==bot gate as the merge.
     expect(workflow).toContain("pull-requests: write");
@@ -981,6 +988,12 @@ else { process.stderr.write("unexpected gh call: " + args + "\\n"); process.exit
     expect(feishuStep).toContain(
       "(github.event.workflow_run.conclusion == 'failure' || github.event.workflow_run.conclusion == 'timed_out')",
     );
+    expect(feishuStep).toContain("always()");
+    expect(feishuStep).toContain("steps.vela_guard.outcome == 'failure'");
+    expect(feishuStep).toContain("steps.vela_guard.outputs.reason_b64");
+    expect(feishuStep).toContain("github.event.workflow_run.head_sha");
+    expect(velaGate).toContain('exit 1');
+    expect(velaGate).toContain('reason_b64=$reason');
     expect(feishuStep).not.toContain("'cancelled'");
   });
 
@@ -1598,6 +1611,9 @@ process.stdin.on("end", () => {
   it("[P2] closes packaged-leaf coverage without duplicating the broad E2E lane", async () => {
     const workflow = await readFile(ciWorkflowPath, "utf8");
     const workspaceUnit = sectionBetween(workflow, "  workspace_unit_tests:", "  daemon_unit_tests:");
+
+    expect(workspaceUnit).toContain("pnpm --filter @open-design/launcher-proto test");
+    expect(workspaceUnit).toContain("pnpm --filter @open-design/launcher test");
 
     expect(workspaceUnit).toContain(`if [ "\${{ fromJSON(needs.plan.outputs.scopes).tools_pack_tests_required }}" = "true" ]; then
             pnpm --filter @open-design/desktop build

@@ -1,3 +1,6 @@
+import { ReferralEntry } from './ReferralEntry';
+import { openExternalUrl } from "../providers/registry";
+import { CodingPlanUsage } from './CodingPlanUsage';
 import { WorkspaceQuotaPopover } from './WorkspaceQuotaPopover';
 import { workspaceQuotaView } from '../collab/workspace-quota-view';
 import planCardStyles from './PersonalPlanCard.module.css';
@@ -1176,6 +1179,9 @@ export function EntryTopRightCluster({
   // Sign-out confirm gate (recvqgMWpJZqhL): the menu item only ARMS the
   // confirmation dialog; the real logout chain runs on explicit confirm.
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [logoutSnapshot,setLogoutSnapshot] = useState<VelaLoginStatus | null>(null);
+  const [logoutBusy,setLogoutBusy] = useState(false);
+  const [accountStatus,setAccountStatus] = useState<VelaLoginStatus | null>(null);
   const githubStars = useGithubStars();
   const hasWorkspaceContext = Boolean(context);
   useEffect(() => {
@@ -1190,6 +1196,7 @@ export function EntryTopRightCluster({
       setAccountEmail(status?.user?.email?.trim() || '');
       setAccountUserName(status?.user?.name?.trim() || '');
       setAccountAvatarUrl(status?.user?.image?.trim() || '');
+      setAccountStatus(status);
     });
     return () => {
       cancelled = true;
@@ -1677,7 +1684,9 @@ export function EntryTopRightCluster({
                           href={accountBillingUrl}
                           {...externalLinkProps}
                           data-testid="entry-account-billing"
-                          onClick={() => {
+                          onClick={(event) => {
+                            event.preventDefault();
+                            void openExternalUrl(accountBillingUrl);
                             trackAccountAction('billing');
                             closeAccountMenu();
                           }}
@@ -1727,6 +1736,8 @@ export function EntryTopRightCluster({
                           closeAccountMenu();
                           // recvqgMWpJZqhL: never sign out on this click alone —
                           // arm the confirmation dialog and let it run the logout.
+                          setLogoutSnapshot(accountStatus);
+                          if (!accountStatus?.credentialRevision) void fetchVelaLoginStatus().then(setLogoutSnapshot);
                           setConfirmSignOut(true);
                         }}
                       >
@@ -1737,15 +1748,18 @@ export function EntryTopRightCluster({
                 ) : null}
                 {confirmSignOut ? (
                   <SignOutConfirmDialog
+                    email={logoutSnapshot?.user?.email}
+                    busy={logoutBusy}
+                    confirmDisabled={!logoutSnapshot?.credentialRevision}
                     onCancel={() => setConfirmSignOut(false)}
                     onConfirm={() => {
-                      setConfirmSignOut(false);
-                      // Real sign-out: clear the vela profile auth on the
-                      // daemon, then nudge every workspace surface to re-read
-                      // (the context read now resolves to null → the shell
-                      // falls back to the signed-out local form).
-                      void velaLogout().then(async (result) => {
+                      if (!logoutSnapshot?.credentialRevision || logoutBusy) return;
+                      setLogoutBusy(true);
+                      void velaLogout({expectedAppUserId:logoutSnapshot.user?.id ?? '',expectedCredentialRevision:logoutSnapshot.credentialRevision}).then(async (result) => {
+                        setLogoutBusy(false);
+                        if (result.status === 409) {setLogoutSnapshot(await fetchVelaLoginStatus());return;}
                         if (!result.ok) return;
+                        setConfirmSignOut(false);
                         await onSignedOut?.();
                         // recvqbkcLqIFH7: a stale "dismissed" flag on the
                         // footer's CloudSignInTip must not survive a real
@@ -2248,6 +2262,7 @@ export function EntryNavRail({
   // While collapsed the rail is visually hidden but its controls stay mounted;
   // mark it `inert` so they leave the tab order and pointer flow entirely.
   const railRef = useRef<HTMLElement | null>(null);
+  const referralCompact = useRailAutoCollapsed() || !open;
   useEffect(() => {
     const node = railRef.current;
     if (!node) return;
@@ -2304,6 +2319,7 @@ export function EntryNavRail({
   }, [railIdentity]);
 
   return (
+    <>
     <nav
       ref={railRef}
       className={`entry-nav-rail${open ? ' is-open' : ''}`}
@@ -2422,7 +2438,7 @@ export function EntryNavRail({
                           });
                           setTeamOpen(false);
                           if (inviteTarget.kind === 'vela') {
-                            window.open(inviteTarget.url, '_blank', 'noopener,noreferrer');
+                            void openExternalUrl(inviteTarget.url);
                           } else if (inviteTarget.kind === 'local') {
                             setInviteOpen(true);
                           }
@@ -2450,7 +2466,9 @@ export function EntryNavRail({
                         href={teamConsoleUrl(workspaceSettingsUrl, 'create-team')}
                         {...externalLinkProps}
                         data-testid="entry-nav-create-team"
-                        onClick={() => {
+                        onClick={(event) => {
+                          event.preventDefault();
+                          void openExternalUrl(teamConsoleUrl(workspaceSettingsUrl, 'create-team'));
                           trackWorkspaceSwitcherClick(analytics.track, {
                             page_name: analyticsPage,
                             area: 'workspace_switcher',
@@ -2658,6 +2676,7 @@ export function EntryNavRail({
             the account module into. `display: contents` keeps the account
             dock itself a flex child of this group, so its own `order: 99` +
             `margin-top: auto` still push it below the nav items. */}
+        {isHome && !referralCompact ? <ReferralEntry /> : null}
         {context ? <div ref={setAccountHost} className="entry-nav-rail__account-host" /> : null}
       </div>
       {/* Signed in, the social links ride the account dock above the identity
@@ -2735,5 +2754,6 @@ export function EntryNavRail({
         priorityAnnouncementMetricsConsent={priorityAnnouncementMetricsConsent}
       />
     </nav>
+    </>
   );
 }
