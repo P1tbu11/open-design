@@ -1704,9 +1704,13 @@ async function expectGeneratedPreviewToRemainStable(page: Page, heading: string)
           reject(new Error('generated artifact preview became hidden after first paint'));
           return;
         }
+        // The reveal is not a masking placeholder: it is the surface that builds
+        // and then hands the page over, so it is allowed to be on screen here.
+        // The skeleton this used to catch is no longer rendered on this path.
         const blockingSurface = Array.from(
           document.querySelectorAll<HTMLElement>('.viewer-loading, .viewer-empty'),
         ).some((element) => {
+          if (element.closest('[data-testid="preview-reveal-host"]')) return false;
           const candidateStyle = getComputedStyle(element);
           return candidateStyle.display !== 'none'
             && candidateStyle.visibility !== 'hidden'

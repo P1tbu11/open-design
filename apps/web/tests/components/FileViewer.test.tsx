@@ -11547,6 +11547,7 @@ describe('FileViewer tweaks toolbar', () => {
         'selection',
         'snapshot',
         'observability',
+        'reveal',
       ]);
       expect(src.searchParams.get('odPreviewEpoch')).toMatch(/^preview-document-\d+$/);
     });

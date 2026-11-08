@@ -18084,8 +18084,19 @@ function HtmlViewer({
             </div>
       </>)}
       <div className="viewer-body" ref={previewBodyRef}>
+        {/*
+          No skeleton screen on the preview path any more. Generation owns this
+          surface end to end: `PreviewRevealHost` draws the crew circling while
+          the run streams, then assembles the page the moment it lands. A
+          wireframe card was a third state that said "something is happening"
+          without saying what, and it is what flashed whenever a new file had not
+          been written yet.
+        */}
         {initialPreviewLoading ? (
-          <FileViewerLoadingSkeleton />
+          // Nothing at all: the reveal surface owns this area while a page is
+          // being generated, and a skeleton here would be the third state this
+          // change exists to remove.
+          null
         ) : (
           <>
             <div

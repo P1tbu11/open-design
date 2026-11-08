@@ -1,15 +1,22 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import type { RefObject } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   buildPreviewRevealBridge,
+  isPreviewRevealPatch,
+  parsePreviewRevealBlueprint,
+  PREVIEW_REVEAL_PATCH_CAP,
+  PREVIEW_REVEAL_PATCH_REQUEST_TYPE,
+  PREVIEW_REVEAL_PATCH_TYPE,
   PREVIEW_REVEAL_REQUEST_TYPE,
   PREVIEW_REVEAL_RESPONSE_TYPE,
   type PreviewRevealBlueprint,
 } from '@open-design/contracts/runtime/preview-reveal';
-import { PreviewRevealStage, RevealText, toBlueprintSpace, uniformScale } from '../../src/components/preview-reveal/PreviewReveal';
+import { PreviewRevealHost, PreviewRevealStage, RevealText, toBlueprintSpace, uniformScale } from '../../src/components/preview-reveal/PreviewReveal';
+import { PreviewRevealWorking } from '../../src/components/preview-reveal/PreviewRevealWorking';
 import {
   claimPreviewRevealAutoplay,
   planPreviewReveal,
@@ -711,7 +718,7 @@ describe('preview reveal text clone scaling', () => {
     // These properties are deliberately ones nobody listed before: if the rule
     // ever regresses to a name whitelist again, this fails.
     const shot = await snapshot(
-      `<p data-probe="t" style="font-size:20px;line-height:70px;text-indent:40px;word-spacing:12px;outline-offset:8px;column-gap:24px">Scaled probe</p>`,
+      `<p data-probe="t" style="font-size:20px;line-height:70px;text-indent:40px;word-spacing:12px;outline-offset:8px;stroke-width:2px">Scaled probe</p>`,
       { t: { layout: 200, painted: 100 } },
     );
     const layer = shot.layers.find((item) => item.kind === 'text');
@@ -725,7 +732,9 @@ describe('preview reveal text clone scaling', () => {
     expect(declared(layer!.style, 'text-indent')).toBe('20px');
     expect(declared(layer!.style, 'word-spacing')).toBe('6px');
     expect(declared(layer!.style, 'outline-offset')).toBe('4px');
-    expect(declared(layer!.style, 'column-gap')).toBe('12px');
+    // A px length on an inline-SVG text property, which is likewise unnamed
+    // elsewhere: the rule is positional, not a list of remembered names.
+    expect(declared(layer!.style, 'stroke-width')).toBe('1px');
   });
 
   it('leaves keywords, ratios and zero lengths alone', async () => {
@@ -768,5 +777,182 @@ describe('preview reveal text clone scaling', () => {
     const layer = shot.layers.find((item) => item.kind === 'text');
     expect(layer).toBeDefined();
     expect(layer!.style.length).toBeLessThan(2_400);
+  });
+});
+
+describe('preview reveal as the generation surface', () => {
+  const stageProps = {
+    labels: { skip: 'Skip', status: 'Assembling' },
+    pointer: staticPointer(),
+  };
+
+  it('circles the crew while a page is being generated', () => {
+    render(
+      <PreviewRevealWorking
+        sessionKey="project/a.html/1"
+        pointer={staticPointer()}
+        reducedMotion={false}
+      />,
+    );
+    const surface = screen.getByTestId('preview-reveal-working');
+    expect(surface).toBeTruthy();
+    // It is a live region that says work is happening, not a decorative image.
+    expect(surface.getAttribute('role')).toBe('status');
+    expect(surface.getAttribute('aria-busy')).toBe('true');
+    // and it carries a pool of arrows to animate.
+    expect(surface.querySelectorAll('[data-working-cursor]').length).toBeGreaterThan(0);
+  });
+
+  it('shows the crew, not a skeleton, while the run is streaming', () => {
+    // The whole point of the change: generation and the reveal are one surface,
+    // so a streaming run renders the crew instead of a wireframe placeholder.
+    const frameRef = { current: null } as RefObject<HTMLIFrameElement | null>;
+    render(
+      <PreviewRevealHost
+        active
+        blocked={false}
+        streaming
+        previewReady={false}
+        sessionKey="project/a.html/1"
+        frameRef={frameRef}
+      />,
+    );
+    expect(screen.getByTestId('preview-reveal-working')).toBeTruthy();
+    // The build stage is a later act; it must not be up yet.
+    expect(screen.queryByTestId('preview-reveal')).toBeNull();
+  });
+
+  it('stands down entirely when the preview is not the active surface', () => {
+    const frameRef = { current: null } as RefObject<HTMLIFrameElement | null>;
+    render(
+      <PreviewRevealHost
+        active={false}
+        blocked={false}
+        streaming
+        previewReady={false}
+        sessionKey="project/a.html/1"
+        frameRef={frameRef}
+      />,
+    );
+    expect(screen.queryByTestId('preview-reveal-working')).toBeNull();
+  });
+});
+
+describe('preview reveal handover', () => {
+  const frameRef = { current: null } as RefObject<HTMLIFrameElement | null>;
+  const host = (over: Partial<{ streaming: boolean; previewReady: boolean; active: boolean }> = {}) => (
+    <PreviewRevealHost
+      active={over.active ?? true}
+      blocked={false}
+      streaming={over.streaming ?? false}
+      previewReady={over.previewReady ?? true}
+      sessionKey="project/a.html/1"
+      frameRef={frameRef}
+    />
+  );
+
+  it('keeps the crew on screen while the stream has ended but the frame is not ready', () => {
+    // The gap that would otherwise show nothing: the run is done, the iframe has
+    // not finished navigating, so the build stage cannot start. Leaving the crew
+    // up makes the two acts continuous.
+    const { rerender } = render(host({ streaming: true, previewReady: false }));
+    expect(screen.getByTestId('preview-reveal-working')).toBeTruthy();
+    rerender(host({ streaming: false, previewReady: false }));
+    // Still there: the handover has not happened yet.
+    expect(screen.getByTestId('preview-reveal-working')).toBeTruthy();
+  });
+
+  it('stands down once the preview is not streaming and nothing is pending', () => {
+    render(host({ streaming: false, previewReady: true }));
+    expect(screen.queryByTestId('preview-reveal-working')).toBeNull();
+    expect(screen.queryByTestId('preview-reveal')).toBeNull();
+  });
+});
+
+describe('preview reveal patches', () => {
+  /**
+   * Boot the real bridge, mutate the document, then ask for a patch.
+   * Returns the layers the bridge reported as changed.
+   */
+  async function patchAfter(mutate: () => void) {
+    // The bridge arms itself once per window; release any observer a previous
+    // case left behind so this document is only watched by one of them.
+    const prior = (window as unknown as { __odPreviewRevealObserver?: { disconnect(): void } }).__odPreviewRevealObserver;
+    prior?.disconnect();
+    delete (window as unknown as { __odPreviewReveal?: boolean }).__odPreviewReveal;
+    const previousRect = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function rect(this: HTMLElement) {
+      const w = Number(this.dataset.w ?? 100);
+      const h = Number(this.dataset.h ?? 30);
+      return { x: 10, y: 10, left: 10, top: 10, right: 10 + w, bottom: 10 + h, width: w, height: h, toJSON() { return this; } };
+    };
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 800 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 600 });
+    // Content first, then the bridge: the observer must only see changes that
+    // happen while it is running, not the document being built beneath it.
+    document.body.innerHTML = `<p data-w="180" data-h="30" style="font-size:20px">Untouched</p><p data-w="180" data-h="30" style="font-size:20px" id="target">Before</p>`;
+    const source = buildPreviewRevealBridge().replace(/^<script[^>]*>/, '').replace(/<\/script>$/, '');
+    window.eval(source);
+
+    const messages: unknown[] = [];
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === PREVIEW_REVEAL_PATCH_TYPE) messages.push(event.data);
+    };
+    window.addEventListener('message', onMessage);
+
+    mutate();
+    // jsdom delivers mutation records on a microtask.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    window.postMessage({ type: PREVIEW_REVEAL_PATCH_REQUEST_TYPE, version: 1, id: 'patch-1' }, '*');
+    const started = Date.now();
+    while (messages.length === 0 && Date.now() - started < 500) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    window.removeEventListener('message', onMessage);
+    Element.prototype.getBoundingClientRect = previousRect;
+    const reply = messages[0] as { id: string; layers: Array<{ kind: string; text: string }> } | undefined;
+    return reply;
+  }
+
+  it('reports only the elements that changed, not the whole page', async () => {
+    // The point of a patch: re-drawing the untouched part of the page would
+    // flash work the agent never did.
+    const reply = await patchAfter(() => {
+      const el = document.getElementById('target');
+      if (el) el.textContent = 'After';
+    });
+    expect(reply).toBeDefined();
+    expect(reply!.id).toBe('patch-1');
+    expect(reply!.layers.length).toBeGreaterThan(0);
+    expect(reply!.layers.length).toBeLessThanOrEqual(PREVIEW_REVEAL_PATCH_CAP);
+    expect(reply!.layers.some((layer) => layer.text.includes('After'))).toBe(true);
+    // The sibling nobody touched must not be in the patch.
+    expect(reply!.layers.some((layer) => layer.text.includes('Untouched'))).toBe(false);
+  });
+
+  it('never reports an element that did not change', async () => {
+    // Stated as a content assertion rather than "no reply": jsdom keeps every
+    // bridge instance from earlier tests observing the document, so a clean
+    // batch is not guaranteed. What must hold regardless is that the untouched
+    // paragraph never appears as a patch layer.
+    const reply = await patchAfter(() => {
+      const el = document.getElementById('target');
+      if (el) el.textContent = 'OnlyThisChanged';
+    });
+    expect(reply).toBeDefined();
+    expect(reply!.layers.some((layer) => layer.text.includes('Untouched'))).toBe(false);
+  });
+
+  it('carries the same shape a full blueprint does', async () => {
+    const reply = await patchAfter(() => {
+      const el = document.getElementById('target');
+      if (el) el.setAttribute('style', 'font-size:24px');
+    });
+    expect(reply).toBeDefined();
+    // Parsed by the same validator, so the renderer can consume it unchanged.
+    const parsed = parsePreviewRevealBlueprint(reply);
+    expect(parsed).not.toBeNull();
+    expect(isPreviewRevealPatch(reply)).toBe(true);
+    expect(isPreviewRevealPatch({ type: PREVIEW_REVEAL_RESPONSE_TYPE })).toBe(false);
   });
 });
