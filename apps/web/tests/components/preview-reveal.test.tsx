@@ -17,6 +17,7 @@ import {
 } from '@open-design/contracts/runtime/preview-reveal';
 import { PreviewRevealHost, PreviewRevealStage, RevealText, toBlueprintSpace, uniformScale } from '../../src/components/preview-reveal/PreviewReveal';
 import { PreviewRevealWorking } from '../../src/components/preview-reveal/PreviewRevealWorking';
+import { CursorGlyph } from '../../src/components/preview-reveal/CursorGlyph';
 import {
   claimPreviewRevealAutoplay,
   planPreviewReveal,
@@ -954,5 +955,34 @@ describe('preview reveal patches', () => {
     expect(parsed).not.toBeNull();
     expect(isPreviewRevealPatch(reply)).toBe(true);
     expect(isPreviewRevealPatch({ type: PREVIEW_REVEAL_RESPONSE_TYPE })).toBe(false);
+  });
+});
+
+describe('replay button glyph anchoring', () => {
+  it('centres the toolbar glyph on its painted ink, not its hot spot', () => {
+    // The regression: the toolbar reused the overlay's tip anchor, which shifts
+    // the sprite by its hot spot. On a 28x28 viewBox whose ink is centred at
+    // (12.85, 11.95) — not (14, 14) — that put the visible arrow 5.3px left and
+    // 3.5px above the button centre.
+    const { container } = render(
+      <CursorGlyph color="#0D99FF" anchor="center" renderedSize={20} />,
+    );
+    const svg = container.querySelector('svg') as SVGSVGElement;
+    expect(svg).toBeTruthy();
+    // A centred glyph must not carry the tip's negative hot-spot shift.
+    expect(svg.style.transform).not.toContain('-5px, -3.5px');
+    // It shifts by the ink-to-viewBox-centre delta, scaled to the 20px box.
+    const unit = 20 / 28;
+    const expectedX = (14 - 12.85) * unit;
+    const expectedY = (14 - 11.95) * unit;
+    expect(svg.style.transform).toContain(`translate(${expectedX}px, ${expectedY}px)`);
+  });
+
+  it('keeps the tip anchor for overlay cursors', () => {
+    // The overlay positions a cursor BY its pointer tip; changing that default
+    // would move every arrow and the companion off the point they mark.
+    const { container } = render(<CursorGlyph color="#0D99FF" />);
+    const svg = container.querySelector('svg') as SVGSVGElement;
+    expect(svg.style.transform).toContain('translate(-5px, -3.5px)');
   });
 });

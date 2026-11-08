@@ -41,7 +41,7 @@ export function PreviewRevealReplayButton({
       onFocus={onSummon}
     >
       <span className={styles.glyph} aria-hidden="true">
-        <CursorGlyph color={REVEAL_LEAD_COLOR} />
+        <CursorGlyph color={REVEAL_LEAD_COLOR} anchor="center" renderedSize={20} />
       </span>
     </button>
   );

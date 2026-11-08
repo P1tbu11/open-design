@@ -5,15 +5,36 @@
  * that stays behind, and the replay control in the viewer toolbar — draws this
  * same glyph, so "the thing that builds the page" is one recognizable object
  * rather than an icon that happens to sit next to it.
+ *
+ * Two anchoring modes, because the same sprite is used two ways:
+ *
+ * - `anchor="tip"` (default): the SVG is shifted by the arrow's hot spot so the
+ *   element's own position IS the pointer position. That is what the overlay
+ *   cursors need — they are placed at a coordinate and the arrow must point
+ *   from exactly there.
+ * - `anchor="center"`: the sprite is centred on its painted ink instead. A
+ *   button wants the arrow to look centred, and neither the viewBox centre nor
+ *   the hot spot is that point: the ink's bounding box is centred at
+ *   (12.85, 11.95) in a 28×28 viewBox whose centre is (14, 14). Using the tip
+ *   anchor there put the visible glyph 5.3px left and 3.5px above the button
+ *   centre.
  */
 
 import { REVEAL_ARROW_HOTSPOT, REVEAL_ARROW_PATH } from './swarm';
+
+/** Size of the drawing canvas the path is authored in. */
+const VIEWBOX = 28;
+/** Centre of the arrow's painted ink, measured from the path's bounding box. */
+const INK_CENTRE = { x: 12.85, y: 11.95 };
 
 export function CursorGlyph({
   color,
   ink = '#ffffff',
   angle = 0,
   scale = 1,
+  anchor = 'tip',
+  /** CSS pixel size of the rendered box, used to scale the centring correction. */
+  renderedSize,
   className,
 }: {
   color: string;
@@ -21,20 +42,42 @@ export function CursorGlyph({
   /** Degrees. 0 points up-left, which is the path's own orientation. */
   angle?: number;
   scale?: number;
+  /**
+   * `tip` positions the sprite by its pointer hot spot (overlay cursors);
+   * `center` centres its painted ink (toolbar icons).
+   */
+  anchor?: 'tip' | 'center';
+  /** CSS pixel size of the rendered box, used to scale the centring correction. */
+  renderedSize?: number;
   className?: string;
 }) {
+  const centred = anchor === 'center';
+  // A centred sprite keeps rotation around the ink too, so a rotated toolbar
+  // glyph would still spin in place rather than sweep around an empty corner.
+  const origin = centred ? INK_CENTRE : REVEAL_ARROW_HOTSPOT;
+  // The shift is expressed in viewBox units, but it is applied as a CSS
+  // translate on the rendered box — so a sprite drawn at 20px needs it scaled by
+  // 20/28, or the correction lands short by exactly that ratio.
+  const unit = centred && renderedSize ? renderedSize / VIEWBOX : 1;
+  const shift = centred
+    ? {
+      x: (VIEWBOX / 2 - INK_CENTRE.x) * unit,
+      y: (VIEWBOX / 2 - INK_CENTRE.y) * unit,
+    }
+    : { x: -REVEAL_ARROW_HOTSPOT.x, y: -REVEAL_ARROW_HOTSPOT.y };
+
   return (
     <svg
       className={className}
-      width="28"
-      height="28"
-      viewBox="0 0 28 28"
+      width={VIEWBOX}
+      height={VIEWBOX}
+      viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
       aria-hidden="true"
       focusable="false"
       style={{
         overflow: 'visible',
-        transformOrigin: `${REVEAL_ARROW_HOTSPOT.x}px ${REVEAL_ARROW_HOTSPOT.y}px`,
-        transform: `translate(${-REVEAL_ARROW_HOTSPOT.x}px, ${-REVEAL_ARROW_HOTSPOT.y}px) rotate(${angle}deg) scale(${scale})`,
+        transformOrigin: `${origin.x}px ${origin.y}px`,
+        transform: `translate(${shift.x}px, ${shift.y}px) rotate(${angle}deg) scale(${scale})`,
       }}
     >
       <path

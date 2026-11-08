@@ -5,15 +5,24 @@
   position: relative;
 }
 
-/* The glyph is nudged onto the optical centre of the 28px hit area: the arrow's
-   visual mass sits low-right of its tip, so centring the box reads as off-centre. */
+/* The glyph is centred on the arrow's PAINTED box, not on its viewBox.
+   `CursorGlyph` draws the cursor in a 28×28 viewBox and shifts it by its hot
+   spot, because on the overlay the sprite is positioned by its tip. Inside a
+   button that shift is unwanted, so `CursorGlyph` takes `anchor="center"` there:
+   it drops the hot-spot translate and compensates for the ink sitting 1.15/2.05
+   viewBox units left of and above the viewBox centre. Without that the visible
+   arrow landed 5.3px left and 3.5px up from the button centre. */
 .glyph {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 20px;
   height: 20px;
-  margin: 3px 0 0 1px;
+}
+
+.glyph svg {
+  width: 20px;
+  height: 20px;
 }
 
 .glyph svg {
