@@ -1,0 +1,144 @@
+.stage {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.layer,
+.cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.layer {
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.fill,
+.media,
+.marquee {
+  position: absolute;
+  inset: 0;
+}
+
+.fill {
+  transition: opacity 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.text {
+  display: block;
+  overflow: hidden;
+}
+
+.caret {
+  display: inline-block;
+  width: 1px;
+  height: 0.9em;
+  margin-left: 1px;
+  background: currentColor;
+  vertical-align: text-bottom;
+  animation: preview-reveal-caret 1s steps(1) infinite;
+}
+
+@keyframes preview-reveal-caret {
+  0%, 45% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Soft rainbow drawn only as a ring: a mask punches the interior out. */
+.marquee {
+  border: 1.5px solid transparent;
+  border-radius: inherit;
+  background:
+    linear-gradient(135deg,
+      rgba(168, 214, 255, 0.92) 0%,
+      rgba(199, 186, 255, 0.88) 26%,
+      rgba(255, 186, 224, 0.88) 52%,
+      rgba(186, 246, 226, 0.9) 76%,
+      rgba(168, 214, 255, 0.92) 100%) border-box;
+  -webkit-mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.handle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #fbfdff;
+  border: 1.25px solid rgba(186, 200, 255, 0.95);
+  box-sizing: border-box;
+}
+
+.handle[data-corner='nw'] { top: 0; left: 0; transform: translate(-50%, -50%); }
+.handle[data-corner='ne'] { top: 0; right: 0; transform: translate(50%, -50%); }
+.handle[data-corner='sw'] { bottom: 0; left: 0; transform: translate(-50%, 50%); }
+.handle[data-corner='se'] { bottom: 0; right: 0; transform: translate(50%, 50%); }
+
+/* Exactly the original swarm badge: centred under the box, 4px/1px padding,
+   2px radius, 600 11px/16px, tabular numerals, no shadow. */
+.sizeTag {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  transform: translateX(-50%);
+  padding: 1px 4px;
+  border-radius: 2px;
+  color: #fff;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cursor {
+  z-index: 3;
+  width: 0;
+  height: 0;
+  overflow: visible;
+}
+
+.pointer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  will-change: transform;
+}
+
+
+.skip {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-pill, 999px);
+  background: color-mix(in srgb, var(--bg-panel, white) 92%, transparent);
+  color: var(--text-strong, #111);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+}

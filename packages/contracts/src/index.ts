@@ -83,6 +83,7 @@ export * from './runtime/deck-stage-fallback.js';
 export * from './runtime/html-injection-points.js';
 export * from './runtime/deck-protocol.js';
 export * from './runtime/preview-observability.js';
+export * from './runtime/preview-reveal.js';
 export * from './runtime/preview-runtime-state.js';
 export * from './runtime/model-window-limit.js';
 export * from './runtime/membership-concurrency-limit.js';

@@ -27,6 +27,10 @@ import {
   buildPreviewBuildFocusBridge,
 } from '@open-design/contracts/runtime/preview-build-focus';
 import {
+  PREVIEW_REVEAL_BRIDGE_MARKER,
+  buildPreviewRevealBridge,
+} from '@open-design/contracts/runtime/preview-reveal';
+import {
   buildPreviewFocusGuard,
   buildPreviewVisibilityGuard,
   buildPreviewRedirectGuard,
@@ -1737,6 +1741,10 @@ function wantsUrlPreviewRedirectGuard(value: unknown): boolean {
   return previewBridgeTokens(value).some((token) => token === 'redirect');
 }
 
+function wantsUrlPreviewRevealBridge(value: unknown): boolean {
+  return previewBridgeTokens(value).some((token) => token === 'reveal');
+}
+
 function injectBeforeBodyClose(html: string, marker: string, injection: string): string {
   if (html.includes(marker)) return html;
   const bodyCloseIndex = findRealTagOffset(html, /<\/body(?=[\t\n\f\r >])/i);
@@ -1787,7 +1795,8 @@ function injectUrlPreviewBridge(
     | 'buildfocus'
     | 'sandbox'
     | 'focus'
-    | 'redirect',
+    | 'redirect'
+    | 'reveal',
 ): string {
   if (bridge === 'sandbox') {
     return injectAfterHeadOpen(html, 'data-od-sandbox-shim', buildPreviewSandboxShim());
@@ -1826,7 +1835,10 @@ function injectUrlPreviewBridge(
   if (bridge === 'selection') {
     return injectBeforeBodyClose(html, 'data-od-url-selection-bridge', URL_PREVIEW_SELECTION_BRIDGE);
   }
-  return injectBeforeBodyClose(html, 'data-od-url-snapshot-bridge', URL_PREVIEW_SNAPSHOT_BRIDGE);
+  if (bridge === 'snapshot') {
+    return injectBeforeBodyClose(html, 'data-od-url-snapshot-bridge', URL_PREVIEW_SNAPSHOT_BRIDGE);
+  }
+  return injectBeforeBodyClose(html, PREVIEW_REVEAL_BRIDGE_MARKER, buildPreviewRevealBridge());
 }
 
 function applyUrlPreviewBridgesToHtml(
@@ -1845,6 +1857,7 @@ function applyUrlPreviewBridgesToHtml(
       wantsUrlPreviewSandboxGuard(requestedBridge) ||
       wantsUrlPreviewFocusGuard(requestedBridge) ||
       wantsUrlPreviewRedirectGuard(requestedBridge) ||
+      wantsUrlPreviewRevealBridge(requestedBridge) ||
       requestedMotionPreview === '1'
     ) ||
     !/^text\/html(?:;|$)/i.test(mime)
@@ -1887,6 +1900,9 @@ function applyUrlPreviewBridgesToHtml(
   }
   if (wantsUrlPreviewSnapshotBridge(requestedBridge)) {
     html = injectUrlPreviewBridge(html, 'snapshot');
+  }
+  if (wantsUrlPreviewRevealBridge(requestedBridge)) {
+    html = injectUrlPreviewBridge(html, 'reveal');
   }
   return html;
 }

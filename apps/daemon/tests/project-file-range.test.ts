@@ -1802,13 +1802,14 @@ describe('GET /api/projects/:id/raw/* range request route', () => {
   });
 
   it('injects all URL preview bridges together', async () => {
-    const bridged = await fetch(`${rawUrl('body.html')}?odPreviewBridge=scroll&odPreviewBridge=selection&odPreviewBridge=snapshot&odPreviewBridge=observability`);
+    const bridged = await fetch(`${rawUrl('body.html')}?odPreviewBridge=scroll&odPreviewBridge=selection&odPreviewBridge=snapshot&odPreviewBridge=observability&odPreviewBridge=reveal`);
     expect(bridged.status).toBe(200);
     const html = await bridged.text();
     expect(html).toContain('data-od-url-scroll-bridge');
     expect(html).toContain('data-od-url-selection-bridge');
     expect(html).toContain('data-od-url-snapshot-bridge');
     expect(html).toContain('data-od-preview-observability');
+    expect(html).toContain('data-od-preview-reveal');
     expect(html.indexOf('data-od-preview-observability')).toBeLessThan(html.indexOf('<body>'));
     expect(html.indexOf('data-od-url-scroll-bridge')).toBeLessThan(html.indexOf('</body>'));
     expect(html.indexOf('data-od-url-selection-bridge')).toBeLessThan(html.indexOf('</body>'));

@@ -4108,6 +4108,9 @@ export interface Dict {
   'fileViewer.videoMeta': string;
   'fileViewer.audioMeta': string;
   'fileViewer.reload': string;
+  'fileViewer.previewReveal.replay': string;
+  'fileViewer.previewReveal.skip': string;
+  'fileViewer.previewReveal.status': string;
   'fileViewer.reloadDisk': string;
   'fileViewer.copy': string;
   'fileViewer.copyTitle': string;

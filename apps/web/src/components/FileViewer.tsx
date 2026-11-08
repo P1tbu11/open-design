@@ -32,6 +32,7 @@ import {
   type OpenDesignHostPreviewNavigationFailure,
 } from '@open-design/host';
 import { CenteredLoader } from './Loading';
+import { PreviewRevealHost, type PreviewRevealHandle } from './preview-reveal/PreviewReveal';
 import { APP_CHROME_FILE_ACTIONS_ID, APP_CHROME_FILE_ACTIONS_SELECTOR } from './AppChromeHeader';
 import {
   commentSendCompleted,
@@ -448,7 +449,7 @@ const POWERED_PREVIEW_SANDBOX =
   'allow-scripts allow-same-origin allow-downloads allow-popups allow-forms allow-modals allow-pointer-lock';
 const POWERED_PREVIEW_ALLOW =
   'accelerometer; autoplay; camera; cross-origin-isolated; fullscreen; gamepad; gyroscope; microphone; xr-spatial-tracking';
-const BASE_PREVIEW_BRIDGE_QUERY = 'odPreviewBridge=scroll&odPreviewBridge=selection&odPreviewBridge=snapshot&odPreviewBridge=observability';
+const BASE_PREVIEW_BRIDGE_QUERY = 'odPreviewBridge=scroll&odPreviewBridge=selection&odPreviewBridge=snapshot&odPreviewBridge=observability&odPreviewBridge=reveal';
 const HTML_PASSIVE_PREVIEW_FULL_TEXT_LIMIT = 2 * 1024 * 1024;
 const HTML_ROUTING_TEXT_PREVIEW_LIMIT = 96 * 1024;
 const HTML_PREVIEW_ASSET_PREFLIGHT_LIMIT = 32;
@@ -8818,6 +8819,7 @@ function HtmlViewer({
   // apart from "canvas shrank" without re-deriving it from React state.
   const lastAutoFitCanvasWidthRef = useRef<number | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const previewRevealRef = useRef<PreviewRevealHandle | null>(null);
   const urlPreviewIframeRef = useRef<HTMLIFrameElement | null>(null);
   const srcDocPreviewIframeRef = useRef<HTMLIFrameElement | null>(null);
   const setUnpooledUrlPreviewIframe = useCallback((frame: HTMLIFrameElement | null) => {
@@ -11395,6 +11397,7 @@ function HtmlViewer({
           paletteBridge: false,
           previewFocusGuard: true,
           previewObservability: true,
+          previewRevealBridge: true,
           deferFontStylesheets: true,
           // Embed the reload counter so the srcdoc string differs across reloads
           // even when the fetched HTML bytes are identical (issue #4650).
@@ -17316,6 +17319,21 @@ function HtmlViewer({
           >
             <Icon name="reload" size={14} />
           </button>
+          {workspaceActive && mode === 'preview' && !effectiveDeck ? (
+            <button
+              type="button"
+              className="icon-only od-tooltip"
+              data-testid="preview-reveal-replay"
+              title={t('fileViewer.previewReveal.replay')}
+              data-tooltip={t('fileViewer.previewReveal.replay')}
+              data-tooltip-placement="bottom"
+              aria-label={t('fileViewer.previewReveal.replay')}
+              disabled={manualEditMode || drawOverlayOpen || boardMode || (useUrlLoadPreview ? urlPreviewFirstLoadPending || urlFrameSrc === 'about:blank' : previewSource === null)}
+              onClick={() => previewRevealRef.current?.replay()}
+            >
+              <RemixIcon name="cursor-ai-line" size={15} />
+            </button>
+          ) : null}
           {/* Two-segment pill tablist: both destinations stay visible and the
               active one is legible at a glance. A single toggle that flips its
               own label reads as "what am I looking at now?" and forces the user
@@ -18356,6 +18374,17 @@ function HtmlViewer({
                           <CenteredLoader label={t('fileViewer.loading')} />
                         </div>
                       ) : null}
+                      <PreviewRevealHost
+                        ref={previewRevealRef}
+                        active={workspaceActive && mode === 'preview' && !effectiveDeck}
+                        blocked={manualEditMode || drawOverlayOpen || boardMode}
+                        streaming={streaming}
+                        previewReady={useUrlLoadPreview
+                          ? !urlPreviewFirstLoadPending && urlFrameSrc !== 'about:blank'
+                          : previewSource !== null}
+                        sessionKey={`${projectId}\0${file.name}\0${file.mtime}`}
+                        frameRef={iframeRef}
+                      />
                     </div>
                   </PreviewDrawOverlay>
                   {previewAssetWarning ? (

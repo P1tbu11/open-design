@@ -24,6 +24,7 @@ await build({
     "./src/runtime/preview-build-focus.ts",
     "./src/runtime/preview-runtime-state.ts",
     "./src/runtime/preview-guards.ts",
+    "./src/runtime/preview-reveal.ts",
     "./src/runtime/html-injection-points.ts",
     "./src/design-systems/components-manifest.ts",
     "./src/design-systems/derived-token-outputs.ts",

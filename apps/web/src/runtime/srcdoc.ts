@@ -33,6 +33,7 @@ import {
   buildPreviewBaseHrefBridge,
   buildPreviewObservabilityBridge,
 } from '@open-design/contracts/runtime/preview-observability';
+import { buildPreviewRevealBridge } from '@open-design/contracts/runtime/preview-reveal';
 import {
   PREVIEW_RUNTIME_STATE_LIMITS,
   PREVIEW_RUNTIME_STATE_VERSION,
@@ -94,6 +95,9 @@ export type SrcdocOptions = {
   /** Install the live-preview error and white-screen reporting bridge. Keep
    * this disabled for exports, captures, thumbnails, and historical previews. */
   previewObservability?: boolean;
+  /** Measure the finished preview so the host can play the build curtain.
+   * Live preview only — exports and thumbnails stay clean. */
+  previewRevealBridge?: boolean;
   /** Let trusted font-CDN stylesheets load without blocking the live preview's
    * first paint. Keep disabled for exports and other capture surfaces. */
   deferFontStylesheets?: boolean;
@@ -440,12 +444,15 @@ export function buildSrcdoc(
     ))),
     options.transportActivationGeneration ?? '',
   );
+  const withReveal = options.previewRevealBridge
+    ? injectBeforeBodyEnd(withTransport, buildPreviewRevealBridge())
+    : withTransport;
   // Embed the reload counter so the srcdoc string differs across reloads even
   // when the underlying HTML bytes are identical.  This ensures the browser
   // sees a changed `srcdoc` attribute and re-parses the document (issue #4650).
   return options.reloadKey !== undefined
-    ? withTransport.replace(/(<html\b)([^>]*>)/i, `$1 data-od-reload-key="${options.reloadKey}"$2`)
-    : withTransport;
+    ? withReveal.replace(/(<html\b)([^>]*>)/i, `$1 data-od-reload-key="${options.reloadKey}"$2`)
+    : withReveal;
 }
 
 /**
