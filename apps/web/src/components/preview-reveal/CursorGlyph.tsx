@@ -27,6 +27,21 @@ const VIEWBOX = 28;
 /** Centre of the arrow's painted ink, measured from the path's bounding box. */
 const INK_CENTRE = { x: 12.85, y: 11.95 };
 
+/**
+ * A soft cast shadow under the arrow, so it reads as a physical object lying on
+ * the page rather than a flat sticker pasted over it.
+ *
+ * Two layers instead of one: a tight one that gives the edge a little weight,
+ * and a wide, very faint one that reads as ambient occlusion. A single blur
+ * strong enough to be visible at this size also smears the arrow's own outline,
+ * which is what makes small icons look muddy.
+ *
+ * `drop-shadow` rather than `box-shadow` because the sprite is a transparent SVG
+ * path: a box shadow would draw shadow around a rectangle nobody can see.
+ */
+const GLYPH_SHADOW =
+  'drop-shadow(0 1px 1.5px rgba(16, 24, 40, 0.20)) drop-shadow(0 3px 7px rgba(16, 24, 40, 0.08))';
+
 export function CursorGlyph({
   color,
   ink = '#ffffff',
@@ -35,6 +50,7 @@ export function CursorGlyph({
   anchor = 'tip',
   /** CSS pixel size of the rendered box, used to scale the centring correction. */
   renderedSize,
+  shadow = true,
   className,
 }: {
   color: string;
@@ -49,6 +65,8 @@ export function CursorGlyph({
   anchor?: 'tip' | 'center';
   /** CSS pixel size of the rendered box, used to scale the centring correction. */
   renderedSize?: number;
+  /** Set false where a shadow would only add noise (tiny, decorative use). */
+  shadow?: boolean;
   className?: string;
 }) {
   const centred = anchor === 'center';
@@ -76,6 +94,9 @@ export function CursorGlyph({
       focusable="false"
       style={{
         overflow: 'visible',
+        // The shadow rides on the same transform as the sprite so it rotates and
+        // scales with it rather than sitting in screen space.
+        filter: shadow ? GLYPH_SHADOW : undefined,
         transformOrigin: `${origin.x}px ${origin.y}px`,
         transform: `translate(${shift.x}px, ${shift.y}px) rotate(${angle}deg) scale(${scale})`,
       }}

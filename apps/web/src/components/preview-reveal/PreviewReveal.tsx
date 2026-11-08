@@ -741,6 +741,12 @@ export function PreviewCompanion({
       onDoubleClick={onReveal}
     >
       <span className={styles.companionGlow} />
+      {/*
+        The arrow turns to face the direction it is travelling, so anything
+        inside this wrapper is rotated with it. That is right for the arrow and
+        wrong for a label: text that leans with the cursor is unreadable at angle
+        and looks like a glitch at 180°.
+      */}
       <div ref={glyphRef} className={styles.companionGlyph}>
         <CursorGlyph
           className={styles.pointer}
@@ -748,6 +754,19 @@ export function PreviewCompanion({
           angle={0}
         />
       </div>
+      {/*
+        The name tag, hung off the arrow's shoulder the way a multiplayer cursor
+        carries its owner's name. It is a sibling of the rotating glyph rather
+        than a child of it, so it shares the cursor's POSITION (the parent's
+        per-frame translate) but not its rotation: the tag stays level while the
+        arrow banks.
+
+        Untranslated on purpose: this is a brand mark, not a sentence, so it must
+        read identically in every locale.
+      */}
+      <span className={styles.companionTag} data-testid="preview-reveal-companion-tag">
+        BANG
+      </span>
     </div>
   );
 }

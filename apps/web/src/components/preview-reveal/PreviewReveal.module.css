@@ -259,6 +259,43 @@
   will-change: transform;
 }
 
+/* The name tag on the parked cursor.
+ *
+ * Placed at the arrow's lower-right shoulder: the tip is the pointer, so the tag
+ * has to stay clear of the top-left corner or it would cover whatever the cursor
+ * is pointing at.
+ *
+ * It is a SIBLING of the rotating glyph, not a child of it. The arrow banks to
+ * face its direction of travel, and text that leans with it is unreadable at an
+ * angle and plainly broken at 180°. As a sibling the tag still rides the parent's
+ * per-frame translate — so it tracks the cursor exactly — while staying level
+ * itself.
+ *
+ * Colour is the lead agent's own (#0D99FF), so the tag is literally the same
+ * blue as the arrow it belongs to rather than a separate brand colour.
+ */
+.companionTag {
+  position: absolute;
+  top: 15px;
+  left: 13px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #0D99FF;
+  color: #ffffff;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  /* A hair of shadow so the capsule keeps its edge over a busy page, matched to
+     the arrow's own cast shadow rather than a heavier floating-card look. */
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.18), 0 2px 8px rgba(13, 153, 255, 0.24);
+  /* The arrow is drawn to be interactive; the tag is a label on it. */
+  pointer-events: none;
+  user-select: none;
+}
+
 @keyframes preview-reveal-breathe {
   0%, 100% { opacity: 0.32; transform: scale(0.86); }
   50% { opacity: 0.62; transform: scale(1.06); }
