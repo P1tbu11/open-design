@@ -15,6 +15,17 @@ export const PREVIEW_REVEAL_BRIDGE_MARKER = 'data-od-preview-reveal';
 export const PREVIEW_REVEAL_PROTOCOL_VERSION = 1;
 export const PREVIEW_REVEAL_REQUEST_TYPE = 'od:preview-reveal-snapshot';
 export const PREVIEW_REVEAL_RESPONSE_TYPE = 'od:preview-reveal-blueprint';
+/**
+ * The page relays its own pointer to the host.
+ *
+ * The preview iframe is cross-origin by construction (`sandbox` without
+ * `allow-same-origin`), so a `pointermove` over the page never reaches the
+ * host's window: DOM events do not cross an iframe boundary. Anything that has
+ * to react to the mouse while the user is reading or scrolling the page — the
+ * cursor that stays after the build, above all — therefore needs the page to
+ * say where the pointer is. This is that one message.
+ */
+export const PREVIEW_REVEAL_POINTER_TYPE = 'od:preview-reveal-pointer';
 /** First-screen choreography. Past this, the curtain stops being a curtain. */
 export const PREVIEW_REVEAL_LAYER_CAP = 36;
 const MAX_COORDINATE = 20_000;
@@ -27,6 +38,19 @@ export interface PreviewRevealRequest {
   type: typeof PREVIEW_REVEAL_REQUEST_TYPE;
   version: typeof PREVIEW_REVEAL_PROTOCOL_VERSION;
   id: string;
+}
+
+/**
+ * A pointer reading relayed from inside the page. Coordinates are in the
+ * page's own viewport, which is the same box the blueprint measured.
+ * `inside: false` is the page saying the pointer left it.
+ */
+export interface PreviewRevealPointer {
+  type: typeof PREVIEW_REVEAL_POINTER_TYPE;
+  version: typeof PREVIEW_REVEAL_PROTOCOL_VERSION;
+  x: number;
+  y: number;
+  inside: boolean;
 }
 
 export type PreviewRevealKind = 'rect' | 'text' | 'image';
@@ -91,6 +115,17 @@ function cssColor(value: unknown): string {
 function imageSrc(value: unknown): string {
   if (typeof value !== 'string' || value.length > MAX_SRC) return '';
   return SRC_PATTERN.test(value) ? value : '';
+}
+
+export function parsePreviewRevealPointer(data: unknown): PreviewRevealPointer | null {
+  if (!data || typeof data !== 'object') return null;
+  const record = data as Record<string, unknown>;
+  if (record.type !== PREVIEW_REVEAL_POINTER_TYPE) return null;
+  if (record.version !== PREVIEW_REVEAL_PROTOCOL_VERSION) return null;
+  const x = finiteBox(record.x, MAX_COORDINATE);
+  const y = finiteBox(record.y, MAX_COORDINATE);
+  if (x === null || y === null) return null;
+  return { type: PREVIEW_REVEAL_POINTER_TYPE, version: PREVIEW_REVEAL_PROTOCOL_VERSION, x, y, inside: record.inside !== false };
 }
 
 /**
@@ -188,6 +223,7 @@ export function buildPreviewRevealBridge(): string {
   window.__odPreviewReveal = true;
   var REQUEST = ${JSON.stringify(PREVIEW_REVEAL_REQUEST_TYPE)};
   var RESPONSE = ${JSON.stringify(PREVIEW_REVEAL_RESPONSE_TYPE)};
+  var POINTER = ${JSON.stringify(PREVIEW_REVEAL_POINTER_TYPE)};
   var VERSION = ${PREVIEW_REVEAL_PROTOCOL_VERSION};
   var CAP = ${PREVIEW_REVEAL_LAYER_CAP};
   var SELECTOR = 'img,svg,picture,p,h1,h2,h3,h4,h5,h6,li,button,a,span,label,div,section,article,header,footer,nav,main,aside,figure,ul,ol';
@@ -241,33 +277,126 @@ export function buildPreviewRevealBridge(): string {
     if (n > 160) return 160;
     return Math.round(n);
   }
-  /* The properties a rebuilt span cannot invent: the page's own type stack,
-     spacing, stroke and weight. The clone carries them so nothing is guessed. */
-  var TEXT_PROPS = [
-    'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
-    'font-stretch', 'font-feature-settings', 'font-variation-settings', 'font-kerning',
-    'font-optical-sizing', 'line-height', 'letter-spacing', 'word-spacing',
-    'text-transform', 'text-align', 'text-indent', 'text-decoration-line',
-    'text-decoration-color', 'text-decoration-style', 'text-decoration-thickness',
-    'text-underline-offset', 'text-shadow', 'white-space', 'direction',
-    'overflow-wrap', 'word-break', 'hyphens', 'tab-size',
-    '-webkit-text-fill-color', '-webkit-text-stroke-width', '-webkit-text-stroke-color',
-    'text-rendering', '-webkit-font-smoothing', 'writing-mode', 'color'
-  ];
-  function styleText(style, scale){
+  /* Everything the clone must carry, taken from the page's computed style.
+   *
+   * This used to be a fixed list of ~34 type properties, and the type was
+   * rescaled by an explicit whitelist of three names ('font-size',
+   * 'letter-spacing', 'word-spacing'). That shape has one failure mode and it is
+   * not hypothetical: any length the list forgot was copied in its LAYOUT size
+   * into a clone drawn at the painted size. 'line-height: 70px' survived into a
+   * clone whose font had been scaled to 9px, and the extra 61px of leading
+   * pushed the glyphs 29px below where the page put them.
+   *
+   * So the rule is now positional rather than nominal: every computed property
+   * whose value is a bare px length is scaled, whatever it is called. Custom
+   * properties, keywords, percentages and unitless ratios pass through — a
+   * ratio like 'line-height: 1.25' is scale-invariant by definition, while
+   * 'getComputedStyle' resolves an explicit line-height to px, so the px case is
+   * exactly the one that needs the multiplication.
+   *
+   * Three filters keep it honest and small:
+   *  - 'CLONE_OWNS' — properties the clone's own box control (it sets
+   *    'width:100%', 'margin:0', 'padding:0', 'border:0', 'position:relative'
+   *    itself). Copying the page's values would fight those and re-introduce a
+   *    box the overlay already sized.
+   *  - 'NOOP_VALUE' — values that mean "nothing here". Without it the string is
+   *    ~2.7k characters of 'normal'/'none'/'auto', which does not fit the
+   *    protocol's 2400-character budget and buries the properties that matter.
+   *  - parent equality — an inherited value identical to the parent's is already
+   *    inherited by the clone, so copying it adds bytes and no behaviour. This
+   *    is also what keeps the list short enough to survive the transport cap.
+   */
+  var CLONE_OWNS = /^(?:--|margin|padding|border(?:-[a-z]+)*-(?:width|style)|border(?:-[a-z]+)*-(?:start|end|top|bottom|left|right)?-?radius|width|height|min-|max-|block-size|inline-size|position|display|float|clear|overflow|box-sizing|top|right|bottom|left|inset|transform|translate|scale|rotate|perspective|animation|transition|x|y|cx|cy|r|rx|ry|d)$/;
+  /**
+   * Values that carry no instruction of their own.
+   *
+   * 'normal' is deliberately NOT here. On most properties it is the initial
+   * value and dropping it is free, but on 'line-height' it is a real instruction
+   * whose resolved height differs from an inherited one (10px text inside a
+   * 'line-height:1.75' ancestor is 13px with 'normal', 17.5px by inheritance).
+   * Dropping it silently handed the clone the ancestor's leading instead of the
+   * page's own — which is the same class of bug this rewrite exists to fix.
+   */
+  var NOOP_VALUE = {
+    none: 1, auto: 1, initial: 1, inherit: 1, unset: 1, revert: 1,
+    visible: 1, static: 1, running: 1, ease: 1, linear: 1,
+    manual: 1, legacy: 1, 'auto-fill': 1, disc: 1, solid: 1,
+    isolate: 1, flat: 1, outside: 1, 'allow-end': 1, optimizespeed: 1
+  };
+  /** A bare px length: the only shape that needs the scale multiplication. */
+  var PX_LENGTH = /^-?\\d*\\.?\\d+px$/;
+  /** '0px' and friends: a zero is a zero at any scale. */
+  var ZERO_LENGTH = /^0(?:\\.0+)?px$/;
+
+  /**
+   * The parent's computed style, for the "already inherited" filter in
+   * 'styleText'. Returns null when there is no usable parent, which simply
+   * disables that filter rather than dropping properties.
+   */
+  function parentStyleOf(el){
+    try {
+      var parent = el.parentElement;
+      if (!parent) return null;
+      return getComputedStyle(parent);
+    } catch (err) {
+      return null;
+    }
+  }
+  /**
+   * Properties whose value reaches an element by inheritance rather than by
+   * its own declaration.
+   *
+   * These must ALWAYS be written onto the clone, even when the value matches the
+   * original element's parent. The clone does not hang under that parent any
+   * more: it sits inside the overlay's own wrapper, whose inherited values come
+   * from the app's stylesheet instead of the previewed page's. Skipping the
+   * declaration therefore does not mean "inherit the same thing" — it means
+   * "inherit whatever the overlay's ancestor happens to say". That is how a
+   * span the page resolved to 'line-height: normal' came out at the overlay's
+   * 17.5px leading.
+   */
+  var INHERITED = {
+    'color': 1, 'font-family': 1, 'font-size': 1, 'font-style': 1,
+    'font-weight': 1, 'font-variant': 1, 'font-stretch': 1, 'font-kerning': 1,
+    'font-feature-settings': 1, 'font-variation-settings': 1,
+    'font-optical-sizing': 1, 'font-size-adjust': 1,
+    'line-height': 1, 'letter-spacing': 1, 'word-spacing': 1,
+    'text-align': 1, 'text-indent': 1, 'text-transform': 1,
+    'text-shadow': 1, 'text-rendering': 1, 'text-underline-offset': 1,
+    'white-space': 1, 'direction': 1, 'visibility': 1, 'cursor': 1,
+    'quotes': 1, 'hyphens': 1, 'tab-size': 1, 'word-break': 1,
+    'overflow-wrap': 1, 'line-break': 1, 'text-justify': 1,
+    'writing-mode': 1, 'text-orientation': 1, 'list-style-type': 1,
+    '-webkit-font-smoothing': 1, '-webkit-text-fill-color': 1,
+    '-webkit-text-stroke-color': 1, '-webkit-text-stroke-width': 1,
+    '-webkit-font-feature-settings': 1, 'border-collapse': 1,
+    'border-spacing': 1, 'caption-side': 1, 'empty-cells': 1
+  };
+  function styleText(style, scale, parent){
     var parts = [];
-    for (var i = 0; i < TEXT_PROPS.length; i++) {
-      var prop = TEXT_PROPS[i];
+    var factor = scale && isFinite(scale) && scale > 0 ? scale : 1;
+    for (var i = 0; i < style.length; i++) {
+      var prop = style[i];
+      if (!prop || CLONE_OWNS.test(prop)) continue;
       var value = style.getPropertyValue(prop);
       if (!value) continue;
-      if (prop === 'font-size' || prop === 'letter-spacing' || prop === 'word-spacing') {
-        var n = parseFloat(value);
-        if (isFinite(n) && scale && scale !== 1) {
-          value = round(n * scale) + 'px';
-        }
+      var trimmed = value.replace(/^\\s+|\\s+$/g, '');
+      if (!trimmed) continue;
+      if (NOOP_VALUE[trimmed.toLowerCase()]) continue;
+      // An inherited value identical to the parent's is NOT safe to skip: the
+      // clone hangs under the overlay, not under that parent, so omitting the
+      // declaration hands it the overlay's inherited value instead. See
+      // INHERITED. Only non-inherited properties can be elided this way, and
+      // those are the ones the clone never needed in the first place.
+      if (!INHERITED[prop] && parent && parent.getPropertyValue(prop).replace(/^\\s+|\\s+$/g, '') === trimmed) continue;
+      var out = value;
+      if (factor !== 1 && PX_LENGTH.test(trimmed)) {
+        // A zero length stays zero; rounding it would only lose the unit.
+        out = ZERO_LENGTH.test(trimmed) ? trimmed : round(parseFloat(trimmed) * factor) + 'px';
       }
-      parts.push(prop + ':' + value);
+      parts.push(prop + ':' + out);
     }
+    // The clone draws a page-local box, not a page-level one.
     parts.push('margin:0');
     parts.push('padding:0');
     parts.push('border:0');
@@ -298,6 +427,24 @@ export function buildPreviewRevealBridge(): string {
     }
     return key;
   }
+  /* The host cannot see the mouse over this page: the frame is cross-origin, so
+     no pointer event escapes it. Relay the reading instead — it costs one
+     postMessage per move and it is the only way a cursor drawn by the host can
+     stay beside the pointer while the user reads the page. */
+  var lastMove = 0;
+  function relay(x, y, inside){
+    try {
+      window.parent.postMessage({ type: POINTER, version: VERSION, x: round(x), y: round(y), inside: inside }, '*');
+    } catch (err) {}
+  }
+  window.addEventListener('pointermove', function(ev){
+    var now = Date.now();
+    if (now - lastMove < 16) return;
+    lastMove = now;
+    relay(ev.clientX, ev.clientY, true);
+  }, { passive: true });
+  document.addEventListener('pointerleave', function(){ relay(0, 0, false); }, { passive: true });
+  window.addEventListener('blur', function(){ relay(0, 0, false); });
   window.addEventListener('message', function(ev){
     var data = ev && ev.data;
     if (!data || data.type !== REQUEST || data.version !== VERSION || typeof data.id !== 'string') return;
@@ -375,7 +522,7 @@ export function buildPreviewRevealBridge(): string {
         weight: weightOf(style),
         size: sizeOf(style, scale),
         text: kind === 'text' ? direct : '',
-        style: kind === 'text' ? styleText(style, scale) : '',
+        style: kind === 'text' ? styleText(style, scale, parentStyleOf(el)) : '',
         html: kind === 'text' ? cloneHtml(el) : '',
         scale: scale,
         src: src,

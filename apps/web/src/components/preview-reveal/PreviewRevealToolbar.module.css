@@ -1,0 +1,42 @@
+/* The toolbar affordance for replaying the build. The arrow is the affordance,
+   so the button contributes only the hit area and the hover wash the toolbar
+   already gives every icon-only control. */
+.trigger {
+  position: relative;
+}
+
+/* The glyph is nudged onto the optical centre of the 28px hit area: the arrow's
+   visual mass sits low-right of its tip, so centring the box reads as off-centre. */
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin: 3px 0 0 1px;
+}
+
+.glyph svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* A slow breath, the same rhythm as the parked cursor, so the button and the
+   thing it operates read as one idea. Opacity only — the toolbar must never
+   visibly reflow. */
+.trigger:not(:disabled) .glyph {
+  animation: preview-reveal-toolbar-breathe 3.4s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+}
+
+.trigger:disabled .glyph {
+  opacity: 0.4;
+}
+
+@keyframes preview-reveal-toolbar-breathe {
+  0%, 100% { opacity: 0.78; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger:not(:disabled) .glyph { animation: none; opacity: 1; }
+}

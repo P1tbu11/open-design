@@ -33,6 +33,7 @@ import {
 } from '@open-design/host';
 import { CenteredLoader } from './Loading';
 import { PreviewRevealHost, type PreviewRevealHandle } from './preview-reveal/PreviewReveal';
+import { PreviewRevealReplayButton } from './preview-reveal/PreviewRevealToolbar';
 import { APP_CHROME_FILE_ACTIONS_ID, APP_CHROME_FILE_ACTIONS_SELECTOR } from './AppChromeHeader';
 import {
   commentSendCompleted,
@@ -17320,19 +17321,12 @@ function HtmlViewer({
             <Icon name="reload" size={14} />
           </button>
           {workspaceActive && mode === 'preview' && !effectiveDeck ? (
-            <button
-              type="button"
-              className="icon-only od-tooltip"
-              data-testid="preview-reveal-replay"
-              title={t('fileViewer.previewReveal.replay')}
-              data-tooltip={t('fileViewer.previewReveal.replay')}
-              data-tooltip-placement="bottom"
-              aria-label={t('fileViewer.previewReveal.replay')}
+            <PreviewRevealReplayButton
+              label={t('fileViewer.previewReveal.replay')}
               disabled={manualEditMode || drawOverlayOpen || boardMode || (useUrlLoadPreview ? urlPreviewFirstLoadPending || urlFrameSrc === 'about:blank' : previewSource === null)}
-              onClick={() => previewRevealRef.current?.replay()}
-            >
-              <RemixIcon name="cursor-ai-line" size={15} />
-            </button>
+              onReplay={() => previewRevealRef.current?.replay()}
+              onSummon={() => previewRevealRef.current?.summon()}
+            />
           ) : null}
           {/* Two-segment pill tablist: both destinations stay visible and the
               active one is legible at a glance. A single toggle that flips its

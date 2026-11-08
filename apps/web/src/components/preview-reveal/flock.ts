@@ -8,12 +8,39 @@
  * Population follows the original numbers, hard-coded on purpose:
  * 18 cursors walk in, the build keeps 8..48 alive from a formula, and the
  * finale fills back up to 36.
+ *
+ * Distances and forces are the reference's own (`swarm-cursors/swarm-rebuild/
+ * swarm.js`, `Engine#follow`): orbit 135, neighbour radius 90, pointer ring 48,
+ * facing offset 128, alignment 0.7/0.3, and the speed/force ceilings below.
+ * Change one of those and the flock stops behaving like the original.
  */
 
-export const MIN_AGENTS = 8;
-export const MAX_AGENTS = 48;
-export const FLOCK_AGENTS = 36;
-export const INTRO_AGENTS = 18;
+import { PRESS_DECAY, pressBody, createPressTrack, type PressTrack } from './press';
+import { REVEAL_FACING_OFFSET } from './swarm';
+
+/**
+ * Population. The reference runs 18 walking in, 8..48 during the build and 36
+ * for the finale; on a build curtain this short that many arrows read as noise
+ * rather than as a crew — and most of them never touch the page, so they are
+ * pure clutter. Ten arrive, the build holds 6..14 depending on how much is
+ * queued, and the finale tops back up to 12 for the merge.
+ */
+
+/**
+ * Every cursor below this id draws, and a cursor may only take a task while it
+ * is home crew.
+ */
+const DRAWING_CURSORS = 6;
+
+/**
+ * The floor is exactly the drawing roster, not a hair lower: home crew is what
+ * never leaves, so a lower floor would let the crew cull a cursor that is
+ * mid-gesture and the box it is dragging would stall half-drawn.
+ */
+export const MIN_AGENTS = DRAWING_CURSORS;
+export const MAX_AGENTS = 14;
+export const FLOCK_AGENTS = 12;
+export const INTRO_AGENTS = 10;
 
 /** The original agent palette, cycled for helpers that own no task. */
 const FLOCK_COLORS = [
@@ -69,7 +96,19 @@ export interface FlockWork {
   blend: number;
 }
 
-export type FlockPhase = 'build' | 'flock';
+/**
+ * `build` draws the page, `flock` circles it, and `converge` is the finale:
+ * the whole crew spirals in on the pointer until one arrow is left.
+ *
+ * The converge is geometric, not a force balance. The boid loop above is tuned
+ * to *hold* a ring — its radial term is a spring around `ORBIT_RADIUS` — so
+ * asking it to collapse by shrinking the radius fights itself and the crew only
+ * tightens a little before the curtain ends. Rotating each cursor's polar offset
+ * toward the knot and easing its length to zero is both simpler and exact, and
+ * it keeps every per-cursor orbit phase, so the crew spirals in as a crowd
+ * rather than sliding along straight lines.
+ */
+export type FlockPhase = 'build' | 'flock' | 'converge';
 
 export interface FlockStepInput {
   state: FlockState;
@@ -77,25 +116,36 @@ export interface FlockStepInput {
   time: number;
   /** Pointer position in stage space, or null when it is outside. */
   pointer: FlockPoint | null;
+  /** Smoothed pointer velocity, shared with the collision so the bounce reads true. */
+  track: PressTrack;
   /** Pointer travel in pixels per second, which is what grows the crew. */
   pointerSpeed: number;
   /** Tasks that have not finished yet, the original's `avail.length`. */
   pending: number;
   /** Where the swarm gathers when nothing better is happening. */
   anchor: FlockPoint;
+  /**
+   * The point the finale collapses into. Defaults to `anchor`; the host passes
+   * the survivor's resting spot so the knot forms exactly where that arrow will
+   * then live.
+   */
+  convergeAt?: FlockPoint;
   /** Per-cursor corner pin, when that cursor is drawing a box right now. */
   work: (cursor: FlockCursor) => FlockWork | null;
   phase: FlockPhase;
+  /** 0..1 through the finale merge. Ignored outside the `converge` phase. */
+  converge?: number;
 }
 
-const ORBIT_RADIUS = 118;
-const NEIGHBOUR_RADIUS = 96;
-const POINTER_KEEPOUT = 46;
+const ORBIT_RADIUS = 135;
+const NEIGHBOUR_RADIUS = 90;
 const BUILD_SPAWN_S = 0.035;
 const FLOCK_SPAWN_S = 0.04;
 const LEAVE_S = 0.34;
+/** A merged cursor disappears once inside this radius of the knot. */
+const MERGE_RADIUS = 26;
 /** Arrow tip sits upper-left, so the sprite needs this offset to face its travel. */
-export const FLOCK_ANGLE_OFFSET = 135;
+export const FLOCK_ANGLE_OFFSET = REVEAL_FACING_OFFSET;
 
 function seeded(index: number): () => number {
   let state = (index + 1) * 0x9e3779b1;
@@ -149,8 +199,11 @@ function makeCursor(
   };
 }
 
-/** 18 walk in; the first eight are home crew. The role roster never leaves, and every
- *  cursor that draws is inside those eight, so the crew can shrink without losing work. */
+/**
+ * The intro crew walks in. The first `MIN_AGENTS` are home crew and are the
+ * only cursors that hold drawing roles, so the crew can shrink back to the floor
+ * without ever losing a cursor that still has work.
+ */
 export function createFlockState(anchor: FlockPoint, roleCount: number): FlockState {
   nextCursorId = 0;
   const state: FlockState = { cursors: [], spawnCooldown: 0, nextId: 0 };
@@ -166,11 +219,19 @@ export function createFlockState(anchor: FlockPoint, roleCount: number): FlockSt
   return state;
 }
 
-/** The original formula: minimum crew plus pointer travel plus pending work, capped. */
+/**
+ * Minimum crew plus pointer travel plus queued work, capped.
+ *
+ * The reference divides pending work by 2 against a 48-cursor ceiling; against
+ * this much smaller crew both terms would saturate the cap on any real page
+ * (a 28-layer page alone would add 7 bystanders who never touch it). They are
+ * divided by 8 and 90 instead, so the crew grows because the page is genuinely
+ * busy and not merely because it has layers.
+ */
 export function flockTarget(pointerSpeed: number, pending: number, phase: FlockPhase): number {
-  if (phase === 'flock') return FLOCK_AGENTS;
+  if (phase !== 'build') return FLOCK_AGENTS;
   return clamp(
-    MIN_AGENTS + Math.floor(pointerSpeed / 40) + Math.floor(pending / 2),
+    MIN_AGENTS + Math.floor(pointerSpeed / 90) + Math.floor(pending / 8),
     MIN_AGENTS,
     MAX_AGENTS,
   );
@@ -189,31 +250,39 @@ export function stepFlock(input: FlockStepInput): void {
   const { state, pointer, anchor } = input;
   const dt = Math.min(0.05, Math.max(0, input.dt));
   if (dt === 0) return;
+  const merging = input.phase === 'converge';
   const roleCount = countRoles(state);
   const want = flockTarget(input.pointerSpeed, input.pending, input.phase);
 
   state.spawnCooldown -= dt;
-  for (let guard = 0; guard < 4; guard += 1) {
-    const active = state.cursors.filter((cursor) => cursor.leaving === 0).length;
-    if (active >= want || state.spawnCooldown > 0) break;
-    const role = freeRole(state, roleCount);
-    state.cursors.push(makeCursor(
-      state,
-      anchor,
-      role,
-      false,
-      40 + roleCount * 6 + (active % 5) * 7,
-    ));
-    state.spawnCooldown = input.phase === 'flock' ? FLOCK_SPAWN_S : BUILD_SPAWN_S;
+  // The finale only ever sheds cursors: refilling behind a merge would make the
+  // knot grow as it tightens.
+  if (!merging) {
+    for (let guard = 0; guard < 4; guard += 1) {
+      const active = state.cursors.filter((cursor) => cursor.leaving === 0).length;
+      if (active >= want || state.spawnCooldown > 0) break;
+      const role = freeRole(state, roleCount);
+      state.cursors.push(makeCursor(
+        state,
+        anchor,
+        role,
+        false,
+        40 + roleCount * 6 + (active % 5) * 7,
+      ));
+      state.spawnCooldown = input.phase === 'flock' ? FLOCK_SPAWN_S : BUILD_SPAWN_S;
+    }
   }
 
-  // Anyone above the target flies off, unless it is home crew.
-  let active = state.cursors.filter((cursor) => cursor.leaving === 0).length;
-  for (const cursor of state.cursors) {
-    if (active <= want) break;
-    if (cursor.home || cursor.leaving > 0) continue;
-    cursor.leaving = 0.0001;
-    active -= 1;
+  // Anyone above the target flies off, unless it is home crew. During the merge
+  // the crew is allowed to exceed the ceiling on its way in.
+  if (!merging) {
+    let active = state.cursors.filter((cursor) => cursor.leaving === 0).length;
+    for (const cursor of state.cursors) {
+      if (active <= want) break;
+      if (cursor.home || cursor.leaving > 0) continue;
+      cursor.leaving = 0.0001;
+      active -= 1;
+    }
   }
 
   for (const cursor of state.cursors) {
@@ -222,14 +291,16 @@ export function stepFlock(input: FlockStepInput): void {
   if (state.cursors.some((cursor) => cursor.leaving >= 1)) {
     state.cursors = state.cursors.filter((cursor) => cursor.leaving < 1);
   }
-
   advance(state.cursors.filter((cursor) => cursor.leaving === 0), {
     dt,
     time: input.time,
     pointer,
+    track: input.track,
     anchor,
+    convergeAt: input.convergeAt ?? anchor,
     work: input.work,
     releasing: input.phase === 'flock',
+    converge: merging ? clamp(input.converge ?? 0, 0, 1) : 0,
   });
 }
 
@@ -247,14 +318,29 @@ function advance(
     dt: number;
     time: number;
     pointer: FlockPoint | null;
+    track: PressTrack;
     anchor: FlockPoint;
+    convergeAt: FlockPoint;
     work: (cursor: FlockCursor) => FlockWork | null;
     releasing: boolean;
+    converge: number;
   },
 ): void {
   const { pointer, anchor } = input;
   const dt = input.dt;
   const time = input.time / 1000;
+  const converge = input.converge;
+
+  // The finale is not a force balance. The loop below is tuned to *hold* a ring
+  // — its radial term is a spring around ORBIT_RADIUS — so shrinking that
+  // radius fights itself and the crew only tightens a little. Instead each
+  // cursor's polar offset is rotated and shortened toward the knot directly,
+  // keeping its own orbit phase so the crew spirals in as a crowd.
+  if (converge > 0) {
+    mergeInto(cursors, input.convergeAt, converge, dt);
+    return;
+  }
+
   const origin = pointer ?? anchor;
   const radius = ORBIT_RADIUS * (1 + 0.18 * Math.sin(time * 0.55));
   const swirl = Math.tanh(Math.cos(time * 0.11) * 3);
@@ -262,9 +348,8 @@ function advance(
   const desired: Array<[number, number]> = [];
   for (const cursor of cursors) {
     const work = input.work(cursor);
-    // In the finale everyone only circles; no one splits off to a corner.
-    const pin = input.releasing ? 0 : 1;
-    const blend = work ? clamp(work.blend, 0, 1) * pin : 0;
+    // Once the build is over nobody splits off to a corner.
+    const blend = work && !input.releasing ? clamp(work.blend, 0, 1) : 0;
     const dx = cursor.x - origin.x;
     const dy = cursor.y - origin.y;
     const distance = Math.hypot(dx, dy) || 0.01;
@@ -326,31 +411,81 @@ function advance(
     cursor.y += cursor.vy * dt;
   }
 
+  // Same collision the companion uses, so a knock feels identical in both.
   if (pointer) {
     for (const cursor of cursors) {
-      const dx = cursor.x - pointer.x;
-      const dy = cursor.y - pointer.y;
-      const distance = Math.hypot(dx, dy) || 0.01;
-      if (distance >= POINTER_KEEPOUT) {
-        cursor.press = Math.max(0, cursor.press - dt * 6);
-        continue;
-      }
-      const nx = dx / distance;
-      const ny = dy / distance;
-      cursor.x = pointer.x + nx * POINTER_KEEPOUT;
-      cursor.y = pointer.y + ny * POINTER_KEEPOUT;
-      cursor.vx += nx * 260;
-      cursor.vy += ny * 260;
-      cursor.press = 1;
+      if (pressBody(input.track, cursor, pointer)) cursor.press = 1;
     }
-  } else {
-    for (const cursor of cursors) cursor.press = Math.max(0, cursor.press - dt * 6);
   }
 
+  // The original turns a cursor while it is actually travelling, and relaxes
+  // every flinch on the same 6/s clock.
   for (const cursor of cursors) {
-    if (Math.hypot(cursor.vx, cursor.vy) < 26) continue;
-    const facing = (Math.atan2(cursor.vy, cursor.vx) * 180) / Math.PI + FLOCK_ANGLE_OFFSET;
-    const delta = ((((facing - cursor.angle + 540) % 360) + 360) % 360) - 180;
-    cursor.angle += delta * Math.min(1, dt * 8);
+    if (Math.hypot(cursor.vx, cursor.vy) >= 30) {
+      const facing = (Math.atan2(cursor.vy, cursor.vx) * 180) / Math.PI + FLOCK_ANGLE_OFFSET;
+      const delta = ((((facing - cursor.angle + 540) % 360) + 360) % 360) - 180;
+      cursor.angle += delta * Math.min(1, dt * 8);
+    }
+    cursor.press = Math.max(0, cursor.press - dt * PRESS_DECAY);
+  }
+}
+
+/**
+ * The finale, in polar form.
+ *
+ * Every cursor keeps the bearing it already has and winds in on that bearing,
+ * so the crowd reads as arrows spiralling down a funnel rather than sliding
+ * along parallel lines. The wind is a fraction of a turn that grows with the
+ * progress, and each cursor's own `spin`/`curl` decide how far it travels —
+ * that is what keeps the group looking disordered on the way in.
+ *
+ * Arrivals are staggered by index: the crew disappears from the outside in
+ * over the last part of the merge, instead of all vanishing on one frame.
+ * The lowest-id cursor (the blue lead) is always the one left standing, and it
+ * is the one the host hands to `PreviewCompanion`.
+ */
+function mergeInto(
+  cursors: FlockCursor[],
+  target: FlockPoint,
+  progress: number,
+  dt: number,
+): void {
+  if (cursors.length === 0) return;
+  for (const cursor of cursors) {
+    const dx = cursor.x - target.x;
+    const dy = cursor.y - target.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > 0.5) {
+      const bearing = Math.atan2(dy, dx);
+      // A quarter-turn to a full turn of wind, longer for the cursors that
+      // already spin hard: identical to how they behave in the ring.
+      const wind = (0.25 + Math.abs(cursor.curl) * 0.55) * (cursor.curl < 0 ? -1 : 1) * progress;
+      const nextBearing = bearing + wind;
+      // Ease-in so the knot opens with a turn and closes with a snap.
+      const pulled = distance * (1 - progress ** 1.35);
+      const nx = target.x + Math.cos(nextBearing) * pulled;
+      const ny = target.y + Math.sin(nextBearing) * pulled;
+      cursor.vx = (nx - cursor.x) / Math.max(dt, 0.001);
+      cursor.vy = (ny - cursor.y) / Math.max(dt, 0.001);
+      cursor.x = nx;
+      cursor.y = ny;
+      const facing = (Math.atan2(cursor.vy, cursor.vx) * 180) / Math.PI + FLOCK_ANGLE_OFFSET;
+      const delta = ((((facing - cursor.angle + 540) % 360) + 360) % 360) - 180;
+      cursor.angle += delta * Math.min(1, dt * 12);
+    }
+    cursor.press = Math.max(0, cursor.press - dt * PRESS_DECAY);
+  }
+
+  // Bows out from the outside in. The lead arrow never bows out; it is the one
+  // the host turns into the surviving cursor.
+  const lead = cursors.reduce((best, cursor) => (cursor.id < best.id ? cursor : best), cursors[0]!);
+  const reach = MERGE_RADIUS + 30 * (1 - progress);
+  for (const cursor of cursors) {
+    if (cursor === lead || cursor.leaving > 0) continue;
+    // Stagger by id so they do not all reach the knot on the same frame.
+    const lag = 0.55 + ((cursor.id * 37) % 100) / 260;
+    if (progress >= lag && Math.hypot(cursor.x - target.x, cursor.y - target.y) <= reach) {
+      cursor.leaving = 0.0001;
+    }
   }
 }

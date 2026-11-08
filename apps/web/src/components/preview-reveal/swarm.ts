@@ -29,13 +29,40 @@ export const REVEAL_ARROW_PATH = 'M4.6 3.9 C4.2 3.1 4.9 2.4 5.7 2.8 L20.6 9.4 C2
 /** Hot spot of the arrow, in the 28×28 cursor canvas. */
 export const REVEAL_ARROW_HOTSPOT = { x: 5, y: 3.5 };
 
-/** A pressed cursor shrinks a touch, the way the original does on click. */
+/**
+ * A pressed cursor shrinks a touch, the way the original does on click: the
+ * reference renders `1 - press * 0.12`, so this is the fully-pressed factor.
+ */
 export const REVEAL_PRESS_SCALE = 0.88;
+
+/** The cursor the whole swarm collapses into: the swarm's own first arrow. */
+export const REVEAL_LEAD_COLOR = '#0D99FF';
+
+/**
+ * The arrow tip sits upper-left, so a sprite travelling right must be turned
+ * this much to face its direction. The reference uses 128 with the same path.
+ */
+export const REVEAL_FACING_OFFSET = 128;
 
 export const REVEAL_INTRO_MS = 920;
 
 export function formatRevealSize(width: number, height: number): string {
   return `${Math.max(0, Math.round(width))} × ${Math.max(0, Math.round(height))}`;
+}
+
+/**
+ * A drag that reads as a drag.
+ *
+ * `easeOut` (the reference's only curve) front-loads almost all of the travel:
+ * at a third of the way through it is already at 70% of the box, so the marquee
+ * appears to snap open and then crawl. A gesture you are meant to *watch* needs
+ * its distance spread across the whole beat, so this is a slight ease-in-out —
+ * a touch of acceleration off the corner, a touch of deceleration into the
+ * landing, and a long readable middle.
+ */
+export function easeGesture(t: number): number {
+  const clamped = Math.min(1, Math.max(0, t));
+  return clamped * clamped * (3 - 2 * clamped);
 }
 
 function easeOut(t: number): number {
@@ -71,7 +98,9 @@ export function revealLayerFrame(input: {
   now: number;
 }): RevealLayerFrame {
   const raw = input.durationMs <= 0 ? 1 : Math.min(1, Math.max(0, (input.now - input.startMs) / input.durationMs));
-  const progress = easeOut(raw);
+  // Box growth is spread across the whole gesture; fills and typing keep the
+  // reference's front-loaded curve, where snapping into place is the point.
+  const progress = input.action === 'duplicate' ? easeOut(raw) : easeGesture(raw);
   const growing = input.action !== 'duplicate';
   // Content and chrome share one hand-off point: the instant the fill starts to
   // appear, the marquee and its size chip are gone. For a rect that is when the

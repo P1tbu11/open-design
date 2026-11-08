@@ -10,6 +10,7 @@ import {
 } from 'react';
 import {
   parsePreviewRevealBlueprint,
+  parsePreviewRevealPointer,
   previewRevealRequest,
   type PreviewRevealBlueprint,
   type PreviewRevealLayer,
@@ -18,15 +19,39 @@ import { useT } from '../../i18n';
 import {
   claimPreviewRevealAutoplay,
   planPreviewReveal,
+  previewRevealConvergeAt,
+  previewRevealPhaseAt,
   shouldQueuePreviewRevealAutoplay,
 } from './plan';
-import { cursorWork, REVEAL_AGENTS, REVEAL_ARROW_HOTSPOT, REVEAL_ARROW_PATH, revealLayerFrame, type CursorWork } from './swarm';
-import { createFlockState, flockColorOf, stepFlock, type FlockPoint } from './flock';
+import { cursorWork, REVEAL_AGENTS, REVEAL_PRESS_SCALE, revealLayerFrame, type CursorWork } from './swarm';
+import {
+  createFlockState,
+  flockColorOf,
+  stepFlock,
+  type FlockPoint,
+} from './flock';
+import { COMPANION_REST, createCompanion, nudgeCompanion, stepCompanion, type CompanionState } from './companion';
+import { usePointerRuntime, type PointerRuntime } from './pointer';
+import type { PressPoint } from './press';
+import { CursorGlyph } from './CursorGlyph';
 import { RevealSound } from './sound';
 import styles from './PreviewReveal.module.css';
 
+/** Where the crowd ends and the one remaining cursor takes over. */
+export interface PreviewRevealHandoff {
+  x: number;
+  y: number;
+  angle: number;
+}
+
 export interface PreviewRevealHandle {
   replay: () => void;
+  /**
+   * The toolbar gesture that says "I am about to operate on this page". The
+   * cursor on the page answers it, which is what makes the toolbar control and
+   * the cursor read as one assistant rather than a button and a decoration.
+   */
+  summon: () => void;
 }
 
 export interface PreviewRevealHostProps {
@@ -43,7 +68,11 @@ export interface PreviewRevealLabels {
   status: string;
 }
 
-const FADE_MS = 180;
+/** The page reappears under the swarm: the curtain thins away, the arrows stay. */
+const CURTAIN_FADE_MS = 520;
+
+/** How long the "I was hit" glow outlives the collision frame. */
+const KNOCK_HOLD_MS = 420;
 
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -67,18 +96,18 @@ function placedFrames(
     layer.group ? blueprint.layers.find((item) => item.group === layer.group && item.master) ?? null : null
   );
   return blueprint.layers.flatMap((layer) => {
-      const task = plan.tasks.find((item) => item.layerId === layer.id);
-      if (!task) return [];
-      const frame = revealLayerFrame({
-        layer,
-        master: task.action === 'duplicate' ? masterOf(layer) : null,
-        action: task.action,
-        startMs: task.startMs,
-        durationMs: task.durationMs,
-        now,
-      });
-      return frame.visible ? [{ layer, task, frame }] : [];
+    const task = plan.tasks.find((item) => item.layerId === layer.id);
+    if (!task) return [];
+    const frame = revealLayerFrame({
+      layer,
+      master: task.action === 'duplicate' ? masterOf(layer) : null,
+      action: task.action,
+      startMs: task.startMs,
+      durationMs: task.durationMs,
+      now,
     });
+    return frame.visible ? [{ layer, task, frame }] : [];
+  });
 }
 
 function focusOf(
@@ -113,23 +142,84 @@ function anchorOf(frames: ReturnType<typeof placedFrames>, viewport: { width: nu
 }
 
 /**
+ * Where the knot forms: the cursor's resting offset from the pointer, kept
+ * inside the stage so a pointer near an edge does not push the merge offscreen.
+ */
+function knotOf(pointer: FlockPoint, viewport: { width: number; height: number }): FlockPoint {
+  const margin = 24;
+  return {
+    x: Math.max(margin, Math.min(viewport.width - margin, pointer.x + COMPANION_REST.x)),
+    y: Math.max(margin, Math.min(viewport.height - margin, pointer.y + COMPANION_REST.y)),
+  };
+}
+
+/**
+ * Pointer in stage pixels → the blueprint's own coordinate space.
+ *
+ * The surface is drawn at the blueprint's size and then uniformly scaled and
+ * centred onto the stage, so everything on it — cursor orbits, the keep-out
+ * ring, the knot — lives in blueprint units. Handing it raw stage pixels would
+ * put the crew in the wrong place the moment those two sizes disagree, and the
+ * letterboxing has to be subtracted before dividing.
+ */
+/**
+ * Pointer in stage pixels → the blueprint's own coordinate space.
+ *
+ * The surface is drawn at the blueprint's size and then uniformly scaled and
+ * centred onto the stage, so everything on it — cursor orbits, the keep-out
+ * ring, the knot — lives in blueprint units. Handing it raw stage pixels would
+ * put the crew in the wrong place the moment those two sizes disagree, and the
+ * letterboxing has to be subtracted before dividing.
+ *
+ * `screen` is the live stage, `surface` is the blueprint-sized box drawn on it,
+ * so the conversion divides by the surface→stage enlargement factor.
+ */
+export function toBlueprintSpace(
+  point: PressPoint | null,
+  screen: { width: number; height: number },
+  surface: { width: number; height: number },
+): PressPoint | null {
+  if (!point) return null;
+  const scale = uniformScale(surface, screen);
+  if (scale <= 0) return null;
+  return {
+    x: (point.x - screen.width / 2) / scale + surface.width / 2,
+    y: (point.y - screen.height / 2) / scale + surface.height / 2,
+  };
+}
+
+/**
+ * The one scale factor used to fit a blueprint-sized surface onto a stage: the
+ * smaller of the two axis ratios, so the whole surface stays visible and the
+ * remainder is letterboxed. Both axes get this same number — see the note on
+ * the canvas in `PreviewRevealStage`.
+ *
+ * `from` is the content, `to` is the box it is drawn into, so a result above 1
+ * means the surface is enlarged to fill the stage.
+ */
+export function uniformScale(from: { width: number; height: number }, to: { width: number; height: number }): number {
+  return Math.min(
+    to.width / Math.max(1, from.width),
+    to.height / Math.max(1, from.height),
+  );
+}
+
+/**
  * A text layer, revealed by wiping its cloned markup sideways. The page's own
  * computed type stack is applied through `styleText`, so font, spacing, weight
  * and stroke stay exactly as the page rendered them — nothing is re-guessed.
  */
-function RevealText({
+export function RevealText({
   className,
   styleText,
   html,
   fallback,
-  scale,
   typed,
 }: {
   className: string | undefined;
   styleText: string;
   html: string;
   fallback: string;
-  scale: number;
   typed: number;
 }) {
   const cloneRef = useRef<HTMLDivElement | null>(null);
@@ -137,15 +227,19 @@ function RevealText({
   // the node verbatim keeps every property React's style object would normalise.
   // `white-space` comes along with it, so a wrapped heading stays wrapped instead
   // of being flattened to one clipped line by the overlay's own CSS.
+  //
+  // It arrives ALREADY expressed in the overlay's coordinate space: the bridge
+  // measures boxes with `getBoundingClientRect()` (painted/stage pixels) and
+  // multiplies font-size, letter-spacing and word-spacing by the same ratio, so
+  // the type is sized for the box it is about to sit in. Adding a `transform`
+  // here would apply that ratio a second time — on a page whose stage is scaled
+  // to a third (4680px design on a 1400px viewport) that left 9px type painted
+  // at 1.4px. The node must stay untransformed; only its own CSS sizes it.
   const applyStyle = useCallback((node: HTMLDivElement | null) => {
     cloneRef.current = node;
     if (!node) return;
     node.setAttribute('style', styleText);
-    if (scale && scale !== 1) {
-      node.style.transform = `scale(${scale})`;
-      node.style.transformOrigin = 'top left';
-    }
-  }, [styleText, scale]);
+  }, [styleText]);
 
   return (
     <div
@@ -170,18 +264,35 @@ function RevealText({
 export function PreviewRevealStage({
   blueprint,
   labels,
+  pointer,
   onDone,
   onSkip,
 }: {
   blueprint: PreviewRevealBlueprint;
   labels: PreviewRevealLabels;
-  onDone: () => void;
+  /** The host's single pointer reading, shared with the cursor that follows. */
+  pointer: PointerRuntime;
+  onDone: (handoff: PreviewRevealHandoff) => void;
   onSkip: () => void;
 }) {
   const plan = useMemo(() => planPreviewReveal(blueprint), [blueprint]);
   const [now, setNow] = useState(0);
+  // The live size of the stage. The blueprint is measured once, so the drawing
+  // surface has to be mapped onto whatever box the preview has now.
+  const [stageSize, setStageSize] = useState(() => ({
+    width: blueprint.viewport.width,
+    height: blueprint.viewport.height,
+  }));
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  // Mirrors `stageSize` for the animation loop. The loop must not restart when
+  // the preview is resized (that would reset the whole timeline), so it reads
+  // the live box from here instead of taking it as a dependency.
+  const stageSizeRef = useRef({ width: blueprint.viewport.width, height: blueprint.viewport.height });
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
+  // Where the finale collapses to, latched once so the surviving arrow is handed
+  // over at exactly the point the crew gathered into.
+  const knotRef = useRef<FlockPoint | null>(null);
   const flock = useMemo(
     () => createFlockState(
       { x: blueprint.viewport.width / 2, y: blueprint.viewport.height / 2 },
@@ -189,14 +300,11 @@ export function PreviewRevealStage({
     ),
     [blueprint.requestId, blueprint.viewport.width, blueprint.viewport.height],
   );
-  const pointerRef = useRef<FlockPoint | null>(null);
-  const pointerSpeedRef = useRef(0);
-  const lastPointerRef = useRef<{ x: number; y: number; at: number } | null>(null);
   const pendingRef = useRef(0);
   const lastFrameRef = useRef(0);
-  const stageRef = useRef<HTMLDivElement | null>(null);
   const soundRef = useRef<RevealSound | null>(null);
   const soundedRef = useRef<Set<string>>(new Set());
+  const releasedRef = useRef(false);
 
   useEffect(() => {
     // The audio context has to be created inside a user gesture, so it is armed
@@ -204,47 +312,21 @@ export function PreviewRevealStage({
     const sound = new RevealSound();
     soundRef.current = sound;
     soundedRef.current = new Set();
+    releasedRef.current = false;
     return () => {
       sound.dispose();
       soundRef.current = null;
     };
   }, [blueprint.requestId]);
 
-  // The pointer is tracked on window, like the original, so the swarm keeps its
-  // bearing even while the cursor crosses the chrome around the preview.
+  // Arm audio on the first gesture the stage sees; the graph itself stays put.
   useEffect(() => {
-    const onMove = (event: PointerEvent) => {
-      const stage = stageRef.current;
-      if (!stage) return;
-      soundRef.current?.arm();
-      const rect = stage.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      const inside = x >= -40 && y >= -40 && x <= rect.width + 40 && y <= rect.height + 40;
-      const now = performance.now();
-      const last = lastPointerRef.current;
-      if (inside && last && now > last.at) {
-        const travelled = Math.hypot(x - last.x, y - last.y);
-        const speed = (travelled / ((now - last.at) / 1000));
-        // Smooth the reading so one jittery sample cannot inflate the crew.
-        pointerSpeedRef.current = pointerSpeedRef.current * 0.72 + Math.min(4000, speed) * 0.28;
-      }
-      if (!inside) pointerSpeedRef.current *= 0.8;
-      lastPointerRef.current = inside ? { x, y, at: now } : null;
-      pointerRef.current = inside ? { x, y } : null;
-    };
-    const onLeave = () => {
-      pointerRef.current = null;
-      pointerSpeedRef.current = 0;
-      lastPointerRef.current = null;
-    };
-    window.addEventListener('pointermove', onMove, { passive: true });
-    document.documentElement.addEventListener('pointerleave', onLeave);
-    window.addEventListener('blur', onLeave);
+    const arm = () => soundRef.current?.arm();
+    window.addEventListener('pointerdown', arm, { passive: true, capture: true });
+    window.addEventListener('keydown', arm, { capture: true });
     return () => {
-      window.removeEventListener('pointermove', onMove);
-      document.documentElement.removeEventListener('pointerleave', onLeave);
-      window.removeEventListener('blur', onLeave);
+      window.removeEventListener('pointerdown', arm, { capture: true });
+      window.removeEventListener('keydown', arm, { capture: true });
     };
   }, []);
 
@@ -256,10 +338,27 @@ export function PreviewRevealStage({
       const elapsed = time - started;
       const dt = lastFrameRef.current === 0 ? 1 / 60 : (time - lastFrameRef.current) / 1000;
       lastFrameRef.current = time;
+      pointer.sample(dt);
       const currentFrames = placedFrames(blueprint, plan, elapsed);
       const anchor = anchorOf(currentFrames, blueprint.viewport);
+      const phase = previewRevealPhaseAt(plan, elapsed);
+      const converge = previewRevealConvergeAt(plan, elapsed);
+      // The whole curtain counts: a build fired from the toolbar leaves the
+      // pointer up on the button, and the reading from before that click is
+      // still the user's position on the page.
+      const live = stageSizeRef.current;
+      const gather = toBlueprintSpace(
+        pointer.remembered(plan.durationMs + 500),
+        live,
+        blueprint.viewport,
+      );
+      const knot = gather
+        ? knotOf(gather, blueprint.viewport)
+        : { x: anchor.x + COMPANION_REST.x, y: anchor.y + COMPANION_REST.y };
+      // Latched the moment the merge starts: after that the crew's own centroid
+      // would drag it around and the handoff would drift.
+      if (knotRef.current === null && converge > 0) knotRef.current = knot;
       pendingRef.current = plan.tasks.filter((task) => task.startMs + task.durationMs > elapsed).length;
-      pointerSpeedRef.current *= 0.94;
       // One click when the cursor grabs a box, matching the original's `press()`.
       for (const item of currentFrames) {
         if (soundedRef.current.has(item.layer.id)) continue;
@@ -270,15 +369,26 @@ export function PreviewRevealStage({
           viewportWidth: blueprint.viewport.width,
         });
       }
+      // The page comes back while the crew is still on screen, so the merge
+      // happens over the real page rather than over a fading screenshot.
+      if (!releasedRef.current && elapsed >= plan.buildMs) {
+        releasedRef.current = true;
+        soundRef.current?.release();
+      }
       stepFlock({
         state: flock,
         dt,
         time: elapsed,
-        pointer: pointerRef.current,
-        pointerSpeed: pointerSpeedRef.current,
+        // Everyone on the surface, including the pointer, works in blueprint
+        // units — see `toBlueprintSpace`.
+        pointer: toBlueprintSpace(pointer.point, live, blueprint.viewport),
+        track: pointer.track,
+        pointerSpeed: pointer.speed,
         pending: pendingRef.current,
         anchor,
-        phase: elapsed >= plan.buildMs ? 'flock' : 'build',
+        convergeAt: knot,
+        phase,
+        converge,
         work: (cursor) => {
           if (cursor.agent < 0) return null;
           const agent = REVEAL_AGENTS[cursor.agent];
@@ -288,22 +398,48 @@ export function PreviewRevealStage({
         },
       });
       setNow(elapsed);
-      if (elapsed >= plan.durationMs + FADE_MS) {
-        onDoneRef.current();
+      if (elapsed >= plan.durationMs) {
+        // Hand over exactly at the knot: the knot was formed beside the pointer,
+        // which is where the companion rests, so this is a settle, not a jump.
+        // The knot is in blueprint units and the companion lives in stage
+        // pixels, so it is mapped on the way out.
+        const knot = knotRef.current ?? knotOf(anchor, blueprint.viewport);
+        const scale = uniformScale(blueprint.viewport, live);
+        onDoneRef.current({
+          x: live.width / 2 + (knot.x - blueprint.viewport.width / 2) * scale,
+          y: live.height / 2 + (knot.y - blueprint.viewport.height / 2) * scale,
+          angle: 0,
+        });
         return;
       }
       frame = window.requestAnimationFrame(tick);
     };
     frame = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(frame);
-  }, [blueprint, plan, flock]);
+  }, [blueprint, plan, flock, pointer]);
 
-  const trackPointer = useCallback((event: { currentTarget: EventTarget | null; clientX: number; clientY: number }) => {
-    const target = event.currentTarget;
-    if (!(target instanceof HTMLElement)) return;
-    const rect = target.getBoundingClientRect();
-    pointerRef.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-  }, []);
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return undefined;
+    const measure = () => {
+      const rect = stage.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      stageSizeRef.current = { width: rect.width, height: rect.height };
+      setStageSize((current) => (
+        Math.abs(current.width - rect.width) < 0.5 && Math.abs(current.height - rect.height) < 0.5
+          ? current
+          : { width: rect.width, height: rect.height }
+      ));
+    };
+    measure();
+    if (typeof ResizeObserver !== 'function') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, [blueprint.requestId]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -320,21 +456,53 @@ export function PreviewRevealStage({
     return () => window.removeEventListener('keydown', onKey);
   }, [onSkip]);
 
-  const fade = now > plan.durationMs ? Math.min(1, (now - plan.durationMs) / FADE_MS) : 0;
+  // The curtain covers the page while it is being built, then thins away so the
+  // real page is what the swarm gathers over. The arrows do NOT fade with it:
+  // the finale is the crew folding in over the revealed page, and hiding them
+  // under the same opacity is what made the merge invisible.
+  const curtain = now <= plan.buildMs
+    ? 1
+    : Math.max(0, 1 - (now - plan.buildMs) / CURTAIN_FADE_MS);
   const frames = placedFrames(blueprint, plan, now);
+  const phase = previewRevealPhaseAt(plan, now);
+  // One factor for both axes: see the note on the canvas below. `min` keeps the
+  // whole surface visible; the rest of the stage is letterboxed.
+  const fit = uniformScale(blueprint.viewport, stageSize);
 
   return (
     <div
       ref={stageRef}
       className={styles.stage}
-      style={{ background: blueprint.background, opacity: 1 - fade }}
       role="status"
       aria-label={labels.status}
       data-testid="preview-reveal"
-      onPointerMove={trackPointer}
-      onPointerDown={trackPointer}
+      data-phase={phase}
     >
-      {frames.map(({ layer, task, frame }) => {
+      <div className={styles.curtain} style={{ background: blueprint.background, opacity: curtain }} />
+      {/*
+        The crew and the boxes are measured in the viewport the blueprint was
+        taken in, so they are drawn on a surface of exactly that size and the
+        surface is scaled onto the live stage.
+
+        The scale is UNIFORM. Resizing the preview does not reflow this surface
+        the way it reflows the page — so a per-axis `scale(sx, sy)` would stretch
+        type sideways whenever the two aspect ratios disagreed, and the same
+        headline the page renders cleanly would come out condensed and tall. One
+        factor (`min` of the two, so nothing is cropped) keeps every glyph the
+        shape the page gave it; the leftover space is letterboxed.
+      */}
+      <div
+        className={styles.canvas}
+        style={{
+          opacity: curtain,
+          width: blueprint.viewport.width,
+          height: blueprint.viewport.height,
+          transform: `translate(-50%, -50%) scale(${fit})`,
+          left: '50%',
+          top: '50%',
+        }}
+      >
+        {frames.map(({ layer, task, frame }) => {
         const agent = REVEAL_AGENTS.find((item) => item.id === task.agent);
         if (!agent) return null;
         return (
@@ -369,7 +537,6 @@ export function PreviewRevealStage({
                 styleText={layer.style ?? ''}
                 html={layer.html ?? ''}
                 fallback={layer.text}
-                scale={layer.scale ?? 1}
                 typed={frame.typed}
               />
             ) : null}
@@ -393,7 +560,7 @@ export function PreviewRevealStage({
                 ))}
               </>
             ) : null}
-            {frame.dragging ? (
+            {frame.dragging && task.action !== 'duplicate' ? (
               <span
                 className={styles.sizeTag}
                 style={{ background: agent.color }}
@@ -404,10 +571,10 @@ export function PreviewRevealStage({
           </div>
         );
       })}
+      </div>
       {flock.cursors.map((cursor) => {
         const agent = cursor.agent >= 0 ? REVEAL_AGENTS[cursor.agent] : undefined;
         const role = agent?.role ?? 'layout';
-        const leavingFade = cursor.leaving > 0 ? 1 - cursor.leaving : 1;
         return (
           <div
             key={cursor.id}
@@ -416,34 +583,157 @@ export function PreviewRevealStage({
             data-testid={agent && agent.id < 3 ? `preview-reveal-cursor-${role}` : undefined}
             style={{
               transform: `translate(${cursor.x}px, ${cursor.y}px)`,
-              opacity: leavingFade,
+              opacity: cursor.leaving > 0 ? 1 - cursor.leaving : 1,
             }}
           >
-            <svg
+            <CursorGlyph
               className={styles.pointer}
-              width="28"
-              height="28"
-              viewBox="0 0 28 28"
-              aria-hidden="true"
-              style={{
-                transformOrigin: `${REVEAL_ARROW_HOTSPOT.x}px ${REVEAL_ARROW_HOTSPOT.y}px`,
-                transform: `translate(${-REVEAL_ARROW_HOTSPOT.x}px, ${-REVEAL_ARROW_HOTSPOT.y}px) rotate(${cursor.angle}deg) scale(${(1 - cursor.press * 0.12) * (1 - cursor.leaving * 0.35)})`,
-              }}
-            >
-              <path
-                d={REVEAL_ARROW_PATH}
-                fill={flockColorOf(cursor, REVEAL_AGENTS.map((item) => item.color))}
-                stroke="#fff"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
-            </svg>
+              color={flockColorOf(cursor, REVEAL_AGENTS.map((item) => item.color))}
+              angle={cursor.angle}
+              scale={(1 - cursor.press * (1 - REVEAL_PRESS_SCALE)) * (1 - cursor.leaving * 0.55)}
+            />
           </div>
         );
       })}
-      <button type="button" className={styles.skip} data-testid="preview-reveal-skip" onClick={onSkip}>
+      <button
+        type="button"
+        className={styles.skip}
+        data-testid="preview-reveal-skip"
+        onClick={onSkip}
+        tabIndex={curtain > 0 ? 0 : -1}
+        style={{ opacity: curtain }}
+      >
         {labels.skip}
       </button>
+    </div>
+  );
+}
+
+/**
+ * The cursor that stays behind when the build ends.
+ *
+ * It is the same arrow, the same palette entry and the same collision as the
+ * swarm, so it reads as one member of the crew that stayed rather than a new
+ * widget appearing after the show. It rests just outside the pointer's ring, so
+ * brushing past it really does knock it, and its spring really does bring it
+ * back — that loop is the entire "it is alive" impression.
+ *
+ * Positions are written straight to the node: this thing runs for as long as
+ * the page is open, and a 60fps React re-render for one arrow is waste.
+ */
+export function PreviewCompanion({
+  seed,
+  surfaceRef,
+  pointer,
+  reducedMotion,
+  summonKey,
+  onReveal,
+}: {
+  seed: PreviewRevealHandoff;
+  surfaceRef: RefObject<HTMLElement | null>;
+  /** The host's single pointer reading, shared with the curtain. */
+  pointer: PointerRuntime;
+  reducedMotion: boolean;
+  /** Bumped by the toolbar control; the cursor perks up when it changes. */
+  summonKey: number;
+  /** Double-clicking the cursor replays the build it came from. */
+  onReveal: () => void;
+}) {
+  const nodeRef = useRef<HTMLDivElement | null>(null);
+  const glyphRef = useRef<HTMLDivElement | null>(null);
+  const stateRef = useRef<CompanionState | null>(null);
+  const soundRef = useRef<RevealSound | null>(null);
+  const knockedUntilRef = useRef(0);
+
+  useEffect(() => {
+    const sound = new RevealSound();
+    soundRef.current = sound;
+    return () => {
+      sound.dispose();
+      soundRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    const bounds = {
+      width: surface?.clientWidth ?? 0,
+      height: surface?.clientHeight ?? 0,
+    };
+    const state = createCompanion(pointer.point, bounds);
+    // It arrives exactly where the merge left it, then springs to its resting
+    // offset — the knot was deliberately formed at that offset, so the handoff
+    // is a settle rather than a jump.
+    state.x = seed.x;
+    state.y = seed.y;
+    state.angle = seed.angle;
+    stateRef.current = state;
+  }, [seed, surfaceRef, pointer]);
+
+  useEffect(() => {
+    let frame = 0;
+    let last = 0;
+    const started = performance.now();
+    const tick = (time: number) => {
+      const dt = last === 0 ? 1 / 60 : (time - last) / 1000;
+      last = time;
+      pointer.sample(dt);
+      const surface = surfaceRef.current;
+      const state = stateRef.current;
+      if (state && surface) {
+        const visual = stepCompanion({
+          state,
+          track: pointer.track,
+          dt: reducedMotion ? 0 : dt,
+          time: time - started,
+          pointer: pointer.point,
+          bounds: { width: surface.clientWidth, height: surface.clientHeight },
+        });
+        if (visual.knocked) {
+          soundRef.current?.click({ x: visual.x, viewportWidth: surface.clientWidth || 1 });
+        }
+        if (visual.knocked) knockedUntilRef.current = time + KNOCK_HOLD_MS;
+        const node = nodeRef.current;
+        if (node) {
+          node.style.transform = `translate3d(${visual.x.toFixed(2)}px, ${visual.y.toFixed(2)}px, 0)`;
+          // The flag holds for a beat so the glow can answer it; a one-frame
+          // attribute is invisible to CSS and to anything watching.
+          node.dataset.knocked = time < knockedUntilRef.current ? 'true' : 'false';
+        }
+        const glyph = glyphRef.current;
+        if (glyph) glyph.style.transform = `rotate(${visual.angle.toFixed(2)}deg) scale(${visual.scale.toFixed(3)})`;
+      }
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [pointer, reducedMotion, surfaceRef]);
+
+  // The toolbar asked for attention: lean away from the pointer so the answer
+  // is visible wherever the mouse happens to be.
+  useEffect(() => {
+    if (summonKey === 0) return;
+    const state = stateRef.current;
+    if (!state) return;
+    nudgeCompanion(state, pointer.point);
+  }, [summonKey, pointer]);
+
+  return (
+    <div
+      ref={nodeRef}
+      className={styles.companion}
+      data-testid="preview-reveal-companion"
+      aria-hidden="true"
+      onDoubleClick={onReveal}
+    >
+      <span className={styles.companionGlow} />
+      <div ref={glyphRef} className={styles.companionGlyph}>
+        <CursorGlyph
+          className={styles.pointer}
+          color={REVEAL_AGENTS[0]!.color}
+          angle={0}
+        />
+      </div>
     </div>
   );
 }
@@ -468,6 +758,12 @@ export const PreviewRevealHost = forwardRef<PreviewRevealHandle, PreviewRevealHo
     const pendingAutoplay = useRef(false);
     const [loadTick, setLoadTick] = useState(0);
     const [playback, setPlayback] = useState<PreviewRevealBlueprint | null>(null);
+    const [companion, setCompanion] = useState<PreviewRevealHandoff | null>(null);
+    const [summonKey, setSummonKey] = useState(0);
+    const surfaceRef = useRef<HTMLDivElement | null>(null);
+    // One reading, mounted for the whole life of the overlay: the curtain and the
+    // cursor that follows it must never disagree about where the pointer is.
+    const pointer = usePointerRuntime(surfaceRef);
 
     const labels = useMemo<PreviewRevealLabels>(() => ({
       skip: t('fileViewer.previewReveal.skip'),
@@ -487,10 +783,15 @@ export const PreviewRevealHost = forwardRef<PreviewRevealHandle, PreviewRevealHo
     useImperativeHandle(ref, () => ({
       replay: () => {
         if (!active || blocked || !previewReady) return;
+        setCompanion(null);
         setPlayback(null);
         postRequest();
       },
-    }), [active, blocked, previewReady, postRequest]);
+      summon: () => {
+        if (!companion) return;
+        setSummonKey((key) => key + 1);
+      },
+    }), [active, blocked, previewReady, postRequest, companion]);
 
     useEffect(() => {
       const frame = frameRef.current;
@@ -504,15 +805,25 @@ export const PreviewRevealHost = forwardRef<PreviewRevealHandle, PreviewRevealHo
       const onMessage = (event: MessageEvent) => {
         const frame = frameRef.current;
         if (!frame || event.source !== frame.contentWindow) return;
+        // The page relays its own pointer, because DOM events never cross the
+        // cross-origin frame boundary. Without it the host is blind to the mouse
+        // whenever it is over the page, which is most of the time.
+        const relayed = parsePreviewRevealPointer(event.data);
+        if (relayed) {
+          pointer.receive(relayed.inside ? { x: relayed.x, y: relayed.y } : null);
+          return;
+        }
         const blueprint = parsePreviewRevealBlueprint(event.data);
         if (!blueprint || blueprint.requestId !== pendingId.current) return;
         pendingId.current = null;
         if (blueprint.layers.length === 0) return;
+        // A new build always starts from the swarm, never from a leftover cursor.
+        setCompanion(null);
         setPlayback(blueprint);
       };
       window.addEventListener('message', onMessage);
       return () => window.removeEventListener('message', onMessage);
-    }, [frameRef]);
+    }, [frameRef, pointer]);
 
     useEffect(() => {
       if (identity.current !== sessionKey) {
@@ -520,6 +831,7 @@ export const PreviewRevealHost = forwardRef<PreviewRevealHandle, PreviewRevealHo
         pendingAutoplay.current = false;
         wasStreaming.current = streaming;
         setPlayback(null);
+        setCompanion(null);
         return;
       }
       if (wasStreaming.current && !streaming) pendingAutoplay.current = true;
@@ -538,16 +850,62 @@ export const PreviewRevealHost = forwardRef<PreviewRevealHandle, PreviewRevealHo
       claimPreviewRevealAutoplay(sessionKey);
     }, [active, blocked, streaming, previewReady, reducedMotion, sessionKey, loadTick, postRequest]);
 
-    const dismiss = useCallback(() => setPlayback(null), []);
-    if (!playback) return null;
+    // Leaving the preview (source tab, manual edit, board) puts the cursor away;
+    // it belongs to the page it was watching.
+    useEffect(() => {
+      if (active && !blocked) return;
+      setCompanion(null);
+      setPlayback(null);
+    }, [active, blocked]);
+
+    const replay = useCallback(() => {
+      if (!active || blocked || !previewReady) return;
+      setCompanion(null);
+      setPlayback(null);
+      postRequest();
+    }, [active, blocked, previewReady, postRequest]);
+
+    const finish = useCallback((handoff: PreviewRevealHandoff) => {
+      setPlayback(null);
+      setCompanion(handoff);
+    }, []);
+
+    const dismiss = useCallback(() => {
+      setPlayback(null);
+      setCompanion(null);
+    }, []);
+
+    if (!playback && !companion) return null;
+
+    // One overlay owns both acts: the curtain, and the cursor it leaves behind.
+    // Keeping them in one container means the handoff point is the same
+    // coordinate space on both sides, so the merge lands exactly where the
+    // survivor then rests.
     return (
-      <PreviewRevealStage
-        key={playback.requestId}
-        blueprint={playback}
-        labels={labels}
-        onDone={dismiss}
-        onSkip={dismiss}
-      />
+      <div ref={surfaceRef} className={styles.host} data-testid="preview-reveal-host">
+        {playback ? (
+          <PreviewRevealStage
+            key={playback.requestId}
+            blueprint={playback}
+            labels={labels}
+            pointer={pointer}
+            onDone={finish}
+            onSkip={dismiss}
+          />
+        ) : null}
+        {companion ? (
+          <PreviewCompanion
+            seed={companion}
+            surfaceRef={surfaceRef}
+            pointer={pointer}
+            reducedMotion={reducedMotion}
+            summonKey={summonKey}
+            onReveal={replay}
+          />
+        ) : null}
+      </div>
     );
   },
 );
+
+export type { PointerRuntime };

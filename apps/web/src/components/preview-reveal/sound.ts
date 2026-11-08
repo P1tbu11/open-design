@@ -1,13 +1,15 @@
 /**
- * The click the swarm makes when it grabs a box.
+ * The swarm's own sounds, at the moments this port actually has.
  *
- * This is the original's `press()` sound, not its glass piano: three short
- * band-passed noise bursts — a sharp grab, a deeper body, then a lighter
- * release a few dozen milliseconds later. That is what reads as the "click"
- * that accompanies every drag.
+ * Two of the reference's cues are reproduced: `press()` — the three-band noise
+ * click that lands whenever a cursor grabs something — and the finale's
+ * `intro()`/`release()` sweeps, which are the page "coming apart" and the real
+ * page coming back. The piano/glass arpeggios are deliberately absent: they are
+ * a soundtrack for a two-minute page rebuild, and this curtain is six seconds
+ * long with its own rhythm.
  *
- * The graph is created once on the first gesture and lives as long as the
- * stage. Nothing here touches the page or the preview frame.
+ * The graph is created once, on the first gesture the stage sees, and lives as
+ * long as the host. Nothing here touches the page or the preview frame.
  */
 
 function clamp(value: number, min: number, max: number): number {
@@ -16,6 +18,10 @@ function clamp(value: number, min: number, max: number): number {
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
+}
+
+function midiToHz(midi: number): number {
+  return 440 * 2 ** ((midi - 69) / 12);
 }
 
 export interface RevealClickInput {
@@ -78,6 +84,66 @@ export class RevealSound {
     this.tick(t + 0.004, pan, rand(2100, 2700), 4, 0.32, 0.012);
     this.tick(t + 0.005, pan, rand(650, 850), 2, 0.16, 0.022);
     this.tick(t + rand(0.055, 0.075), pan, rand(2900, 3400), 4, 0.15, 0.008);
+  }
+
+  /**
+   * The page dissolving: an airy band-passed swell plus a low open fifth, the
+   * reference's `intro()`. Fired when the curtain starts and again, one octave
+   * up and quieter, as the crew folds into the single remaining cursor.
+   */
+  gather(): void {
+    this.sweep(260, 2400, 900, 1.8, 0.16, 2.2);
+    this.pad(40, 0.3, 0.07, 2.4);
+  }
+
+  /** Back to the real page: the reference's falling `release()` sweep. */
+  release(): void {
+    this.sweep(3000, 220, 220, 1, 0.12, 1.1);
+  }
+
+  private sweep(from: number, peak: number, to: number, rise: number, gain: number, length: number): void {
+    if (!this.enabled) return;
+    const ctx = this.ensure();
+    if (!ctx || ctx.state !== 'running' || !this.noise) return;
+    const t = ctx.currentTime + 0.01;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.loop = true;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.value = 0.8;
+    band.frequency.setValueAtTime(from, t);
+    band.frequency.exponentialRampToValueAtTime(peak, t + rise * 0.5);
+    band.frequency.exponentialRampToValueAtTime(to, t + rise);
+    const bus = this.bus(t, 0, 0.6);
+    bus.gain.setValueAtTime(0, t);
+    bus.gain.linearRampToValueAtTime(gain, t + rise * 0.4);
+    bus.gain.exponentialRampToValueAtTime(0.0005, t + length);
+    src.connect(band);
+    band.connect(bus);
+    src.start(t);
+    src.stop(t + length + 0.1);
+  }
+
+  /** Two detuned triangles: the low fifth under the sweep. */
+  private pad(midi: number, delay: number, gain: number, length: number): void {
+    if (!this.enabled) return;
+    const ctx = this.ctx;
+    if (!ctx || !this.master) return;
+    const when = ctx.currentTime + delay;
+    const bus = this.bus(when, 0, 0.6);
+    bus.gain.setValueAtTime(0, when);
+    bus.gain.linearRampToValueAtTime(gain, when + length * 0.4);
+    bus.gain.exponentialRampToValueAtTime(0.0005, when + length);
+    for (const detune of [-4, 4]) {
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = midiToHz(midi);
+      osc.detune.value = detune;
+      osc.connect(bus);
+      osc.start(when);
+      osc.stop(when + length + 0.05);
+    }
   }
 
   private ensure(): AudioContext | null {

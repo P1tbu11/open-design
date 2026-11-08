@@ -1,9 +1,40 @@
+/* The overlay that owns both acts of the reveal: the curtain while the page is
+   being built, then the single cursor that stays watching it. Both live in one
+   positioned box so the merge point and the resting point are the same
+   coordinate space. */
+.host {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
 .stage {
   position: absolute;
   inset: 0;
   z-index: 4;
   overflow: hidden;
-  pointer-events: auto;
+  /* The pointer is read on `window`, and children opt back in with their own
+     `pointer-events: auto` (the skip button does), so the page underneath stays
+     hoverable and clickable while the crew gathers over it. */
+  pointer-events: none;
+}
+
+/* The opaque backdrop the page is drawn onto. Separate from the stage so it can
+   fade away while the cursors above it stay fully visible for the merge. No CSS
+   transition: the render loop already interpolates the opacity per frame, and a
+   transition on top would smooth it twice. */
+.curtain {
+  position: absolute;
+  inset: 0;
+}
+
+/* The drawing surface. Its size and position are set inline: it is exactly as
+   big as the blueprint's viewport and is scaled/centred onto the stage from
+   there, so no layout box is declared here. */
+.canvas {
+  position: absolute;
+  transform-origin: center center;
 }
 
 .layer,
@@ -125,12 +156,12 @@
   will-change: transform;
 }
 
-
 .skip {
   position: absolute;
   top: 12px;
   right: 12px;
   z-index: 4;
+  pointer-events: auto;
   padding: 6px 10px;
   border: 0;
   border-radius: var(--radius-pill, 999px);
@@ -141,4 +172,57 @@
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+}
+
+/* ------------------------------------------------------------ the survivor */
+
+/* One arrow, kept beside the pointer. The element's transform is written every
+   frame by `PreviewCompanion`, so nothing here may transition it — the physics
+   is the animation, and a CSS transition on top would fight it. */
+.companion {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  width: 0;
+  height: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  will-change: transform;
+}
+
+/* A slow breath so a resting cursor is never a static sticker. Opacity only:
+   the outer transform belongs to the physics. */
+.companionGlow {
+  position: absolute;
+  top: -14px;
+  left: -14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(13, 153, 255, 0.22) 0%, rgba(13, 153, 255, 0) 70%);
+  opacity: 0.5;
+  animation: preview-reveal-breathe 2.4s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+}
+
+.companion[data-knocked='true'] .companionGlow {
+  animation-duration: 700ms;
+  opacity: 0.9;
+}
+
+.companionGlyph {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Written every frame by the loop; no transition, see `.companion`. */
+  will-change: transform;
+}
+
+@keyframes preview-reveal-breathe {
+  0%, 100% { opacity: 0.32; transform: scale(0.86); }
+  50% { opacity: 0.62; transform: scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .companionGlow { animation: none; opacity: 0.4; }
 }

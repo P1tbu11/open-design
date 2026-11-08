@@ -4,7 +4,9 @@ import {
   buildPreviewRevealBridge,
   parsePreviewRevealBlueprint,
   PREVIEW_REVEAL_LAYER_CAP,
+  PREVIEW_REVEAL_POINTER_TYPE,
   PREVIEW_REVEAL_RESPONSE_TYPE,
+  parsePreviewRevealPointer,
 } from '../src/runtime/preview-reveal';
 
 const layer = {
@@ -69,5 +71,28 @@ describe('buildPreviewRevealBridge', () => {
     expect(script.match(/<\/script>/g)).toHaveLength(1);
     expect(script).toContain('od:preview-reveal-snapshot');
     expect(script).toContain('od:preview-reveal-blueprint');
+  });
+});
+
+describe('parsePreviewRevealPointer', () => {
+  it('accepts a relayed reading and rejects hostile coordinates', () => {
+    const relayed = parsePreviewRevealPointer({
+      type: PREVIEW_REVEAL_POINTER_TYPE,
+      version: 1,
+      x: 320,
+      y: 180,
+      inside: true,
+    });
+    expect(relayed).toMatchObject({ x: 320, y: 180, inside: true });
+    expect(parsePreviewRevealPointer({ type: PREVIEW_REVEAL_POINTER_TYPE, version: 1, x: 320, y: 180 })).toMatchObject({ inside: true });
+    expect(parsePreviewRevealPointer({ type: PREVIEW_REVEAL_POINTER_TYPE, version: 1, x: 1e9, y: 10 })).toBeNull();
+    expect(parsePreviewRevealPointer({ type: PREVIEW_REVEAL_POINTER_TYPE, version: 1, x: 'left', y: 10 })).toBeNull();
+    expect(parsePreviewRevealPointer({ type: PREVIEW_REVEAL_RESPONSE_TYPE })).toBeNull();
+  });
+
+  it('ships the relay inside the bridge so the host can see the page pointer', () => {
+    const script = buildPreviewRevealBridge();
+    expect(script).toContain(PREVIEW_REVEAL_POINTER_TYPE);
+    expect(script).toContain("addEventListener('pointermove'");
   });
 });
