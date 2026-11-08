@@ -9,8 +9,10 @@ import {
   type RefObject,
 } from 'react';
 import {
+  isPreviewRevealPatch,
   parsePreviewRevealBlueprint,
   parsePreviewRevealPointer,
+  previewRevealPatchRequest,
   previewRevealRequest,
   type PreviewRevealBlueprint,
   type PreviewRevealLayer,
@@ -33,6 +35,8 @@ import {
 import { COMPANION_REST, createCompanion, nudgeCompanion, stepCompanion, type CompanionState } from './companion';
 import { usePointerRuntime, type PointerRuntime } from './pointer';
 import type { PressPoint } from './press';
+import { PreviewRevealWorking } from './PreviewRevealWorking';
+import { PreviewRevealPatch } from './PreviewRevealPatch';
 import { CursorGlyph } from './CursorGlyph';
 import { RevealSound } from './sound';
 import styles from './PreviewReveal.module.css';
@@ -73,6 +77,16 @@ const CURTAIN_FADE_MS = 520;
 
 /** How long the "I was hit" glow outlives the collision frame. */
 const KNOCK_HOLD_MS = 420;
+
+/**
+ * How often the host asks the page for changed boxes while a run streams.
+ *
+ * An agent writing HTML mutates the DOM far faster than a curtain is worth
+ * drawing, so patches are coalesced to one per window. 260ms is roughly the
+ * length of one patch animation — a new one therefore lands as the previous
+ * finishes rather than stacking on top of it.
+ */
+const PATCH_POLL_MS = 260;
 
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -752,12 +766,22 @@ export const PreviewRevealHost = forwardRef<PreviewRevealHandle, PreviewRevealHo
     const t = useT();
     const reducedMotion = useReducedMotion();
     const pendingId = useRef<string | null>(null);
+    const patchId = useRef<string | null>(null);
     const requestSeq = useRef(0);
     const wasStreaming = useRef(streaming);
     const identity = useRef(sessionKey);
+    // A ref for the effect's own reads (it must not re-run on every arm), and a
+    // state mirror so the render can keep the crew on screen through the
+    // handover gap — a ref alone would never re-render the surface.
     const pendingAutoplay = useRef(false);
+    const [autoplayArmed, setAutoplayArmed] = useState(false);
+    const armAutoplay = useCallback((armed: boolean) => {
+      pendingAutoplay.current = armed;
+      setAutoplayArmed(armed);
+    }, []);
     const [loadTick, setLoadTick] = useState(0);
     const [playback, setPlayback] = useState<PreviewRevealBlueprint | null>(null);
+    const [patch, setPatch] = useState<PreviewRevealBlueprint | null>(null);
     const [companion, setCompanion] = useState<PreviewRevealHandoff | null>(null);
     const [summonKey, setSummonKey] = useState(0);
     const surfaceRef = useRef<HTMLDivElement | null>(null);
@@ -778,6 +802,24 @@ export const PreviewRevealHost = forwardRef<PreviewRevealHandle, PreviewRevealHo
       pendingId.current = id;
       target.postMessage(previewRevealRequest(id), '*');
       return true;
+    }, [frameRef]);
+
+    /**
+     * Ask for whatever changed since the last look.
+     *
+     * Fire-and-forget: the page answers only when something is dirty, so an idle
+     * poll costs one postMessage and nothing else. It is deliberately a poll
+     * rather than a push — the page cannot call into the host on its own, and a
+     * poll keeps the coalescing window under the host's control (one patch per
+     * interval, not one per mutation).
+     */
+    const postPatchRequest = useCallback(() => {
+      const frame = frameRef.current;
+      const target = frameCanAnswer(frame) ? frame.contentWindow : null;
+      if (!target) return;
+      const id = `patch-${requestSeq.current += 1}`;
+      patchId.current = id;
+      target.postMessage(previewRevealPatchRequest(id), '*');
     }, [frameRef]);
 
     useImperativeHandle(ref, () => ({
@@ -814,11 +856,23 @@ export const PreviewRevealHost = forwardRef<PreviewRevealHandle, PreviewRevealHo
           return;
         }
         const blueprint = parsePreviewRevealBlueprint(event.data);
-        if (!blueprint || blueprint.requestId !== pendingId.current) return;
+        if (!blueprint) return;
+        // A patch answers a different request than a full snapshot: it names the
+        // boxes that just changed, and it plays as a small curtain rather than a
+        // page build.
+        if (isPreviewRevealPatch(event.data)) {
+          if (blueprint.requestId !== patchId.current) return;
+          patchId.current = null;
+          if (blueprint.layers.length === 0) return;
+          setPatch(blueprint);
+          return;
+        }
+        if (blueprint.requestId !== pendingId.current) return;
         pendingId.current = null;
         if (blueprint.layers.length === 0) return;
         // A new build always starts from the swarm, never from a leftover cursor.
         setCompanion(null);
+        setPatch(null);
         setPlayback(blueprint);
       };
       window.addEventListener('message', onMessage);
@@ -828,16 +882,21 @@ export const PreviewRevealHost = forwardRef<PreviewRevealHandle, PreviewRevealHo
     useEffect(() => {
       if (identity.current !== sessionKey) {
         identity.current = sessionKey;
-        pendingAutoplay.current = false;
+        armAutoplay(false);
         wasStreaming.current = streaming;
         setPlayback(null);
         setCompanion(null);
         return;
       }
-      if (wasStreaming.current && !streaming) pendingAutoplay.current = true;
+      if (wasStreaming.current && !streaming) armAutoplay(true);
       wasStreaming.current = streaming;
-      if (reducedMotion) pendingAutoplay.current = false;
+      if (reducedMotion) armAutoplay(false);
       if (!pendingAutoplay.current) return;
+      // The gate is re-evaluated on every dependency change, and `previewReady`
+      // lands a tick or two after the stream ends (the iframe still has to
+      // navigate and paint). Keeping `pendingAutoplay` armed until it succeeds
+      // is what stops the handoff from being dropped on the floor: the crew
+      // would disappear with nothing left on screen to replace it.
       if (!shouldQueuePreviewRevealAutoplay({
         streamingEnded: true,
         active,
@@ -846,9 +905,25 @@ export const PreviewRevealHost = forwardRef<PreviewRevealHandle, PreviewRevealHo
         reducedMotion,
       })) return;
       if (!postRequest()) return;
-      pendingAutoplay.current = false;
+      armAutoplay(false);
       claimPreviewRevealAutoplay(sessionKey);
-    }, [active, blocked, streaming, previewReady, reducedMotion, sessionKey, loadTick, postRequest]);
+    }, [active, blocked, streaming, previewReady, reducedMotion, sessionKey, loadTick, postRequest, armAutoplay]);
+
+    // While a run is streaming into a page that is already on screen, poll for
+    // the boxes that changed so each edit gets its own small curtain. Coalesced
+    // on a timer: an agent writing HTML mutates the DOM far faster than a patch
+    // is worth drawing, and one patch per burst reads as an edit where one patch
+    // per mutation reads as noise.
+    useEffect(() => {
+      if (!streaming || !active || blocked || !previewReady || reducedMotion) return undefined;
+      const timer = window.setInterval(() => {
+        // A patch is a second curtain, not a replacement for a running build:
+        // skip while the full stage is on screen or another patch is playing.
+        if (playback || patch) return;
+        postPatchRequest();
+      }, PATCH_POLL_MS);
+      return () => window.clearInterval(timer);
+    }, [streaming, active, blocked, previewReady, reducedMotion, playback, patch, postPatchRequest]);
 
     // Leaving the preview (source tab, manual edit, board) puts the cursor away;
     // it belongs to the page it was watching.
@@ -875,7 +950,22 @@ export const PreviewRevealHost = forwardRef<PreviewRevealHandle, PreviewRevealHo
       setCompanion(null);
     }, []);
 
-    if (!playback && !companion) return null;
+    // Generation owns the surface from its first frame to its last. While the
+    // run is streaming the crew circles; the moment the page lands the build
+    // stage takes over with the same crew. This replaces the skeleton screen
+    // outright: there is no state in which the viewer shows a wireframe card
+    // instead of the thing that is actually happening.
+    //
+    // The handover has a gap: the stream can end before the iframe has navigated
+    // and painted (`previewReady` trails it by a tick), and during that gap the
+    // build stage cannot start yet. Keeping the crew on screen until the
+    // playback actually exists is what makes the two acts continuous instead of
+    // flashing an empty pane between them.
+    const working = active
+      && !blocked
+      && !playback
+      && (streaming || (autoplayArmed && previewReady === false));
+    if (!playback && !companion && !working && !patch) return null;
 
     // One overlay owns both acts: the curtain, and the cursor it leaves behind.
     // Keeping them in one container means the handoff point is the same
@@ -883,6 +973,20 @@ export const PreviewRevealHost = forwardRef<PreviewRevealHandle, PreviewRevealHo
     // survivor then rests.
     return (
       <div ref={surfaceRef} className={styles.host} data-testid="preview-reveal-host">
+        {working && !playback ? (
+          <PreviewRevealWorking
+            sessionKey={sessionKey}
+            pointer={pointer}
+            reducedMotion={reducedMotion}
+          />
+        ) : null}
+        {patch ? (
+          <PreviewRevealPatch
+            key={patch.requestId}
+            blueprint={patch}
+            onDone={() => setPatch(null)}
+          />
+        ) : null}
         {playback ? (
           <PreviewRevealStage
             key={playback.requestId}
