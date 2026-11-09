@@ -1,4 +1,5 @@
 import { openExternalUrl } from "../providers/registry";
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 // InlineModelSwitcher — top-bar chip exposing CLI/BYOK + model picker.
 //
 // Lives in the entry view's sticky top-bar so users can swap between a
@@ -1671,7 +1672,7 @@ export function InlineModelSwitcher({
                       {amrLoginError}
                     </span>
                   ) : amrLoggedIn ? (
-                    amrCanUpgrade ? (
+                    commercialSurfaceEnabled('upgradePrompts') && amrCanUpgrade ? (
                       <button
                         type="button"
                         className="inline-switcher__account-upgrade"

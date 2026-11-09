@@ -17,6 +17,7 @@ import {
 } from './analytics/events';
 import { deriveUploadCohort } from './analytics/upload-tracking';
 import { setPendingDesignSystemCreateEntry } from './analytics/ds-create-entry';
+import { commercialSurfaceEnabled } from './commercial-surfaces';
 import { detectClientType } from './analytics/identity';
 import {
   stashOnboardingEntryForProject,
@@ -6286,14 +6287,18 @@ function AppInner() {
           restoration can finish while login is still up — not over onboarding. */}
       {route.kind === 'home' && route.view === 'home' && (
         <>
-          <TestCampaignModal
-            authenticated={isAmrSessionAuthenticated(amrLoginStatus)}
-            sessionSubject={amrLoginStatus?.user?.id ?? null}
-          />
-          <ProductionCampaignModal
-            authenticated={isAmrSessionAuthenticated(amrLoginStatus)}
-            sessionSubject={amrLoginStatus?.user?.id ?? null}
-          />
+          {commercialSurfaceEnabled('cmsCampaigns') ? (
+            <>
+              <TestCampaignModal
+                authenticated={isAmrSessionAuthenticated(amrLoginStatus)}
+                sessionSubject={amrLoginStatus?.user?.id ?? null}
+              />
+              <ProductionCampaignModal
+                authenticated={isAmrSessionAuthenticated(amrLoginStatus)}
+                sessionSubject={amrLoginStatus?.user?.id ?? null}
+              />
+            </>
+          ) : null}
         </>
       )}
       <TooltipLayer />
@@ -6301,29 +6306,33 @@ function AppInner() {
       {/* Mounted at shell level, outside the route views, so a survey armed by
           an export inside a project stays on screen when the user navigates
           back to home. */}
-      <ExperienceSurvey
-        metricsConsent={config.telemetry?.metrics === true}
-        onExposure={() => trackExperienceSurveyShown(analytics.track)}
-        onDismiss={() => trackExperienceSurveyDismissed(analytics.track)}
-        onSubmit={(answers) => trackExperienceSurveySent(analytics.track, answers)}
-      />
-      <AmrArtifactUpgradeGate
-        cloudModelSelected={config.mode === 'daemon' && config.agentId === 'amr'}
-        homeVisible={route.kind === 'home' && route.view === 'home'}
-        activeProjectId={route.kind === 'project' ? route.projectId : null}
-        activeConversationId={
-          route.kind === 'project' ? route.conversationId ?? null : null
-        }
-        plan={resolvedAmrPlan}
-        planResolved={
-          amrLoginStatus !== null
-          && (!isAmrSessionAuthenticated(amrLoginStatus) || resolvedAmrPlan !== null)
-        }
-        profile={amrLoginStatus?.profile ?? null}
-        metricsConsent={config.telemetry?.metrics === true}
-        workspaceId={amrUpgradeWorkspaceContext?.workspaceId}
-        installationId={config.installationId}
-      />
+      {commercialSurfaceEnabled('experienceSurvey') ? (
+        <ExperienceSurvey
+          metricsConsent={config.telemetry?.metrics === true}
+          onExposure={() => trackExperienceSurveyShown(analytics.track)}
+          onDismiss={() => trackExperienceSurveyDismissed(analytics.track)}
+          onSubmit={(answers) => trackExperienceSurveySent(analytics.track, answers)}
+        />
+      ) : null}
+      {commercialSurfaceEnabled('upgradePrompts') ? (
+        <AmrArtifactUpgradeGate
+          cloudModelSelected={config.mode === 'daemon' && config.agentId === 'amr'}
+          homeVisible={route.kind === 'home' && route.view === 'home'}
+          activeProjectId={route.kind === 'project' ? route.projectId : null}
+          activeConversationId={
+            route.kind === 'project' ? route.conversationId ?? null : null
+          }
+          plan={resolvedAmrPlan}
+          planResolved={
+            amrLoginStatus !== null
+            && (!isAmrSessionAuthenticated(amrLoginStatus) || resolvedAmrPlan !== null)
+          }
+          profile={amrLoginStatus?.profile ?? null}
+          metricsConsent={config.telemetry?.metrics === true}
+          workspaceId={amrUpgradeWorkspaceContext?.workspaceId}
+          installationId={config.installationId}
+        />
+      ) : null}
       <AnimatePresence>
       {settingsOpen ? (
         renderSettingsSurface('modal')

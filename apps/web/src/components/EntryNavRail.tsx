@@ -1,5 +1,6 @@
 import { ReferralEntry } from './ReferralEntry';
 import { openExternalUrl } from "../providers/registry";
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { CodingPlanUsage } from './CodingPlanUsage';
 import { WorkspaceQuotaPopover } from './WorkspaceQuotaPopover';
 import { workspaceQuotaView } from '../collab/workspace-quota-view';
@@ -1329,7 +1330,11 @@ export function EntryTopRightCluster({
   // team-typed, where the wordmark draws `team` instead.
   const isFreePlan = planTier === 'free' || (labelTier ?? '').trim().toLowerCase() === 'free';
   // The seats HTML uses the Free upgrade chip for every role; it only opens quota.
-  const showUpgradePill = isFreePlan && (quotaView.sharedBilling || context?.role === 'owner');
+  // With commercial surfaces off the chip reports the real (zero) balance
+  // instead of selling the upgrade, so the readout keeps working without a CTA.
+  const showUpgradePill = commercialSurfaceEnabled('upgradePrompts')
+    && isFreePlan
+    && (quotaView.sharedBilling || context?.role === 'owner');
   // Design PR #8364: the Owner's Free card sells 升级 like every paid tier. A personal
   // workspace needs no billing permission — its member IS the payer — and an
   // account B reports without any plan is upgradeable as free once the card
@@ -1394,7 +1399,7 @@ export function EntryTopRightCluster({
           {/* GitHub star chip: its own option in the cluster, right after the
               campaign badge (per product) — it used to live in the account
               menu's social row. */}
-          {clusterVisible ? (
+          {commercialSurfaceEnabled('githubStars') && clusterVisible ? (
             <a
               className="entry-top-right-github"
               href={REPO_URL}
@@ -2676,7 +2681,7 @@ export function EntryNavRail({
             the account module into. `display: contents` keeps the account
             dock itself a flex child of this group, so its own `order: 99` +
             `margin-top: auto` still push it below the nav items. */}
-        {isHome && !referralCompact ? <ReferralEntry /> : null}
+        {commercialSurfaceEnabled('referralProgram') && isHome && !referralCompact ? <ReferralEntry /> : null}
         {context ? <div ref={setAccountHost} className="entry-nav-rail__account-host" /> : null}
       </div>
       {/* Signed in, the social links ride the account dock above the identity

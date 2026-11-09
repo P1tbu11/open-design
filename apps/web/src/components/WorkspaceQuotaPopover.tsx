@@ -6,6 +6,7 @@ import { isWorkspaceLifecycleReadable, type WorkspaceCollabContext } from '@open
 import { Button } from '@open-design/components';
 import { notifyWorkspaceBillingRefresh } from '../collab/useWorkspaceContext';
 import type { WorkspaceQuotaView } from '../collab/workspace-quota-view';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { useI18n } from '../i18n';
 import { formatVelaBalanceUsd } from '../providers/daemon';
 import { quotaPopoverConsoleUrl } from '../runtime/workspace-quota-links';
@@ -134,7 +135,7 @@ function SharedWorkspaceQuotaPopover({ view, context, profile, consoleOrigin, ba
           {shownBadge ? <PlanWordmark tier={shownBadge} height={shownBadge === 'team' ? 11 : 20} variant="seats-phase1" /> : null}
         </span>
         {/* Role, not wallet balance, chooses the action. */}
-        {readable && owner && view.planKnown && actionUrl ? (
+        {commercialSurfaceEnabled('upgradePrompts') && readable && owner && view.planKnown && actionUrl ? (
           <Button className="entry-nav-rail__menu-credits-upgrade" onClick={() => navigate(actionUrl, max ? 'credits' : 'upgrade')}>
             {t(max ? 'chat.amrError.rechargeCta' : 'entry.creditsUpgrade')}
           </Button>

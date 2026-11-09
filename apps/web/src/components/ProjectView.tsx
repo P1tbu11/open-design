@@ -392,6 +392,7 @@ import {
   type PluginFolderAgentAction,
 } from './design-files/pluginFolderActions';
 import { SHARE_TO_COMMUNITY_PROMPT } from './share-to-community/shareToCommunityPrompt';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { CenteredLoader } from './Loading';
 import { useCreationHandoffMessages } from './useCreationHandoffMessages';
 import {
@@ -14904,7 +14905,9 @@ export function ProjectView({
               onRequestPluginFolderAgentAction={handlePluginFolderAgentAction}
               activePluginActionPaths={activePluginActionPaths}
               hiddenPluginActionPaths={hiddenAssistantPluginActionPaths}
-              onShareToOpenDesign={handleShareToOpenDesign}
+              onShareToOpenDesign={
+                commercialSurfaceEnabled('sharePrompts') ? handleShareToOpenDesign : undefined
+              }
               shareToOpenDesignBusyMessageId={shareToOpenDesignBusyMessageId}
               forceStreamingMessageIds={forceStreamingPluginMessageIds}
               initialDraft={chatInitialDraft}

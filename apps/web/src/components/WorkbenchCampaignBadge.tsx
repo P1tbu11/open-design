@@ -12,6 +12,7 @@ import { getResolvedDeviceId } from '../analytics/client';
 import { useAnalytics } from '../analytics/provider';
 import type { DeepSeekV4FlashCampaignAudience } from '../campaigns/deepseek-v4-flash';
 import { goPlanPricingUrl } from '../campaigns/go-plan';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { useI18n } from '../i18n';
 import { Icon } from './Icon';
 
@@ -94,7 +95,7 @@ export function WorkbenchCampaignBadge({
     );
   }, [analytics.track, audience, installationId, locale, metricsConsent, page]);
 
-  if (loggedIn !== true) return null;
+  if (!commercialSurfaceEnabled('modelCampaigns') || loggedIn !== true) return null;
 
   return (
     <button

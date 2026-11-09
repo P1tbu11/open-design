@@ -17,6 +17,7 @@ import {
 } from '../analytics/amr-attribution';
 import { useWorkspaceBilling, useWorkspaceContext } from '../collab/useWorkspaceContext';
 import { workspaceUpgradeUrl } from './EntryNavRail';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import {
   amrBalanceGateScopeForWorkspaceContext,
   hasAmrFundingRecovered,
@@ -150,6 +151,10 @@ export function AmrBalanceDialog({
   const close = () => { journey.click('close'); onClose(); };
   // A Max classification cannot fall back to selling the same plan. The
   // frozen funding dialog has no auto-recharge shortcut for any Owner.
+  // The CTA stays whatever the commercial switch says: this dialog is the
+  // recovery path for a blocked send, and a gate that only offers 稍后 strands
+  // the user. What the switch removes is the pitch around it (AmrBalanceDialog
+  // gates its own benefits card).
   const upgradeUrl = workspaceContextLoading || upgradeIntent === 'auto_recharge'
     ? null
     : workspaceUpgradeUrl(workspaceContext, workspaceBilling, {
@@ -266,43 +271,60 @@ export function AmrBalanceDialog({
       >
         <Icon name="close" size={14} />
       </button>
-      <div className={styles.banner}>
-        <img
-          className={styles.bannerImage}
-          src="/upgrade/cloud-signin-aurora.jpg"
-          alt=""
-          width={1680}
-          height={720}
-          decoding="async"
-          draggable={false}
-        />
-      </div>
-      <h2 className={styles.title}>
-        {signedOut ? t('chat.amrBalanceGate.signedOutTitle') : t('chat.amrBalanceGate.title')}
-      </h2>
-      <p className={styles.message}>
-        {/* Product copy S04 / S06 (OPEND-2849): the insufficient variant no
-            longer quotes the balance — the finalized sentence has no amount. */}
-        {signedOut
-          ? t('chat.amrBalanceGate.signedOutMessage')
-          : t('chat.amrBalanceGate.message')}
-      </p>
-      <div className={styles.benefitsCard}>
-        <span className={styles.benefitsTitle}>
-          {t('chat.amrBalanceGate.benefitsTitle')}
-        </span>
-        <ul className={styles.benefits}>
-          {benefits.map((benefit) => (
-            <li key={benefit} className={styles.benefit}>
-              <span className={styles.benefitIcon} aria-hidden>
-                <Icon name="check" size={14} />
-              </span>
-              {benefit}
-            </li>
-          ))}
-        </ul>
-      </div>
-      {/* Dismissal first in DOM so it lands on the left of the row and focus
+      {commercialSurfaceEnabled('upgradePrompts') ? (
+        <>
+          <div className={styles.banner}>
+            <img
+              className={styles.bannerImage}
+              src="/upgrade/cloud-signin-aurora.jpg"
+              alt=""
+              width={1680}
+              height={720}
+              decoding="async"
+              draggable={false}
+            />
+          </div>
+          <h2 className={styles.title}>
+            {signedOut ? t('chat.amrBalanceGate.signedOutTitle') : t('chat.amrBalanceGate.title')}
+          </h2>
+          <p className={styles.message}>
+            {/* Product copy S04 / S06 (OPEND-2849): the insufficient variant no
+                longer quotes the balance — the finalized sentence has no amount. */}
+            {signedOut
+              ? t('chat.amrBalanceGate.signedOutMessage')
+              : t('chat.amrBalanceGate.message')}
+          </p>
+          <div className={styles.benefitsCard}>
+            <span className={styles.benefitsTitle}>
+              {t('chat.amrBalanceGate.benefitsTitle')}
+            </span>
+            <ul className={styles.benefits}>
+              {benefits.map((benefit) => (
+                <li key={benefit} className={styles.benefit}>
+                  <span className={styles.benefitIcon} aria-hidden>
+                    <Icon name="check" size={14} />
+                  </span>
+                  {benefit}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* The commercial switch removes the artwork and the benefits
+              pitch, never the reason the gate exists: the user still needs to
+              know why the send stopped. */}
+          <h2 className={styles.title}>
+            {signedOut ? t('chat.amrBalanceGate.signedOutTitle') : t('chat.amrBalanceGate.title')}
+          </h2>
+          <p className={styles.message}>
+            {signedOut
+              ? t('chat.amrBalanceGate.signedOutMessage')
+              : t('chat.amrBalanceGate.message')}
+          </p>
+        </>
+      )}      {/* Dismissal first in DOM so it lands on the left of the row and focus
           order matches the reading order; the CTA follows on the right. */}
       <div className={styles.actions}>
         <Button variant="ghost" className={signedOut ? styles.later : `${styles.later} ${styles.frozenLater}`} onClick={close}>

@@ -6,6 +6,7 @@ import { Button } from '@open-design/components';
 import { useI18n } from '../i18n';
 import { formatVelaBalanceUsd } from '../providers/daemon';
 import { quotaPopoverConsoleUrl } from '../runtime/workspace-quota-links';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { PlanWordmark } from './PlanWordmark';
 import { Icon } from './Icon';
 import { RemixIcon } from './RemixIcon';
@@ -72,7 +73,7 @@ export function LegacyWorkspaceQuotaPopover({ view, context, profile, consoleOri
           {shownBadge ? <PlanWordmark tier={shownBadge} height={shownBadge === 'team' ? 11 : 20} /> : null}
         </span>
         {/* Role, not wallet balance, chooses the action. */}
-        {readable && owner && view.planKnown && actionUrl ? (
+        {commercialSurfaceEnabled('upgradePrompts') && readable && owner && view.planKnown && actionUrl ? (
           <Button className="entry-nav-rail__menu-credits-upgrade" onClick={() => navigate(actionUrl, max ? 'credits' : 'upgrade')}>
             {t(max ? 'entry.creditsManage' : 'entry.creditsUpgrade')}
           </Button>

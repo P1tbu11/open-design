@@ -251,9 +251,9 @@ const nextConfig: NextConfig = {
             { source: '/frames/:path*', destination: `${DAEMON_ORIGIN}/frames/:path*` },
           ];
         },
-        devIndicators: {
-          position: 'bottom-right',
-        },
+        // The floating dev-tools badge is off: it sits over the bottom-right
+        // corner in every local run and reads as product chrome, not tooling.
+        devIndicators: false,
       }
       : {}),
 };

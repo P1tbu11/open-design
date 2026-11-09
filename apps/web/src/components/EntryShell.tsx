@@ -138,6 +138,7 @@ import { cachedHomeAmrFundingBlock, checkAmrFundingFeedback, confirmHomeAmrFundi
 import { ReferralNotice } from './ReferralNotice';
 import { HomeView, seedHomeComposerPrompt } from './HomeView';
 import { HomeInviteSurface, HomeInviteTrigger } from './HomeInviteSurface';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { entryStrategyRoutingFields } from './entry-strategy-routing';
 import { EntryBlankState } from './EntryBlankState';
 import { RecentProjectsStrip, type ProjectCollectionScope } from './RecentProjectsStrip';
@@ -2043,7 +2044,8 @@ export function EntryShell({
     identityReady: !workspaceContextState.loading && !workspaceContextState.identityChangePending && !workspaceContextState.failure,
     identityUnavailable: Boolean(workspaceContextState.failure && !workspaceContextState.loading && !workspaceContextState.identityChangePending),
     onRetryIdentity: () => notifyWorkspaceContextRefresh(),
-    allowHost: view !== 'onboarding' || (config.mode === 'daemon' && config.agentId === 'amr') || unconfiguredFirstRunCloud,
+    allowHost: commercialSurfaceEnabled('invitePrompts')
+      && (view !== 'onboarding' || (config.mode === 'daemon' && config.agentId === 'amr') || unconfiguredFirstRunCloud),
     onExit: (count, context, completion) => {
       if (!amrAccountId) return;
       if (unconfiguredFirstRunCloud) {
@@ -2192,11 +2194,14 @@ export function EntryShell({
           }}
           onOpenSearch={() => setProjectSearchOpen(true)}
           open={railOpen}
-          inviteSlot={<HomeInviteTrigger signedOut={amrLoggedIn === false} context={railWorkspaceContext} />}
+          inviteSlot={commercialSurfaceEnabled('invitePrompts')
+            ? <HomeInviteTrigger signedOut={amrLoggedIn === false} context={railWorkspaceContext} />
+            : null}
           topRightSlot={<>
-            {topRightCampaignAudience || (homeCampaignHostsVisible && amrLoggedIn === true) ? (
+            {commercialSurfaceEnabled('modelCampaigns') || commercialSurfaceEnabled('cmsCampaigns')
+              ? (topRightCampaignAudience || (homeCampaignHostsVisible && amrLoggedIn === true) ? (
             <>
-              {topRightCampaignAudience ? (
+              {commercialSurfaceEnabled('modelCampaigns') && topRightCampaignAudience ? (
                 <WorkbenchCampaignBadge
                   audience={topRightCampaignAudience}
                   page="home"
@@ -2205,18 +2210,21 @@ export function EntryShell({
                   loggedIn={amrLoggedIn}
                 />
               ) : null}
-              {homeCampaignHostsVisible
+              {commercialSurfaceEnabled('cmsCampaigns')
+                && homeCampaignHostsVisible
                 && canRenderProductionCampaignBadge(amrLoggedIn === true, amrAccountId) ? <ProductionCampaignBadge authenticated sessionSubject={amrAccountId} /> : null}
               {/* The requirements-specific hover entry is its own authorized
                   touchpoint, beside—not renamed from—the account badge. */}
-              {homeCampaignHostsVisible ? (
+              {commercialSurfaceEnabled('cmsCampaigns')
+                && homeCampaignHostsVisible ? (
                 <ProductionCampaignHover
                   authenticated={amrLoggedIn === true}
                   sessionSubject={amrAccountId}
                 />
               ) : null}
             </>
-          ) : null}</>}
+          ) : null)
+          : null}</>}
           context={railWorkspaceContext}
           billing={workspaceBilling}
           billingResponse={workspaceBillingResponse}
@@ -2269,7 +2277,9 @@ export function EntryShell({
               the workspace tabs bar (entryRailBridge), the updater popup host
               lives in the rail footer, and everything below is fixed-position
               or portalled so it occupies no layout space here. */}
-          <WhatsNewPopup active={view === 'home' && !goPlanSunsetMessagePending} />
+          <WhatsNewPopup active={
+            commercialSurfaceEnabled('whatsNew') && view === 'home' && !goPlanSunsetMessagePending
+          } />
           {/* The campaign badge lives in EntryNavRail's top-right cluster so it
               stays beside the account module across every entry tab. */}
           <div
@@ -2282,8 +2292,8 @@ export function EntryShell({
               <HomeView
                 {...homeViewProps}
                 isActive={view === 'home'}
-                referralNotice={<ReferralNotice accountId={amrLoggedIn === true ? amrAccountId : null} profile={amrRegistrationStatus?.profile?.trim() || amrProfile} consoleOrigin={amrRegistrationStatus?.consoleOrigin} active={view === 'home'} context={homeFundingContext} billing={workspaceBillingResponse} />}
-                inviteSurface={<HomeInviteSurface signedOut={amrLoggedIn === false} identityReady={!workspaceContextState.loading && !workspaceContextState.identityChangePending && !workspaceContextState.failure} accountId={amrLoggedIn === true ? amrAccountId : null} context={railWorkspaceContext} active={view === 'home'} onSignInRequested={() => { setInviteSignInRequest('start'); navigate({ kind: 'home', view: 'onboarding' }); }} openAfterSignIn={inviteSignInRequest === 'waiting'} onSignInInviteConsumed={() => setInviteSignInRequest(null)} />}
+                referralNotice={<ReferralNotice accountId={commercialSurfaceEnabled('referralProgram') && amrLoggedIn === true ? amrAccountId : null} profile={amrRegistrationStatus?.profile?.trim() || amrProfile} consoleOrigin={amrRegistrationStatus?.consoleOrigin} active={view === 'home'} context={homeFundingContext} billing={workspaceBillingResponse} />}
+                inviteSurface={<HomeInviteSurface signedOut={amrLoggedIn === false} identityReady={commercialSurfaceEnabled('invitePrompts') && !workspaceContextState.loading && !workspaceContextState.identityChangePending && !workspaceContextState.failure} accountId={amrLoggedIn === true ? amrAccountId : null} context={commercialSurfaceEnabled('invitePrompts') ? railWorkspaceContext : null} active={view === 'home'} onSignInRequested={() => { setInviteSignInRequest('start'); navigate({ kind: 'home', view: 'onboarding' }); }} openAfterSignIn={inviteSignInRequest === 'waiting'} onSignInInviteConsumed={() => setInviteSignInRequest(null)} />}
                 /* Home is the one composer in the shell and consumes the page
                    handoff. The community view used to dock a second HomeView
                    (`variant="dock"`) with a handoff of its own; that mount
@@ -4063,7 +4073,7 @@ function OnboardingView({
             <h1 className="onboarding-cloud__title">{t('settings.onboardingCloudTitle')}</h1>
             <p className="onboarding-cloud__body">{t('settings.onboardingCloudBody')}</p>
             <div className={onboardingWelcomeStyles.signInAction}>
-              {!amrSignedIn && !amrStatusResolving && !cloudBusy ? (
+              {commercialSurfaceEnabled('upgradePrompts') && !amrSignedIn && !amrStatusResolving && !cloudBusy ? (
                 <span className={onboardingWelcomeStyles.creditCorner}>
                   <span
                     className={`${onboardingWelcomeStyles.credits} od-tooltip`}

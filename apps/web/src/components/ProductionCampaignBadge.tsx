@@ -1,4 +1,5 @@
 import { useI18n } from "../i18n";
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { useCallback, useEffect, useRef } from "react";
 import { getOpenDesignHost } from "@open-design/host";
 import {
@@ -67,7 +68,7 @@ export function ProductionCampaignBadge({
 	const { locale } = useI18n();
 	const testDecision = testRuntime?.decisions.get(PLACEMENT);
 	const containerRef = useRef<HTMLDivElement | null>(null);
-	const enabled = !testRuntime && canRenderProductionCampaignBadge(authenticated, sessionSubject) && Boolean(sessionSubject) && Boolean(locale);
+	const enabled = commercialSurfaceEnabled('cmsCampaigns') && !testRuntime && canRenderProductionCampaignBadge(authenticated, sessionSubject) && Boolean(sessionSubject) && Boolean(locale);
 	const load = useCallback(async (signal: AbortSignal, active: AuthorizedDecision | null): Promise<TouchpointLifecycleLoad<AuthorizedDecision>> => {
 		if (!locale || !sessionSubject) return { kind: "clear" };
 		const loaded = await loadProductionTouchpointDecision(PLACEMENT, locale, signal, active?.touchpointDecisionId);

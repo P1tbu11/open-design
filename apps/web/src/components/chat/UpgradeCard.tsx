@@ -48,6 +48,7 @@
 import type { ReactElement } from 'react';
 import { Button } from '@open-design/components';
 import { useT } from '../../i18n';
+import { commercialSurfaceEnabled } from '../../commercial-surfaces';
 import styles from './UpgradeCard.module.css';
 
 export interface UpgradeCardProps {
@@ -136,16 +137,18 @@ export function UpgradeCard({ balanceUsd, onUpgrade, pausedAudience, concurrency
             </>
           ) : out ? t('chat.upgrade.whyOut') : t('chat.upgrade.whyLow')}
         </p>
-        <Button
-          type="button"
-          variant="primary"
-          className={styles.cta}
-          onClick={onUpgrade}
-          disabled={!onUpgrade}
-        >
-          <SparkIcon />
-          {t('settings.amrUpgrade')}
-        </Button>
+        {commercialSurfaceEnabled('upgradePrompts') ? (
+          <Button
+            type="button"
+            variant="primary"
+            className={styles.cta}
+            onClick={onUpgrade}
+            disabled={!onUpgrade}
+          >
+            <SparkIcon />
+            {t('settings.amrUpgrade')}
+          </Button>
+        ) : null}
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import type { WorkspaceCollabContext } from '@open-design/contracts';
 import { useI18n } from '../i18n';
 import { InviteDialog } from './InviteDialog';
 import { Toast } from './Toast';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import styles from './HomeInviteSurface.module.css';
 
 export const WORKSPACE_INVITES_SENT = 'od:workspace-invites-sent';
@@ -19,6 +20,7 @@ export function HomeInviteTrigger({ context, signedOut = false }: { context: Wor
   const { t } = useI18n();
   const analytics = useAnalytics();
   const [surfaceId] = useState(() => crypto.randomUUID());
+  if (!commercialSurfaceEnabled('invitePrompts')) return null;
   if (!signedOut && (!context || !context.permissions.canInviteMembers || context.memberStatus !== 'active' || context.lifecycleState !== 'active')) return null;
   return <Button className={styles.trigger} onClick={() => { trackWorkspaceJourneyClick(analytics.track, { page_name: 'home', area: 'home_invite_header', element: 'invite_teammates', entry_from: 'home_header', surface_instance_id: surfaceId, ...workspaceAnalyticsDimensions(context) }); window.dispatchEvent(new CustomEvent(OPEN_INVITE, { detail: signedOut ? { signedOut: true } : { workspaceId: context?.workspaceId, workspaceMemberId: context?.workspaceMemberId } })); }}><InvitePersonIcon /> {t('homeInvite.invite')}</Button>;
 }
@@ -142,6 +144,7 @@ export function HomeInviteSurface({ accountId, context, active, signedOut = fals
     window.addEventListener(WORKSPACE_INVITES_SENT, onSent);
     return () => window.removeEventListener(WORKSPACE_INVITES_SENT, onSent);
   }, [active, context, storageKey]);
+  if (!commercialSurfaceEnabled('invitePrompts')) return null;
   if (!signedOut && (!context || context.memberStatus !== 'active'
     || context.lifecycleState !== 'active' || !context.permissions.canInviteMembers)) return null;
   const banner = active && storageKey && dismissal !== storageKey ? (

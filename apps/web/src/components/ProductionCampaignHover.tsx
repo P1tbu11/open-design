@@ -4,6 +4,7 @@ import {
 	useTestRuntime,
 } from "./TestCampaignModal";
 import { useI18n } from "../i18n";
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { useCallback, useMemo, useRef } from "react";
 import { getOpenDesignHost } from "@open-design/host";
 import {
@@ -148,6 +149,7 @@ export function ProductionCampaignHover({
 		[testLayer],
 	);
 	const enabled =
+		commercialSurfaceEnabled('cmsCampaigns') &&
 		!testRuntime &&
 		authenticated &&
 		Boolean(sessionSubject) &&

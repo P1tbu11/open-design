@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useI18n } from "../i18n";
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { getOpenDesignHost } from "@open-design/host";
 import { openExternalUrl } from "../providers/registry";
 import {
@@ -328,7 +329,7 @@ export function ProductionCampaignModal({
 	const elementRef = useRef<HTMLDivElement | null>(null);
 	const modalRef = useRef<HTMLDivElement>(null);
 	const restoreFocus = useRef<HTMLElement | null>(null);
-	const productionEnabled = !testRuntime && authenticated && !!sessionSubject && getOpenDesignHost()?.client.type === "desktop";
+	const productionEnabled = commercialSurfaceEnabled('cmsCampaigns') && !testRuntime && authenticated && !!sessionSubject && getOpenDesignHost()?.client.type === "desktop";
 	const load = useCallback(
 		async (signal: AbortSignal, active: AuthorizedDecision | null): Promise<TouchpointLifecycleLoad<AuthorizedDecision>> => {
 			if (!locale || !sessionSubject) return { kind: "clear" };

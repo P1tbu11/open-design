@@ -12,6 +12,7 @@ vi.mock('../src/i18n', () => ({
 }));
 
 import { ExperienceSurvey } from '../src/components/ExperienceSurvey';
+import { COMMERCIAL_SURFACES } from '../src/commercial-surfaces';
 import { lockWebModalScroll } from '../src/components/modal-scroll-lock';
 import {
   SURVEY_DELAY_MS,
@@ -44,6 +45,16 @@ afterEach(() => {
 });
 
 describe('experience survey card arming', () => {
+  // This suite pins the survey's own arming policy, so it runs with the survey
+  // surface switched on; `commercial-surfaces.test.ts` pins the shipping default.
+  beforeEach(() => {
+    COMMERCIAL_SURFACES.experienceSurvey = true;
+  });
+
+  afterEach(() => {
+    COMMERCIAL_SURFACES.experienceSurvey = false;
+  });
+
   it('shows the card once a delivery survives the delay', () => {
     render(<ExperienceSurvey metricsConsent />);
 
@@ -144,5 +155,18 @@ describe('experience survey card arming', () => {
       document.body.style.overflow = '';
       document.body.removeAttribute('data-web-modal-scroll-lock');
     }
+  });
+
+  it('never arms while the commercial surface is switched off', () => {
+    COMMERCIAL_SURFACES.experienceSurvey = false;
+    render(<ExperienceSurvey metricsConsent />);
+
+    deliverArtifact();
+    passTheDelay();
+
+    expect(card()).toBeNull();
+    // Being shown spends the one ask; never being shown must not spend it, so
+    // switching the surface back on still has a card to show.
+    expect(isSurveyRetired()).toBe(false);
   });
 });

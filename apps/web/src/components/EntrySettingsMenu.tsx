@@ -27,6 +27,7 @@ import type { AppConfig } from '../types';
 import { formatDiscordPresenceCount, useDiscordPresence } from './useDiscordPresence';
 import { Icon } from './Icon';
 import { SocialShareGrid } from './SocialShareGrid';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { enterpriseUrl } from './enterpriseUrl';
 import { communityForLocale } from '../lib/community-links';
 import { FeishuIcon } from './chat/support-brand-icons';
@@ -277,25 +278,27 @@ export function EntrySettingsMenu({
             </div>
           </section>
 
-          <section className="entry-settings-menu__section">
-            <div className="entry-settings-menu__section-title">
-              <Icon name="external-link" size={14} />
-              <span>{t('socialShare.openDesignSection')}</span>
-            </div>
-            <SocialShareGrid
-              share={openDesignShare ?? fallbackOpenDesignShare}
-              className="entry-settings-social-share"
-              onShare={(platform) => {
-                trackSettingsPopoverClick(analytics.track, {
-                  page_name: pageName,
-                  area: 'settings_popover',
-                  element: 'share_channel',
-                  channel: platform,
-                });
-              }}
-              onAfterShare={() => setOpen(false)}
-            />
-          </section>
+          {commercialSurfaceEnabled('sharePrompts') ? (
+            <section className="entry-settings-menu__section">
+              <div className="entry-settings-menu__section-title">
+                <Icon name="external-link" size={14} />
+                <span>{t('socialShare.openDesignSection')}</span>
+              </div>
+              <SocialShareGrid
+                share={openDesignShare ?? fallbackOpenDesignShare}
+                className="entry-settings-social-share"
+                onShare={(platform) => {
+                  trackSettingsPopoverClick(analytics.track, {
+                    page_name: pageName,
+                    area: 'settings_popover',
+                    element: 'share_channel',
+                    channel: platform,
+                  });
+                }}
+                onAfterShare={() => setOpen(false)}
+              />
+            </section>
+          ) : null}
 
           <div className="entry-settings-menu__divider" aria-hidden />
 

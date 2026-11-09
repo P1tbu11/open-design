@@ -67,6 +67,7 @@ import {
 } from '../utils/visibleAgents';
 import { ExportDiagnosticsRow } from './ExportDiagnosticsButton';
 import { Icon } from './Icon';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { LabsSection } from './LabsSection';
 import { LABS_EXPERIMENTS } from './labs-experiments';
 import { defaultAgentModelId, effectiveAgentModelChoice } from './agentModelSelection';
@@ -4190,6 +4191,7 @@ export function SettingsDialog({
                       : undefined
                   }
                   onDisabledOptionUpgrade={
+                    commercialSurfaceEnabled('upgradePrompts') &&
                     selected.id === 'amr' &&
                     !workspaceContextLoading &&
                     (!workspaceContext ||
@@ -5044,7 +5046,7 @@ export function SettingsDialog({
                                           </svg>
                                         </span>
                                       ) : null}
-                                      {amrCardCanUpgrade ? (
+                                      {amrCardCanUpgrade && commercialSurfaceEnabled('upgradePrompts') ? (
                                         <button
                                           type="button"
                                           className="agent-card-amr-upgrade"

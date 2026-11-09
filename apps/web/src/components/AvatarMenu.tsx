@@ -4,6 +4,7 @@ import { getResolvedDeviceId } from '../analytics/client';
 import { amrHandoffDeviceId, attributedAmrUrl, recordAmrEntry } from '../analytics/amr-attribution';
 import { useAnalytics } from '../analytics/provider';
 import { useT } from '../i18n';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { AgentIcon } from './AgentIcon';
 import { modelProviderIconSrc } from './modelProviderIcon';
 import { RemixIcon } from './RemixIcon';
@@ -401,7 +402,10 @@ export function AvatarMenu({
   };
   // Plan-gated models stay visible but are not selectable; clicking one routes
   // to the plans page instead of silently choosing a model the run would reject.
+  // With commercial surfaces off there is no plans page to send them to, so the
+  // row stays inert rather than opening a sales funnel.
   const openAmrUpgrade = () => {
+    if (!commercialSurfaceEnabled('upgradePrompts')) return;
     if (!amrCanUpgrade) return;
     openAmrTarget(amrPlansUrl, 'avatar_amr_upgrade');
   };

@@ -10,6 +10,7 @@ import type {
 } from "@open-design/contracts/api/touchpointTestRuntime";
 import { getOpenDesignHost, OPEN_DESIGN_HOST_VERSION } from "@open-design/host";
 import { mountTouchpoint } from "./touchpoint-lifecycle";
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import {
 	navigateCampaignTarget,
 	resolveCampaignTarget,
@@ -428,6 +429,7 @@ export async function dispatchTestCampaignAction(
 function supportsHost(authenticated: boolean): boolean {
 	const host = getOpenDesignHost();
 	return (
+		commercialSurfaceEnabled('cmsCampaigns') &&
 		authenticated &&
 		host?.version === OPEN_DESIGN_HOST_VERSION &&
 		host.client.type === "desktop"

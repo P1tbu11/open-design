@@ -15,6 +15,7 @@ import { AfterExportShareGuide } from './share/AfterExportShareGuide';
 import { CommentSyncBanner } from './share/CommentSyncBanner';
 import { invalidateCommentSyncState } from './share/useCommentSyncState';
 import { useAfterExportShareGuide } from './share/useAfterExportShareGuide';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { useShareGuideAppUserId } from './share/useShareGuideAppUserId';
 import { useProjectShareHistoryState } from './share/useProjectShareHistory';
 import { notifyProjectShareHistoryChanged } from './share/share-publication-events';
@@ -15791,7 +15792,8 @@ function HtmlViewer({
     hasEverShared: projectShareHistory?.hasEverShared ?? null,
     historyLoading: projectShareHistoryState.status === 'loading',
     historyError: projectShareHistoryState.status === 'error',
-    enabled: workspaceActive && !viewerOnly && rawCanShare && !streaming,
+    enabled: commercialSurfaceEnabled('sharePrompts')
+      && workspaceActive && !viewerOnly && rawCanShare && !streaming,
   });
   const rawCanDownload = source !== null && (isShareableArtifact || isMarkdownArtifact);
   const canShare = rawCanShare && !viewerOnly;

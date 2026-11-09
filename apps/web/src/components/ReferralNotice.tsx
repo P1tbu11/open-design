@@ -15,6 +15,7 @@ import {
 } from "../runtime/amr-guidance";
 import { openExternalUrl } from "../providers/registry";
 import { openReferralActivity } from "../runtime/referral-navigation";
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import styles from "./ReferralNotice.module.css";
 
 const dismissed = new Set<string>();
@@ -128,7 +129,7 @@ export function ReferralNotice({
 	const kind = referralNoticeKind(data, exhausted, serverNow);
 	const key = `${profile}:${accountId}:${kind}`;
 	const hidden = wasDismissed(key);
-	const visible = active && accountId && kind && kind !== "pending";
+	const visible = commercialSurfaceEnabled('referralProgram') && active && accountId && kind && kind !== "pending";
 	const analytics = useReferralAnalytics<HTMLElement>(
 		"client_home",
 		visible && !hidden ? key : null,

@@ -13,6 +13,7 @@ import { Button } from '@open-design/components';
 import { useT } from '../i18n';
 import styles from './ExperienceSurvey.module.css';
 import { WEB_MODAL_SCROLL_LOCK_ATTRIBUTE } from './modal-scroll-lock';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import {
   SURVEY_DELAY_MS,
   isSurveyRetired,
@@ -137,9 +138,11 @@ export function ExperienceSurvey({
 
   // Dev-only preview hook, so the card can be eyeballed during development or
   // design review without driving a real export. Never registered in a
-  // production build.
+  // production build, and never while the commercial surface is switched off —
+  // otherwise `?survey=preview` would be a way around the switch.
   useEffect(() => {
     if (process.env.NODE_ENV === 'production') return;
+    if (!commercialSurfaceEnabled('experienceSurvey')) return;
     const globals = window as typeof window & {
       __odExperienceSurvey?: { open: () => void };
     };
@@ -160,6 +163,7 @@ export function ExperienceSurvey({
   // off, because the survey is asked once per user and dropping a chance is
   // how a user ends up never being asked at all.
   useEffect(() => {
+    if (!commercialSurfaceEnabled('experienceSurvey')) return;
     if (!metricsConsent) return;
     let armTimer: number | null = null;
     let modalWatcher: MutationObserver | null = null;

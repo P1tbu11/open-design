@@ -7,6 +7,7 @@ import type { WorkspaceCollabContext } from '@open-design/contracts';
 import { useT } from '../i18n';
 import type { AmrBalanceBranch } from '../runtime/amr-balance-branch';
 import { workspaceUpgradeUrl } from './EntryNavRail';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { Icon } from './Icon';
 import frame from './AmrBalanceDialog.module.css';
 import styles from './AmrConcurrencyDialog.module.css';
@@ -26,7 +27,8 @@ export function AmrConcurrencyDialog({ branch, workspaceContext, profile, consol
   const t = useT();
   const journey = useWorkspaceJourney({ page_name: pageName, area: 'concurrency_limit_dialog', reason: 'concurrency_limit', stage, ...workspaceAnalyticsDimensions(workspaceContext) });
   const close = () => { journey.click('close'); onClose(); };
-  const upgradeUrl = upgradeAllowed && branch.audience === 'owner' && branch.tier !== 'max' && workspaceContext
+  const upgradeUrl = commercialSurfaceEnabled('upgradePrompts')
+    && upgradeAllowed && branch.audience === 'owner' && branch.tier !== 'max' && workspaceContext
     ? workspaceUpgradeUrl(workspaceContext, null, { fallbackProfile: profile, consoleOrigin }) : null;
   const isMax = branch.tier === 'max';
   const memberNotice = branch.audience === 'member';

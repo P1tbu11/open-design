@@ -17,6 +17,7 @@ import {
   writeArchivedIds,
 } from '../message-center-client';
 import { GoPlanSunsetDialog } from './GoPlanSunsetDialog';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import { Icon } from './Icon';
 import styles from './MessageCenter.module.css';
 
@@ -369,7 +370,7 @@ export function MessageCenter({
         ) : visibleMessages.map((message) => <MessageItem key={message.id} locale={locale} message={message} archived={archivedIds.has(message.id)} onRead={markRead} onToggleArchived={toggleArchived} onError={() => setSyncState('error')}/>)}
       </div>
     </aside></div>, document.body) : null}
-    {priorityMessage != null ? (
+    {priorityMessage != null && commercialSurfaceEnabled('subscriptionAnnouncements') ? (
       <GoPlanSunsetDialog
         active={priorityAnnouncementActive}
         currentPlanId={priorityAnnouncementCurrentPlanId ?? 'unknown'}

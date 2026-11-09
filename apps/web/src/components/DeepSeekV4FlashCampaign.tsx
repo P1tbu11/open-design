@@ -22,6 +22,7 @@ import {
 import { useI18n } from '../i18n';
 import { Icon } from './Icon';
 import { modelProviderIconSrc } from './modelProviderIcon';
+import { commercialSurfaceEnabled } from '../commercial-surfaces';
 import styles from './DeepSeekV4FlashCampaign.module.css';
 
 interface Props {
@@ -154,7 +155,7 @@ export function DeepSeekV4FlashCampaign({
   const activeCampaignId = campaign.id;
 
   useEffect(() => {
-    if (!active) {
+    if (!commercialSurfaceEnabled('modelCampaigns') || !active) {
       // Leaving home is NOT a dismissal: close without marking the campaign
       // seen, so the next return to home within the window re-opens it.
       // (Also releases the body scroll lock the open effect installed.)
@@ -268,7 +269,7 @@ export function DeepSeekV4FlashCampaign({
     );
   };
 
-  if (!active || !modalOpen || audience === 'unknown' || typeof document === 'undefined') {
+  if (!commercialSurfaceEnabled('modelCampaigns') || !active || !modalOpen || audience === 'unknown' || typeof document === 'undefined') {
     return null;
   }
 
