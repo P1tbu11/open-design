@@ -65,7 +65,11 @@
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: var(--radius-sm);
+  /* `var(--radius)` (8px), in step with `.chrome-action` — the 演示 / 历史版本 /
+     导出 buttons that share this toolbar. This row used the 4px step, so the
+     icon actions and the labelled actions beside them drew two different
+     corners in one line. */
+  border-radius: var(--radius);
   color: var(--text-muted);
   display: inline-flex;
   align-items: center;

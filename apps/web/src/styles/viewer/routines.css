@@ -3149,14 +3149,42 @@
   background: transparent;
 }
 .app .ws-focus-expand {
-  /* Matches the Home pill in the chrome row (64x32, 12px radius) so the two
-     read as one control family when focus mode lines them up side by side.
-     A 32px square next to a 64px pill looked like a different kind of control;
-     the shared box is what makes the sequence Home → toggle → tabs look
-     intentional rather than assembled. */
-  width: 64px;
-  height: 32px;
-  border-radius: 12px;
+  /* A square icon button sized to its neighbours on this row, not a wide pill:
+     the add-tab next to the tab strip is 28x28, and this control sits in the
+     same run. It must NOT be a 64px box — the row is `display: flex`, so a wide
+     box beside the strip gets flex-shrunk into an arbitrary narrow rectangle
+     (measured 43px in the real window), which is what made it look squashed
+     rather than sized. `flex: 0 0 auto` pins the box so no neighbour can
+     compress it.
+     Radius is `var(--radius)` (8px), the value the buttons that share this row
+     wear: 演示 / 历史版本 / 导出 are `.chrome-action`, which uses that token.
+     The 4px step (`--radius-sm`) is the viewer toolbar's own denser idiom and
+     read as a tighter corner than the controls sitting beside this one. */
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 120ms var(--ease-out), color 120ms var(--ease-out);
+}
+/* Same hover / pressed seat as the add-tab and the viewer's icon actions: a
+   subtle fill and full-strength ink. The button had only its resting style, so
+   it read as inert on hover while every control beside it responded. */
+.app .ws-focus-expand:hover:not(:disabled),
+.app .ws-focus-expand[aria-pressed='true'] {
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+.app .ws-focus-expand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .app .ws-tabs-bar {
   gap: 6px;

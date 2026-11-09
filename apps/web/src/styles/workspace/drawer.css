@@ -2569,7 +2569,16 @@
 }
 .ws-tabs-bar.is-overflowing + .ws-add-tab {
   padding-left: 4px;
-  background: #fff;
+  /* Overlap mask for tabs scrolling underneath. This used to be a solid #fff
+     plate, which read as a stray white rectangle on the row — the shell ground
+     is an app-wide wash, not white, so the plate never matched what it sat on.
+     A fade from the ground colour does the same masking job without asserting
+     a fill the row does not have. */
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    var(--workspace-tab-bar-bg, var(--bg)) 6px
+  );
   box-shadow: -8px 0 10px -9px color-mix(in srgb, var(--text) 30%, transparent);
 }
 .ws-tab-add {
@@ -2577,7 +2586,11 @@
   height: 28px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--radius-pill);
+  /* Rounded square at `var(--radius)` (8px) — the value 演示 / 历史版本 / 导出
+     wear (`.chrome-action`). This had drifted twice: `--radius-pill` made it a
+     circle while every neighbour was a rounded rectangle, and `--radius-sm`
+     (4px) then made it a visibly tighter corner than the same row's buttons. */
+  border-radius: var(--radius);
   background: transparent;
   color: var(--text-muted);
   display: inline-flex;
