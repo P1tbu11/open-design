@@ -23,11 +23,14 @@
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   border-radius: 16px;
-  margin: 0 12px 12px 0;
+  /* Same lift as `.entry-layout.css` gives the card: this scoped variant wins
+     on specificity, so the entry route's top pull has to be repeated here or
+     the card stays under the chrome row in the light theme. */
+  margin: 6px 6px 6px 0;
   box-shadow: 0 1px 1px rgb(0 0 0 / 8%);
 }
 :global(html[data-theme="light"]) .memberFrame :global(.entry:not(.entry--rail-open) .entry-main--scroll) {
-  margin-left: 12px;
+  margin-left: 6px;
 }
 
 @media (prefers-color-scheme: light) {
@@ -41,10 +44,13 @@
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     border-radius: 16px;
-    margin: 0 12px 12px 0;
+    /* Same lift as `.entry-layout.css` gives the card: this scoped variant wins
+     on specificity, so the entry route's top pull has to be repeated here or
+     the card stays under the chrome row in the light theme. */
+  margin: 6px 6px 6px 0;
     box-shadow: 0 1px 1px rgb(0 0 0 / 8%);
   }
   :global(html:not([data-theme])) .memberFrame :global(.entry:not(.entry--rail-open) .entry-main--scroll) {
-    margin-left: 12px;
+    margin-left: 6px;
   }
 }

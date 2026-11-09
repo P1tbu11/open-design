@@ -6202,6 +6202,10 @@ function AppInner() {
         data-client-type={clientType}
         data-host-platform={hostPlatform}
         data-route={route.kind === 'project' ? 'project' : 'entry'}
+        /* Which entry sub-view is showing. The settings page is a full-bleed
+           surface of its own and must not take the entry layout's top-lift —
+           its back button sits exactly where the chrome row's controls live. */
+        data-entry-view={route.kind === 'home' ? route.view : undefined}
       >
         <WorkspaceTabsBar
           route={route}

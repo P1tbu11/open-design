@@ -130,14 +130,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  /* 12px side gutters (per product): to the window's left edge and — through
-     the right margin — to the content card beside it. The bottom gutter is 8
-     (OPEND-3116, design spec): the OpenDesign / account row at the foot of
-     the column sits 8px off the window's bottom edge. Top margin 0: the tab
-     bar already contributes a 10px gap below the tabs (its bottom padding),
-     so the single visible gap between the tabs and this column stays 10px
-     instead of adding the rail's own inset on top of it. */
-  margin: 0 12px 8px;
+  /* Top gutter 0, for the same reason as the content card: the ground and the
+     rail are both white here, so a 6px gap at the top only lowered the column
+     without drawing an edge. Right and bottom keep 6 (the window frame gives
+     those a contrast the top has no equivalent for).
+     Bottom was 8 under OPEND-3116; product unified the shells on 6. */
+  margin: 0 6px 6px;
   /* No padding at all. Bottom: the account row's bottom edge is set by the
      margin above alone — nothing pads it further up. (It used to sit flush
      with the content card's bottom edge, both boxes carrying 12px; the rail's
@@ -275,7 +273,7 @@
      .entry-main--scroll` never matches at this width — and the card sat flush
      against the window edge while the right side kept its 12. */
   .entry-shell--no-header .entry.entry--rail-open .entry-main--scroll {
-    margin-left: 12px;
+    margin-left: 6px;
   }
 }
 /* Topbar panel toggle — the single affordance left visible when the rail
@@ -1873,7 +1871,12 @@ body[data-web-modal-scroll-lock] .entry-main--scroll {
      this element is the scroll container, where an absolutely positioned
      pseudo scrolls away with the content, and `::before` is already taken by
      the top scroll-fade band above. */
-  margin: 0 12px 12px 0;
+  /* Top gutter is 0: the entry ground and the card are both white, so a 6px
+     gap between them is not visible — it only pushed the card down and read as
+     empty space under the chrome row. The card starts flush with the row
+     instead. Right and bottom keep 6, where the window frame provides a
+     contrast the top edge has no equivalent for. */
+  margin: 0 6px 6px 0;
   --entry-content-surface: rgba(255, 255, 255, 0.85);
   --entry-content-ring: var(--glass-refract-ring-edge);
   background: var(--entry-content-surface);
@@ -1890,9 +1893,10 @@ body[data-web-modal-scroll-lock] .entry-main--scroll {
   --entry-topbar-h: 44px;
 }
 /* Rail collapsed: its track is 0-wide and its column is clipped away, so the
-   left gutter has to come from this card instead. */
+   left gutter has to come from this card instead — 6px, matching the three
+   edges it already carries. */
 .entry:not(.entry--rail-open) .entry-main--scroll {
-  margin-left: 12px;
+  margin-left: 6px;
 }
 /* Material spec fallbacks: drop the translucency to a solid surface and take
    the rim down to the neutral border ladder. */

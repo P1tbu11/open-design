@@ -738,6 +738,23 @@
   /* Translucent over the app wash, matching the home ground (app-wash.css
      veil token restores the solid page in degraded modes). */
   background: var(--veil-page);
+  /* Same 6px gutter as the entry content card, on the three edges that touch
+     the window frame. The left stays 0 because this page paints its own
+     navigation column there, and the surface is flush against it. */
+  padding: 6px 6px 6px 0;
+  box-sizing: border-box;
+}
+/* The page reaches the window top like the entry content card does: without
+   this lift its surface starts under the chrome row, leaving a 44px band of
+   empty ground above the settings content. The left column pays that height
+   back so the back button and nav list keep clear of the window controls. */
+.workspace-shell[data-entry-view='settings'] .workspace-shell__body {
+  margin-top: calc(-1 * var(--workspace-tabs-chrome-height, 44px));
+  height: calc(100% + var(--workspace-tabs-chrome-height, 44px));
+  overflow: visible;
+}
+.workspace-shell[data-entry-view='settings'] .settings-sidebar {
+  padding-top: calc(6px + var(--workspace-tabs-chrome-height, 44px));
 }
 .settings-page-shell .modal-settings.settings-page-surface {
   width: 100%;
@@ -1299,8 +1316,9 @@
   gap: 3px;
   /* No right padding: nav items (and search) extend flush to the rail's right
      edge, dropping the 10px gap on the content-facing side. Left keeps 10px so
-     the selected highlight doesn't touch the window edge. */
-  padding: 12px 0 18px 10px;
+     the selected highlight doesn't touch the window edge. Top/bottom match the
+     6px frame gutter so the nav's first and last rows align with the card. */
+  padding: 6px 0 6px 10px;
   /* Same treatment as the top tab strip: fully transparent, riding the
      shell's translucent ground so the wash/wallpaper shows identically —
      no extra white layer, no blur. */
@@ -1546,19 +1564,17 @@
 .settings-page-shell .settings-content {
   grid-column: 2;
   grid-row: 1;
-  /* Fixed 12px gutter on both sides that stays 12px at any window width —
-     no max-width cap, so stretching the window widens the card, not the gaps.
-     `justify-self: center` splits the 24px evenly into 12 + 12. */
-  width: calc(100% - 24px);
+  /* Flush with the surface on all four edges: the 6px frame gutter lives on
+     `.settings-page-shell`'s padding, exactly like the entry content card.
+     Any extra inset here stacks on top of that 6px and reads as a wider
+     margin than every other page. */
+  width: 100%;
   max-width: none;
-  justify-self: center;
-  align-self: start;
-  /* 12px top + 12px bottom outer margin; height leaves exactly that 24px
-     total so the card fills the shell without overflow. */
-  margin: 12px 0 12px;
-  height: calc(100% - 24px);
-  /* 32px top inset between the card edge and the first content row. */
-  padding: 32px 24px 24px;
+  margin: 0;
+  height: 100%;
+  /* Match the entry content card's 24px top inset (`.entry-main__inner`), so
+     the first row on both pages sits the same distance from the card edge. */
+  padding: 24px 24px 24px;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -1602,9 +1618,9 @@
   left: 0;
   right: 0;
   bottom: 100%;
-  /* Tallest variant wins: covers page-shell's 32px band and the modal's 16px
+  /* Tallest variant wins: covers page-shell's 24px band and the modal's 16px
      one; the scroll container clips whatever pokes past its top edge. */
-  height: 40px;
+  height: 32px;
   background: inherit;
 }
 .settings-page-shell .settings-execution-sticky {

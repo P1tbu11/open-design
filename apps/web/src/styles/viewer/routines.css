@@ -970,6 +970,30 @@
 .workspace-shell[data-route='project']:has(> .workspace-shell__body .split.split-focus) {
   grid-template-columns: minmax(0, 1fr);
 }
+/* Entry route: the content card reaches the window top, the rail does not.
+   The negative margin alone is not enough — `.workspace-shell__body` starts at
+   y=44 and clips (`overflow: hidden`), so the card was lifted into a band its
+   own container had already cut off (the truncated top edge).
+   Fixing it on the body's grid row reflows the rail's content-sized track and
+   pushes the whole shell sideways, so instead the body is grown upward by the
+   row's height and the overflow released — the grid columns never change, and
+   the rail keeps its own starting line via padding.
+   Scoped away from the settings page (`route.view === 'settings'`): that view
+   is its own full-bleed surface whose back button sits where the chrome row's
+   controls live, so lifting it would put the two on top of each other. */
+.workspace-shell[data-route='entry']:not([data-entry-view='settings']) > .workspace-shell__body {
+  margin-top: calc(-1 * var(--workspace-tabs-chrome-height, 44px));
+  height: calc(100% + var(--workspace-tabs-chrome-height, 44px));
+  overflow: visible;
+}
+.workspace-shell[data-route='entry']:not([data-entry-view='settings']) .entry-nav-rail {
+  padding-top: var(--workspace-tabs-chrome-height, 44px);
+}
+.workspace-shell[data-route='entry']:not([data-entry-view='settings']) .entry-main--scroll {
+  margin-top: 6px;
+  position: relative;
+  z-index: 1;
+}
 /* ── Project-route tab-strip dock (workspaceTabsDock.ts) ──────────────────
    On the project route the strip portals into .split-chat-tabs-dock at the
    top of the chat column, one level below the chrome row and level with the
@@ -3064,11 +3088,18 @@
    same 8px — it would slide under the Home button. There the card yields the
    chrome row's height first and keeps its own 8px gutter below it. */
 .workspace-shell[data-route='project'] .app .workspace {
-  margin-top: 8px;
+  /* 6px gutter on the top, right and bottom. Product tuned this down from the
+     8px the inter-card gap uses: at 8 the panel read as floating too far off
+     the frame for a surface that is already flush on its left edge. The left
+     stays 0 — in split mode that gap to the chat card is the resize handle's
+     own column, not this rule's. */
+  margin: 6px 6px 6px 0;
   background: var(--bg-panel);
-  box-shadow:
-    var(--shadow-sm),
-    inset 0 0 0 1px color-mix(in srgb, var(--border) 66%, transparent);
+  /* No inset ring. It was added to make the gutter legible when the card
+     painted nothing, but the surface above already does that — and a 1px inset
+     stroke on a rounded card reads as a dent at the corner, because the stroke
+     follows the radius while the fill behind it does not. */
+  box-shadow: var(--shadow-sm);
 }
 /* Focused: the collapsed chat column frees the chrome row's width, so the panel
    spans the window — but the row itself must not paint over it, or its 44px of

@@ -76,10 +76,13 @@ describe('OPEND-3153 — account menu shows no scrollbar in a regular window', (
   });
 });
 
-describe('OPEND-3116 — rail bottom gutter is 8px', () => {
-  it('insets the rail panel 8px from the bottom edge', () => {
+describe('rail bottom gutter (OPEND-3116, superseded by the shared 6px gutter)', () => {
+  it('insets the rail panel from the bottom edge by the shared 6px gutter', () => {
     const panel = cssDeclarations(entryLayoutCss, '.entry-nav-rail__panel');
-    expect(ruleValue(panel, 'margin')).toBe('0 12px 8px');
+    // OPEND-3116 specified 8 here; the shells are now unified on 6. Top is 0
+    // because the ground and the rail are both white, so a top gutter drew no
+    // visible edge — only lowered the column.
+    expect(ruleValue(panel, 'margin')).toBe('0 6px 6px');
   });
 });
 

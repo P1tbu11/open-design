@@ -127,10 +127,12 @@ describe('app scrim material (styles/material.css)', () => {
 });
 
 describe('entry layout materials (styles/home/entry-layout.css)', () => {
-  it('flattens the rail column: 12px side gutters (8px bottom), no padding, no surface / rim / shadow', () => {
+  it('flattens the rail column: no top gutter, 6px right/bottom, no padding, no surface / rim / shadow', () => {
     const panel = declarations(entryLayoutCss, '.entry-nav-rail__panel');
-    // Bottom is 8 since OPEND-3116 (design spec); the sides keep the 12px gutter.
-    expect(panel).toMatch(/margin:\s*0 12px 8px/);
+    // Top is 0 — the ground and the rail are both white, so a top gutter only
+    // lowered the column without drawing an edge. Right/bottom keep the 6px
+    // gutter the shells share.
+    expect(panel).toMatch(/margin:\s*0 6px 6px/);
     expect(panel).toMatch(/padding:\s*0/);
     expect(panel).not.toMatch(/--rail-surface/);
     expect(panel).not.toMatch(/backdrop-filter/);
@@ -144,9 +146,11 @@ describe('entry layout materials (styles/home/entry-layout.css)', () => {
     expect(declarations(entryLayoutCss, '.entry-nav-rail__menu-backdrop')).toMatch(/position:\s*fixed/);
   });
 
-  it('makes the content column the one base card: 85% white frost, 16px corner, inset ring, 12px inset', () => {
+  it('makes the content column the one base card: 85% white frost, 16px corner, inset ring, 6px right/bottom inset', () => {
     const card = declarations(entryLayoutCss, '.entry-main--scroll');
-    expect(card).toMatch(/margin:\s*0 12px 12px 0/);
+    // Top is 0: a gap between two whites does not read as a gap. Right and
+    // bottom keep 6, where the window frame supplies the contrast.
+    expect(card).toMatch(/margin:\s*0 6px 6px 0/);
     expect(card).toMatch(/--entry-content-surface:\s*rgba\(255, 255, 255, 0\.85\)/);
     expect(card).toMatch(/--entry-content-ring:\s*var\(--glass-refract-ring-edge\)/);
     expect(card).toMatch(/background:\s*var\(--entry-content-surface\)/);
@@ -154,7 +158,7 @@ describe('entry layout materials (styles/home/entry-layout.css)', () => {
     expect(card).toMatch(/border-radius:\s*16px/);
     expect(card).toMatch(/box-shadow:\s*var\(--shadow-sm\),\s*inset 0 0 0 1px var\(--entry-content-ring\)/);
     expect(declarations(entryLayoutCss, '.entry:not(.entry--rail-open) .entry-main--scroll')).toMatch(
-      /margin-left:\s*12px/,
+      /margin-left:\s*6px/,
     );
     // Narrow-window auto-collapse keeps `.entry--rail-open`, so it needs its own
     // copy of that gutter.
@@ -164,7 +168,7 @@ describe('entry layout materials (styles/home/entry-layout.css)', () => {
         '@media (max-width: 1080px)',
         '.entry-shell--no-header .entry.entry--rail-open .entry-main--scroll',
       ),
-    ).toMatch(/margin-left:\s*12px/);
+    ).toMatch(/margin-left:\s*6px/);
   });
 
   it('degrades the content card to a solid surface without transparency / backdrop-filter', () => {
