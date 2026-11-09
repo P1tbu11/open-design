@@ -1473,7 +1473,7 @@ describe('FileWorkspace upload input', () => {
     expect(onUploadFiles).not.toHaveBeenCalled();
   });
 
-  it('hides the workspace focus control while the chat pane is open', () => {
+  it('renders one focus control in the first position, in both states', () => {
     const markup = renderToStaticMarkup(
       <FileWorkspace
         projectId="project-1"
@@ -1489,9 +1489,12 @@ describe('FileWorkspace upload input', () => {
       />,
     );
 
-    // While chat is visible the collapse trigger lives in ChatPane.
-    // FileWorkspace only renders an expand control once chat is hidden.
-    expect(markup).not.toContain('data-testid="workspace-focus-toggle"');
+    // One toggle owns the chat column's visibility and never unmounts: the
+    // control must be present while chat is OPEN too, otherwise the only way
+    // to collapse the column would be a control inside the column itself.
+    // Expanded state reports aria-pressed=false.
+    expect(markup).toContain('data-testid="workspace-focus-toggle"');
+    expect(markup).toContain('aria-pressed="false"');
   });
 
   it('renders the expand control on the LEFT of the tab bar while focused', () => {

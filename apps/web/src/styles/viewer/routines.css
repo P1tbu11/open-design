@@ -1004,32 +1004,10 @@
 .workspace-tabs-chrome:has(.workspace-tab.is-active:not(.is-pinned)) .workspace-tabs-glide {
   display: none;
 }
-/* Collapse-chat control, lifted from the chat card header into the dock row.
-   Visual order is dropdown → history dock → collapse; the dropdown portals in
-   last, so `order` (dock 1, collapse 2) fixes the sequence. */
-.split-chat-collapse {
-  appearance: none;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  order: 2;
-  width: 32px;
-  height: 32px;
-  margin-top: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 10px;
-  /* Transparent at rest; the hover seat below is the only fill. */
-  background: transparent;
-  box-shadow: none;
-  color: var(--text);
-  -webkit-app-region: no-drag;
-}
-.split-chat-collapse:hover {
-  background: color-mix(in srgb, var(--bg-panel) 78%, transparent);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 5%, transparent);
-}
+/* The chat column's collapse/expand control is NOT styled here: it lives in
+   the workspace panel's first position (`.ws-focus-expand`, FileWorkspace), one
+   toggle for both directions, because this dock row unmounts with the column it
+   would be collapsing. */
 .split-chat-tabs-dock .workspace-tabs-strip {
   align-items: center;
 }
@@ -3059,6 +3037,9 @@
 /* Focus mode hides the chat card, so the workspace is the only card — give it
    the 8px left gap back (in split mode the left is 0 to keep the inter-card gap
    at 8px). */
+/* Focus mode hides the chat card, so the workspace is the only card — it gets
+   the left gutter back that the inter-card gap used to occupy (in split mode
+   the left is 0 so the gap between the two cards stays 8px). */
 .app .split.split-focus .workspace {
   margin-left: 8px;
 }
@@ -3076,13 +3057,78 @@
    pixel-sampling a first attempt: `--material-regular` and a 0.85 white frost
    both landed on 255/255/255 against the 255 ground. This card therefore takes
    the panel tint (`--bg-panel`, #fafafa) rather than another white, and keeps
-   the rim that actually draws the gutter's edge. */
+   the rim that actually draws the gutter's edge.
+
+   Workspace-focused mode is the exception: the chrome row stays mounted (it
+   owns the traffic-light drag region and Home), so the card cannot start at the
+   same 8px — it would slide under the Home button. There the card yields the
+   chrome row's height first and keeps its own 8px gutter below it. */
 .workspace-shell[data-route='project'] .app .workspace {
   margin-top: 8px;
   background: var(--bg-panel);
   box-shadow:
     var(--shadow-sm),
     inset 0 0 0 1px color-mix(in srgb, var(--border) 66%, transparent);
+}
+/* Focused: the collapsed chat column frees the chrome row's width, so the panel
+   spans the window — but the row itself must not paint over it, or its 44px of
+   white would hide the panel's top edge behind a band (which reads as the same
+   wasted space the gutter was meant to remove). The row keeps only the window
+   controls' strip (traffic lights + Home) and lets everything else fall through:
+   `pointer-events: none` here, re-enabled on the controls it actually hosts.
+   Electron's drag region follows the same split — a `drag` row over the panel
+   would swallow its clicks, which is why `no-drag` is re-asserted for the
+   panel's own top row below. */
+.workspace-shell[data-route='project']:has(> .workspace-shell__body .split.split-focus) > .workspace-tabs-chrome {
+  background: transparent;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+}
+/* The panel starts at the window frame in this mode and gives up the gutter on
+   the other three edges too: with the chat column gone there is no second card
+   to sit beside, so an inset would only frame the panel against itself. Its
+   first row keeps the chrome row's height, which is what holds Home and the
+   tabs on one baseline. Radius goes with the gutter — against the frame a 12px
+   corner would notch the window edge and let the fill behind it show through. */
+.workspace-shell[data-route='project']:has(> .workspace-shell__body .split.split-focus) .app .workspace {
+  margin: 0;
+  border-radius: 0;
+}
+.workspace-shell[data-route='project']:has(> .workspace-shell__body .split.split-focus) > .workspace-tabs-chrome :is(button, a, input, [role='button'], [role='menu']) {
+  pointer-events: auto;
+}
+/* The traffic-light strip keeps the window drag affordance; nothing else in
+   the row does, so a click meant for the panel lands on the panel. */
+.workspace-shell[data-route='project']:has(> .workspace-shell__body .split.split-focus) > .workspace-tabs-chrome > .app-chrome-traffic-space {
+  -webkit-app-region: drag;
+}
+.workspace-shell[data-route='project']:has(> .workspace-shell__body .split.split-focus) .app .ws-tabs-shell {
+  /* Clear the window controls and Home, then sit one 8px gap after the Home
+     pill. The panel's left edge IS the window frame here, so this is an
+     absolute sum: the traffic reserve (already including the lights' own
+     leading inset: x:12 + 52px = 64), the chrome row's 14px padding, Home's
+     64px pill, and the gap. Written as one sum so the toggle follows Home
+     instead of landing on a hand-tuned offset that drifts when either side
+     changes.
+     `padding-block` goes to 0 and the height to the chrome row's own 44px so
+     this row's controls centre on the SAME baseline as Home in the row above —
+     otherwise the two pills sit 8px apart and read as two staggered bars. */
+  padding: 0 14px 0 calc(var(--app-chrome-traffic-space, 0px) + 14px + 64px + 8px);
+  height: var(--workspace-tabs-chrome-height, 44px);
+  min-height: var(--workspace-tabs-chrome-height, 44px);
+  /* The panel's own first row must be clickable/draggable on its own terms:
+     Electron computes drag regions from this element, and inheriting the
+     chrome's would make its tab buttons unclickable. */
+  -webkit-app-region: no-drag;
+}
+/* Window drag for the panel's top strip: the empty run after its controls is
+   the natural grab area now that the row above no longer covers it. */
+.workspace-shell[data-route='project']:has(> .workspace-shell__body .split.split-focus) .app .ws-tabs-bar {
+  -webkit-app-region: drag;
+}
+.workspace-shell[data-route='project']:has(> .workspace-shell__body .split.split-focus) .app :is(.ws-tabs-bar, .ws-tabs-actions) :is(button, a, input, [role='button'], [role='menu'], .ws-tab) {
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
 }
 .app .ws-tabs-shell {
   padding: 6px 14px;
@@ -3103,9 +3149,14 @@
   background: transparent;
 }
 .app .ws-focus-expand {
-  width: 32px;
+  /* Matches the Home pill in the chrome row (64x32, 12px radius) so the two
+     read as one control family when focus mode lines them up side by side.
+     A 32px square next to a 64px pill looked like a different kind of control;
+     the shared box is what makes the sequence Home → toggle → tabs look
+     intentional rather than assembled. */
+  width: 64px;
   height: 32px;
-  border-radius: var(--radius);
+  border-radius: 12px;
 }
 .app .ws-tabs-bar {
   gap: 6px;

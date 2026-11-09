@@ -14739,22 +14739,12 @@ export function ProjectView({
               ref={chatTabsDockRef}
             >
               {/* Conversation controls follow the docked project dropdown:
-                  dropdown → history dock (order 1) → collapse (order 2). The
-                  dropdown portals in after these, so CSS `order` fixes the
-                  visual sequence. */}
+                  dropdown → history dock (order 1). The collapse control is
+                  NOT here: it lives in the workspace panel's first position
+                  instead (FileWorkspace's ws-focus-expand), because this whole
+                  row unmounts when the chat column collapses — a toggle parked
+                  here could not reopen it. */}
               <div className={historyDockStyles.dock} ref={setHistoryPortalTarget} data-testid="chat-history-dock" />
-              <button
-                type="button"
-                className="split-chat-collapse od-tooltip"
-                onClick={() => setWorkspaceFocused(true)}
-                title={t('chat.collapsePane')}
-                aria-label={t('chat.collapsePane')}
-                data-tooltip={t('chat.collapsePane')}
-                data-tooltip-placement="bottom"
-                data-testid="chat-collapse-toggle"
-              >
-                <Icon name="panel-left" size={16} />
-              </button>
             </div>
           ) : null}
           {activeConversationId || conversationLoadError || emptyConversationReadOnlySettled || seedConversationId !== null || projectCollab.materializationPending || projectCollab.contentUpdatePending ? (

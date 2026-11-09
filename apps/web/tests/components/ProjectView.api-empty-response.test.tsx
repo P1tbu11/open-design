@@ -169,13 +169,17 @@ vi.mock('../../src/components/FileWorkspace', () => ({
         data-preview-comments={previewComments.map((comment) => `${comment.id}:${comment.status}`).join(',')}
         data-comment-send-disabled={String(commentSendDisabled)}
       >
-        {focusMode ? (
+        {/* Mirrors the real FileWorkspace: ONE focus toggle in the workspace
+            panel's first position, present in both states — the control must
+            not unmount with the column it collapses. */}
+        {onFocusModeChange ? (
           <button
             type="button"
             data-testid="workspace-focus-toggle"
-            onClick={() => onFocusModeChange?.(false)}
+            aria-pressed={focusMode}
+            onClick={() => onFocusModeChange(!focusMode)}
           >
-            show chat
+            {focusMode ? 'show chat' : 'collapse chat'}
           </button>
         ) : null}
       </div>
@@ -570,7 +574,10 @@ describe('ProjectView API empty response handling', () => {
     await waitFor(() => expect(chatPaneMockState.resizeObserverCallbacks.length).toBeGreaterThan(0));
 
     for (let round = 0; round < 3; round += 1) {
-      fireEvent.click(screen.getByTestId('chat-collapse-toggle'));
+      // The collapse control lives in the workspace panel's first position
+      // (one toggle for both directions), not in the chat column's dock — the
+      // dock unmounts with the column.
+      fireEvent.click(screen.getByTestId('workspace-focus-toggle'));
 
       const split = document.querySelector<HTMLDivElement>('.split');
       expect(split).not.toBeNull();

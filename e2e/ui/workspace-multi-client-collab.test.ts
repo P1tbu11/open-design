@@ -449,13 +449,16 @@ test('[P0] two isolated clients converge live content, presence, and owner unsha
     await expect(
       memberPreview.getByRole('heading', { name: 'Owner version 1' }),
     ).toBeVisible({ timeout: T.long });
-    await expect(memberPage.getByTestId('workspace-focus-toggle')).toBeVisible({
-      timeout: T.long,
-    });
-    await expect(memberPage.getByTestId('chat-collapse-toggle')).toBeHidden();
-    await memberPage.getByTestId('workspace-focus-toggle').click();
-    await expect(memberPage.getByTestId('workspace-focus-toggle')).toHaveCount(0);
-    await expect(memberPage.getByTestId('chat-collapse-toggle')).toBeVisible();
+    // One toggle owns the chat column's visibility and never moves: it is the
+    // workspace panel's first control, not the chat dock's (that row unmounts
+    // when the column collapses). State shows through aria-pressed, not by the
+    // control disappearing.
+    const memberToggle = memberPage.getByTestId('workspace-focus-toggle');
+    await expect(memberToggle).toBeVisible({ timeout: T.long });
+    await expect(memberToggle).toHaveAttribute('aria-pressed', 'false');
+    await memberToggle.click();
+    await expect(memberToggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(memberToggle).toBeVisible();
     const twoPersonPresence = memberPage.getByRole('group', {
       name: /2 collaborators online/i,
     });
@@ -466,8 +469,9 @@ test('[P0] two isolated clients converge live content, presence, and owner unsha
     await expect(ownerPage.getByTestId('file-workspace')).toBeVisible({
       timeout: T.long,
     });
-    await expect(ownerPage.getByTestId('workspace-focus-toggle')).toHaveCount(0);
-    await expect(ownerPage.getByTestId('chat-collapse-toggle')).toBeVisible();
+    // The owner opens the project with the chat column visible, so the same
+    // single toggle reports the expanded state.
+    await expect(ownerPage.getByTestId('workspace-focus-toggle')).toHaveAttribute('aria-pressed', 'false');
     await hub.waitForCommand(
       (entry) =>
         entry.memberId === OWNER.memberId &&
@@ -697,8 +701,7 @@ test('[P0] two isolated clients converge live content, presence, and owner unsha
     ).toBe(memberDocumentMarker);
     // Expanding is sticky for this project visit: content/status events after
     // the initial confirmed non-owner default must never collapse chat again.
-    await expect(memberPage.getByTestId('workspace-focus-toggle')).toHaveCount(0);
-    await expect(memberPage.getByTestId('chat-collapse-toggle')).toBeVisible();
+    await expect(memberPage.getByTestId('workspace-focus-toggle')).toHaveAttribute('aria-pressed', 'false');
 
     const memberFile = await memberPage.request.get(
       `/api/projects/${projectId}/files/index.html`,

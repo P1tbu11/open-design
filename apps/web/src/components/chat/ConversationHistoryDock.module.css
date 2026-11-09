@@ -4,8 +4,14 @@
   flex: 0 0 32px;
   width: 32px;
   height: 32px;
-  /* The row gap is 8px and the 28px button is inset by 2px: leave 4px. */
-  margin-inline-end: -6px;
+  /* Breathing room against the panel's right edge. This used to be -6px, which
+     pulled the button INTO the edge: the negative margin was cancelling the
+     row gap plus the 28px button's own 2px inset, so the icon sat flush against
+     the divider. A positive end margin is the fix — the control needs visible
+     space on the side away from the content it belongs to. 8px matches the
+     gutter the row's own left padding uses, so the icon reads as inset from
+     both ends of the strip rather than shoved against one. */
+  margin-inline-end: 8px;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -4088,19 +4088,27 @@ export function FileWorkspace({
       ) : null}
       <SketchEnginePrewarm />
       <div className="ws-tabs-shell">
-        {onFocusModeChange && focusMode ? (
+        {/* Collapse/expand the chat column. This is the ONE control for that
+            column's visibility, and it lives in the workspace panel rather
+            than in the chat column's own dock row: the chat column is what
+            disappears when collapsed, so a toggle parked there could not bring
+            it back (the dock unmounts with it) and the user had to hunt for
+            the expand affordance on the other side. Fixed first position means
+            the control never moves between the two states.
+            The chevron points the way the column will go: left = collapse. */}
+        {onFocusModeChange ? (
           <button
             type="button"
             className="icon-only ws-focus-expand od-tooltip"
             data-testid="workspace-focus-toggle"
             aria-pressed={focusMode}
-            title={t('workspace.showChat')}
-            data-tooltip={t('workspace.showChat')}
+            title={t(focusMode ? 'workspace.showChat' : 'chat.collapsePane')}
+            data-tooltip={t(focusMode ? 'workspace.showChat' : 'chat.collapsePane')}
             data-tooltip-placement="bottom"
-            aria-label={t('workspace.showChat')}
-            onClick={() => onFocusModeChange(false)}
+            aria-label={t(focusMode ? 'workspace.showChat' : 'chat.collapsePane')}
+            onClick={() => onFocusModeChange(!focusMode)}
           >
-            <Icon name="chevron-right" size={15} />
+            <Icon name={focusMode ? 'chevron-right' : 'panel-left'} size={15} />
           </button>
         ) : null}
         {/* Focus mode keeps the project tab strip on this same row (the chat

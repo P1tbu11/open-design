@@ -816,11 +816,24 @@ const MAC_WINDOW_CHROME =
     : {};
 
 const MAC_WINDOW_CHROME_CSS = `
+  /* Published on the root so consumers OUTSIDE the chrome row can clear the
+     native controls too: the project route narrows the chrome to the chat
+     column, and in workspace-focused mode the workspace panel runs to the
+     window top with its own controls beside the traffic lights. A variable set
+     on .app-chrome-header cannot reach the panel — custom properties inherit
+     down, and the panel is not a descendant. */
+  :root {
+    --app-chrome-traffic-space: 64px;
+    --app-chrome-traffic-margin: 4px;
+  }
+  :root.is-window-fullscreen {
+    --app-chrome-traffic-space: 10px;
+    --app-chrome-traffic-margin: 0px;
+  }
   .app-chrome-header {
     /* Windowed: the home pill sits 4px after the traffic lights (lights span
-       x:12 + 52px = 64px). Fullscreen (class synced from main below): the
-       lights are hidden, so the pill left-aligns with the nav-rail card's
-       10px inset instead. */
+       x:12 + 52px = 64px). Fullscreen: the lights are hidden, so the pill
+       left-aligns with the nav-rail card's 10px inset instead. */
     --app-chrome-traffic-space: 64px !important;
     --app-chrome-traffic-margin: 4px !important;
     -webkit-app-region: drag;
