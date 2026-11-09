@@ -935,6 +935,41 @@
      desktop traffic-light offset (apps/desktop runtime.ts). */
   grid-template-rows: 44px minmax(0, 1fr);
 }
+/* ── Project route: the preview panel runs to the window top ──────────────
+   The 44px chrome row is a WINDOW-level row, so on the project route the
+   preview column used to start 88-132px down (chrome + 设计文件 row + viewer
+   toolbar). Product wants the panel itself to reach the top, the way the
+   reference app's right pane does — while the LEFT column keeps its chrome.
+
+   So the shell becomes two columns whose first track is exactly the chat
+   column plus its resize gutter, and the chrome is pinned into that track
+   only. The body spans BOTH rows and BOTH columns, so `.split` — and with it
+   the workspace card — starts at y=0. The chat slot pays the 44px back as
+   top padding, which is what keeps the left column identical to before. */
+.workspace-shell[data-route='project'] {
+  grid-template-columns:
+    var(--project-workspace-start, 464px)
+    minmax(0, 1fr);
+}
+.workspace-shell[data-route='project'] > .workspace-tabs-chrome {
+  grid-column: 1;
+  grid-row: 1;
+  width: auto;
+}
+.workspace-shell[data-route='project'] > .workspace-shell__body {
+  grid-column: 1 / -1;
+  /* The body spans BOTH rows so `.split` starts at y=0 and the preview column
+     can reach the window's top gutter instead of starting below the chrome
+     row. The chat column pays the 44px back as its own top padding, so the
+     left side is unchanged. */
+  grid-row: 1 / -1;
+}
+/* Workspace-focused mode collapses the chat column, so there is no left column
+   to narrow the chrome to: it takes the whole width back, exactly like the
+   entry route. Matches `.split-focus` doing the collapsing. */
+.workspace-shell[data-route='project']:has(> .workspace-shell__body .split.split-focus) {
+  grid-template-columns: minmax(0, 1fr);
+}
 /* ── Project-route tab-strip dock (workspaceTabsDock.ts) ──────────────────
    On the project route the strip portals into .split-chat-tabs-dock at the
    top of the chat column, one level below the chrome row and level with the
@@ -1558,9 +1593,18 @@
      giving a 10px tab-to-content spacing (was 18px). Bottom/left stay 8px; the
      slot's overflow:hidden (shell.css) clips the card's shadow cleanly at the
      slot edge. Right side is 0 so the gap to the workspace card is just the
-     4px resize-handle column (not 8+4+8=20px). */
-  padding: 0 0 8px 8px;
+     4px resize-handle column (not 8+4+8=20px).
+
+     On the project route the payload is pushed down by the chrome row's 44px
+     instead of leaving it as a hole above the split: the split now starts at
+     y=0 so the workspace column can reach the window top, and paying the row
+     back here is what holds the chat column exactly where it was. Every other
+     route keeps the 0 (the split starts below the chrome anyway). */
+  padding: var(--project-chat-slot-top-inset, 0) 0 8px 8px;
   background: var(--veil-page, transparent);
+}
+:is(.workspace-shell[data-route='project']) .app .split-chat-slot {
+  --project-chat-slot-top-inset: var(--workspace-tabs-chrome-height);
 }
 .app .split-chat-slot > .pane {
   /* overflow:hidden still rounds the content (the composer is a separate
@@ -3018,6 +3062,28 @@
 .app .split.split-focus .workspace {
   margin-left: 8px;
 }
+/* Project route: the panel is a card with an 8px gutter on EVERY side, but its
+   top gutter has to be paid inside the shell's first row (which the chrome also
+   occupies) rather than above it — see the `data-route='project'` body rule.
+   The top margin lands the panel's top edge 8px under the window frame, and
+   `margin-top` on the card is also what keeps the chrome row's 44px from being
+   added a second time on the left: only this column moves up.
+
+   The gutter is only legible if the card contrasts with the ground, and on this
+   shell it does not by default: the ground is `--bg-app: #fff`, the base card
+   rule paints nothing (OPEND-3090), and the tab row inside was pure white too —
+   so an 8px margin between identical whites measures as zero. Verified by
+   pixel-sampling a first attempt: `--material-regular` and a 0.85 white frost
+   both landed on 255/255/255 against the 255 ground. This card therefore takes
+   the panel tint (`--bg-panel`, #fafafa) rather than another white, and keeps
+   the rim that actually draws the gutter's edge. */
+.workspace-shell[data-route='project'] .app .workspace {
+  margin-top: 8px;
+  background: var(--bg-panel);
+  box-shadow:
+    var(--shadow-sm),
+    inset 0 0 0 1px color-mix(in srgb, var(--border) 66%, transparent);
+}
 .app .ws-tabs-shell {
   padding: 6px 14px;
   border-bottom: none;
@@ -3025,6 +3091,16 @@
   background: var(--bg);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+/* Project route: the panel's top edge is 8px under the window frame and this
+   row is its first line, so the row's own top gutter goes to 0 — the card
+   margin above is the gutter. 44px keeps the row's controls on the same
+   centreline the base rule uses.
+   The fill comes OFF here: the card itself now carries the surface and the
+   rim, and a solid white bar inside it would paint over that rim's top arc. */
+.workspace-shell[data-route='project'] .app .ws-tabs-shell {
+  padding: 6px 14px;
+  background: transparent;
 }
 .app .ws-focus-expand {
   width: 32px;

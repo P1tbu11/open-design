@@ -6201,6 +6201,7 @@ function AppInner() {
         className={`workspace-shell workspace-shell--${clientType}`}
         data-client-type={clientType}
         data-host-platform={hostPlatform}
+        data-route={route.kind === 'project' ? 'project' : 'entry'}
       >
         <WorkspaceTabsBar
           route={route}

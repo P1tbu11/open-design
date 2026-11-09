@@ -69,7 +69,10 @@ function declarationsInside(css: string, atRule: string, selector: string): stri
 describe('project chat pane material (styles/viewer/routines.css)', () => {
   it('keeps the 8px bottom/left inset slot painted with the page veil', () => {
     const slot = declarations(routinesCss, '.app .split-chat-slot');
-    expect(slot).toMatch(/padding:\s*0 0 8px 8px;/);
+    // The top term became a variable when the project route started paying the
+    // chrome row back here (so the preview column can reach the window top);
+    // the bottom/left 8px and the right 0 are the part this test exists for.
+    expect(slot).toMatch(/padding:\s*var\(--project-chat-slot-top-inset, 0\) 0 8px 8px;/);
     expect(slot).toMatch(/background:\s*var\(--veil-page, transparent\);/);
   });
 

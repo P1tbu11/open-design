@@ -2343,6 +2343,29 @@ a.avatar-item:visited {
   inherits: true;
   initial-value: 4px;
 }
+/* Where the workspace column begins, as a viewport-relative inset from the
+   shell's left edge. Written on `.split` (`writeProjectSplitLayout`) and read
+   by `.workspace-tabs-chrome` — a sibling of `.split`, not a descendant — to
+   narrow the chrome row so the preview panel can run to the window top.
+   Animatable for the same reason as the two tracks above: a live resize or a
+   collapse/expand must move the chrome edge with it, not behind it. */
+@property --project-workspace-start {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 464px;
+}
+.workspace-shell {
+  /* Entry route default: no split on screen, so the chrome is the full-width
+     window row and nothing is claimed by a workspace column. */
+  --project-workspace-start: 0px;
+}
+.workspace-shell[data-route='project'] {
+  /* First-paint fallback (460 default chat column + 4px handle) until
+     `writeProjectSplitLayout` lands the measured value on this element. See
+     the note there for why it is published on the shell rather than only on
+     `.split`. */
+  --project-workspace-start: 464px;
+}
 .split {
   --project-chat-panel-width: 460px;
   --project-chat-handle-width: 4px;

@@ -1923,6 +1923,11 @@ function applySplitChatPanelWidth(
     split.style.removeProperty('--project-chat-panel-width');
     split.style.removeProperty('--project-chat-handle-width');
     split.style.removeProperty('--project-workspace-panel-track');
+    split.style.removeProperty('--project-workspace-start');
+    // Focused mode gives the chrome the full width back; a stale narrowing
+    // value on the shell would leave it split at a chat column that isn't there.
+    split.closest<HTMLElement>('.workspace-shell')
+      ?.style.removeProperty('--project-workspace-start');
     return;
   }
   writeProjectSplitLayout(split, width, workspacePanelTrack, options);

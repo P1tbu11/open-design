@@ -194,6 +194,15 @@ export function writeProjectSplitLayout(
   split.style.setProperty('--project-chat-panel-width', `${chatPanelWidth}px`);
   split.style.setProperty('--project-chat-handle-width', `${SPLIT_RESIZE_HANDLE_WIDTH}px`);
   split.style.setProperty('--project-workspace-panel-track', workspacePanelTrack);
+  // Where the workspace column starts, in viewport terms. On the project route
+  // the chrome row is narrowed to the chat column so the preview panel can run
+  // to the window top — and the chrome is a SIBLING of `.split`, not a
+  // descendant. Custom properties inherit down, never sideways, so the value
+  // also has to be published on the shell root for the chrome to read it.
+  const workspaceStart = `calc(${chatPanelWidth}px + ${SPLIT_RESIZE_HANDLE_WIDTH}px)`;
+  split.style.setProperty('--project-workspace-start', workspaceStart);
+  split.closest<HTMLElement>('.workspace-shell')
+    ?.style.setProperty('--project-workspace-start', workspaceStart);
   if (settle) {
     // Flush the settled style pass before the class comes off; without the
     // read the add + remove collapse into one pass and the transition runs.
