@@ -96,6 +96,9 @@ deploy/agent-bins/
 # Looper harness attachments (bug screenshots etc.) — agent scratch, not repo content
 .looper-attachments/
 
+# Deepseek harness attachments — same agent scratch, kept out of repo content
+.dsh-attachments/
+
 # Deepwork local progress (git-local; OpenCode-readable via .ignore)
 .slim/deepwork/
 
