@@ -1412,12 +1412,11 @@
    字形按格子尺寸取中间偏小的一档,26×34 的缩略图条里也还认得出轮廓。 */
 .glyph { display: grid; place-items: center; background: var(--chat-bg-subtle); color: var(--chat-text-soft); }
 .glyph svg { width: 45%; height: 45%; max-width: 28px; max-height: 28px; }
-/* 还没出来的格子:设计稿 21:02 版把它从「幕布」换成了像素液体(见 `PixelLiquid`)。
-   为什么液体比幕布对:幕布要求格子里【已经有一张图】,它演的是「图正在显出来」;
-   而这一格要说的是【还没生成出来】—— 那时候什么都还没有,底下没有图可以糊。
+/* 还没出来的格子:占位是黑白 Bayer 抖动(见 `PixelLiquid`),不是一块灰。
+   这一格要说的是【还没生成出来】—— 那时候什么都还没有,底下没有图可以糊。
    ------------------------------------------------------------
-   底色留着、不铺底:上游 light 模式的 bgColor 是 vec4(1,1,1,0),alpha 为 0,
-   没有流体的地方原样透出底下,所以这里让 `--chat-bg-subtle` 透上来。 */
+   底色留着、不铺底:抖动关掉的像素 alpha 为 0,原样透出底下,
+   所以这里让 `--chat-bg-subtle` 透上来。 */
 .shot.load { background: var(--chat-bg-subtle); }
 
 /* ── 思考那一格的正文(组件 3-1)────────────────────────────────

@@ -289,8 +289,8 @@
    placeholder is NOT a grey card: "任何产物卡片加载期间不能用灰色卡片代替".
    The pixel-liquid canvas (`PixelLiquid`) lives inside the same `-mini` box so
    the video card's 9/16 letterbox still holds; the box itself drops its grey
-   fill so the liquid's transparent gaps read as the thumb's own tone, exactly
-   as the sheet has it (upstream `bgColor.a = 0`).
+   fill so the dither's transparent gaps read as the thumb's own tone
+   (off pixels are alpha 0).
    The old `artifact-card-pulse` keyframes are gone with it — reduced-motion
    degradation now lives in the canvas (one static frame, no rAF). */
 .artifact-card-mini.is-loading {

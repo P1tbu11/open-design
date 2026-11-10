@@ -1,166 +1,269 @@
 /**
- * 像素液体 —— 「还没出来的那一格里流动的东西」。
+ * 待生成格子里的黑白 Bayer 抖动场。
  * ------------------------------------------------------------
- * 取自 21st.dev 的 pixel-liquid-bg(@unlumen),经交付稿
- * `docs/design/chat-matrix/matrix-82.html`(pixel-liquid.js)移植过来。
- * 下面这段搬法与取舍是设计稿原文,一并抄进来 —— 它解释了每个常量为什么是这个数,
- * 少了它下一个人只会看到一堆魔法数字。
+ * 这一格从前是绿色像素液体:调色板 `#EAFFEB → #00FF04`,速度场用 curl noise
+ * 顶替上游 Navier-Stokes,再按 color_frag 做软 alpha。观感是一整片霓虹绿。
  *
- * 上游是 three.js 上的一整套 Navier-Stokes:advect → 外力 → divergence →
- * Poisson 迭代 → 投影,速度场留在一串 render target 里滚动,最后一支
- * color_frag 把它像素化、抖动、上色。
+ * 现在改成 visual-agent-chat / Bayer mind 那套平面抖动,仍走 Canvas2D,
+ * 不给每一格开 WebGL:
+ *   · 墨色近黑、关掉的像素全透明(底下的 `--chat-bg-subtle` 透上来)。
+ *   · 4×4 Bayer,17 级有序抖动(Paper Shaders / Codrops 那条矩阵)。
+ *     低于 1/17 保持全空,高于 16/17 保持铺实,中间才进矩阵,平区不会发灰。
+ *   · 矩阵按时间错一格(shimmer),中间调的颗粒在跳,窗体不跟着转。
+ *   · 密度场是 mind 预览那块浏览器板:圆角轮廓挤成有厚度的 SDF,
+ *     固定 yaw / pitch,透视光线行进,漫反射加边缘光得到连续亮度,
+ *     再进 Bayer。边是颗粒褪出去的,不是硬切的线框。
+ *     孔比预览略大,84px 上才打得穿。
  *
- * 这里搬的是【最后那一支】,前面那一套没搬,三个理由:
- *   ① 它要 three.js(约 600KB)。
- *   ② 一个实例 = 一个 WebGL context + 八张 render target。生图格是四格一排,
- *      而浏览器同时活着的 context 上限是 8~16,开不起。
- *   ③ 格子只有 84px 宽。解算网格会比 128×128 还小,解出来的涡量落到 14 列
- *      像素里根本读不出「流体」的意思 —— 那一套的精度在这个尺寸上是浪费的。
- *
- * 所以速度场换成【curl noise】:对一个随时间漂移的标量势 ψ 取旋度,
- *   v = (∂ψ/∂y, -∂ψ/∂x)
- * 这样得到的场天然无散度 —— 而无散度正是上游那一串 Poisson 迭代最后要保证的
- * 性质。省掉的是「把一个乱场解成无散度场」的过程,不是这个性质本身,所以看上去
- * 仍然是液体在推,不是噪声在闪。
- *
- * color_frag 里那几行(像素化、4×4 Bayer 抖动、噪声、调色板、颗粒、alpha)
- * 一字未改地翻成了 JS,见 `shade()`。
- *
- * 画布按【CSS 像素】开,不乘 dpr:上游的 Bayer 是按 gl_FragCoord(设备像素)
- * 取的,在 2× 屏上一格抖动只有半个 CSS 像素,这里的格子本来就小,再切一半就
- * 糊成灰。按 CSS 像素画 + `image-rendering: pixelated`,抖动的方格是实的,
- * 代价是 2× 屏上每个方格由 2×2 设备像素拼成 —— 对「像素液体」来说不算代价。
+ * 画布按【CSS 像素】开,不乘 dpr。Bayer 取的是画布坐标;乘了 dpr,2× 屏上
+ * 一格抖动只有半个 CSS 像素,再被放大就糊成灰。按 CSS 像素画,
+ * 配 `image-rendering: pixelated`,抖动的点是实的。
  */
 
 /** 交付稿那一格的宽度。`DESIGN_PIXEL` 的标定就是在这个尺寸上量出来的。 */
 export const DESIGN_CELL_PX = 84;
 
 /**
- * 上游 pixelSize 默认 18,配的是整屏宽的背景(约 80 列)。交付稿一格 84px,
- * 照抄 18 只剩 4 列,读不出流动;取 6 —— 14 列,和上游的列数量级对得上,
- * 方格也还看得出是方格。**列数比方格边长更决定它像不像「像素液体」。**
+ * 旧像素液体在 84px 上取 6,得到约 14 列方格。这个数仍然是 `pixelSizeFor`
+ * 的标定:再小的采样格会把场切成噪点。Bayer 墨点本身不跟这个步长放大
+ * (见 `shade`),否则宽产物卡的圆云会被切成十字色块。
  */
 export const DESIGN_PIXEL = 6;
 
 /**
- * 于是产品里的取法就从上面那句推出来:守住**列数**,让方格边长跟着宽度走。
+ * 于是产品里的取法就从上面那句推出来:守住**列数**,让采样步长跟着宽度走。
  * 84 / 6 = 14 —— 稿子写死的 6 正是这条式子在 84px 上的解,所以生图格拿到的
  * 仍然是稿子那个数,而更宽的产物卡不会退化成一片细噪点。
  */
 export const TARGET_COLS = Math.round(DESIGN_CELL_PX / DESIGN_PIXEL);
 
-/** 再小的格子也不让方格塌到 1~3px:那时候抖动就不是抖动,是噪点。 */
+/** 再小的格子也不让采样步长塌到 1~3px:那时候场和抖动叠在一起,只剩噪点。 */
 const MIN_PIXEL = 4;
 
-/** 按容器宽度重算方格边长(见 `TARGET_COLS`)。 */
+/**
+ * 按容器宽度重算旧液体方格的边长(见 `TARGET_COLS`)。
+ * `shade` 把它当作抖动格的上限,实际墨点停在 2 CSS 像素。
+ */
 export function pixelSizeFor(width: number): number {
   if (!Number.isFinite(width) || width <= 0) return MIN_PIXEL;
   return Math.max(MIN_PIXEL, Math.round(width / TARGET_COLS));
 }
 
 /**
- * 上游 makeBayerTexture() 里那 16 个数,原样。除以 255 是上游在 shader 里
- * 取纹理时做的(纹素是 0~255 的字节,采样出来是 0~1)。
+ * 4×4 Bayer,顺序与 visual-agent-chat / Paper Shaders 一致。
+ * 阈值是 `(value + 1) / 17`,17 级里两头留给纯空和纯实。
  */
-const BAYER = [
-  0, 136, 34, 170,
-  204, 68, 238, 102,
-  51, 187, 17, 153,
-  255, 119, 221, 85,
-].map((v) => v / 255);
-
-/** 产品指定的两支色。上游默认是五支的粉色系,这里换成两支绿。 */
-const STOPS = ['#EAFFEB', '#00FF04'];
+const BAYER4 = [
+  0, 8, 2, 10,
+  12, 4, 14, 6,
+  3, 11, 1, 9,
+  15, 7, 13, 5,
+];
 
 /**
- * 上游 light 模式的 bgColor 是 vec4(1,1,1,0) —— 白、且 alpha 为 0。
- * alpha 0 的意思是「没有流体的地方完全透出底下」,格子自己的底色因此还在。
+ * 预览着色器里的 `uFront`(0.05, 0.05, 0.05)。近黑,三个通道一样,
+ * 这样格子里不会再冒出绿色。
  */
-const BG = [255, 255, 255];
+const INK_R = 13;
+const INK_G = 13;
+const INK_B = 13;
 
-/**
- * curl noise 的增益。上游那行是 len = clamp(length(vel) * 2.2, 0, 1),
- * 2.2 配的是它自己解出来的速度量纲;这里的场是旋度,量纲不同,先用 GAIN
- * 折算到同一区间,再原样乘 2.2 —— 这样上游那行不用改。
- * 0.18 是量出来的:这个旋度场的速度中位数约 1.12,乘完 0.18×2.2 落在 0.44,
- * 于是【一格里多数方格是淡的、涡走过的那几条才吃满绿】。调大到 0.4 以上,
- * 整格会糊成一块实心绿,液体的形状就没了。
- */
-const GAIN = 0.18;
-
-/** 30 帧够看:方格本来就在跳,60 帧只是多烧一倍 CPU。 */
+/** 30 帧够看:抖动本身就在跳,60 帧只是多烧一倍 CPU。 */
 export const FPS = 30;
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
-const fract = (v: number): number => v - Math.floor(v);
 
-/** 上游 color_frag 里的 hash / noise,一字未改(GLSL → JS)。 */
-const hash = (x: number, y: number): number => fract(Math.sin(x * 127.1 + y * 311.7) * 43758.5453);
+/**
+ * 相机。mind 预览 yaw ≈ 0.55、pitch ≈ 0.42、相机在 z=3.3。
+ * 这里同一侧、略拉近,让 84px 的窗还占得住格子。角度不跟时间走。
+ */
+const YAW = 0.42;
+const PITCH = 0.32;
+const CAM_Y = 0.04;
+const CAM_Z = 2.95;
+const OBJ_SCALE = 1.12;
+const HOLE_R = 0.1;
+/** 和预览一样:一块抖动格 = 2 CSS 像素,再 pixelated 放大。 */
+const DITHER_CELL = 2;
 
-function noise(x: number, y: number): number {
-  const ix = Math.floor(x), iy = Math.floor(y);
-  const fx = x - ix, fy = y - iy;
-  const ux = fx * fx * (3 - 2 * fx);
-  const uy = fy * fy * (3 - 2 * fy);
-  const a = hash(ix, iy), b = hash(ix + 1, iy);
-  const c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
-  return (a + (b - a) * ux) + ((c + (d - c) * ux) - (a + (b - a) * ux)) * uy;
+const COS_YAW = Math.cos(YAW);
+const SIN_YAW = Math.sin(YAW);
+const COS_PITCH = Math.cos(PITCH);
+const SIN_PITCH = Math.sin(PITCH);
+/** R = RY * RX,和预览着色器同一套。 */
+const R00 = COS_YAW;
+const R01 = SIN_YAW * SIN_PITCH;
+const R02 = SIN_YAW * COS_PITCH;
+const R10 = 0;
+const R11 = COS_PITCH;
+const R12 = -SIN_PITCH;
+const R20 = -SIN_YAW;
+const R21 = COS_YAW * SIN_PITCH;
+const R22 = COS_YAW * COS_PITCH;
+
+const LIGHT_X = -0.55;
+const LIGHT_Y = 0.85;
+const LIGHT_Z = 0.5;
+const LIGHT_LEN = Math.hypot(LIGHT_X, LIGHT_Y, LIGHT_Z);
+const LX = LIGHT_X / LIGHT_LEN;
+const LY = LIGHT_Y / LIGHT_LEN;
+const LZ = LIGHT_Z / LIGHT_LEN;
+
+function sdBox(px: number, py: number, bx: number, by: number): number {
+  const dx = Math.abs(px) - bx;
+  const dy = Math.abs(py) - by;
+  return Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0);
+}
+
+function sdRoundBox(px: number, py: number, bx: number, by: number, radius: number): number {
+  return sdBox(px, py, bx - radius, by - radius) - radius;
+}
+
+/** 预览的浏览器轮廓。y 向上。孔比预览的 0.028 大,否则 84px 上打不穿。 */
+function browserShape(px: number, py: number): number {
+  let d = sdRoundBox(px, py - 0.02, 0.62, 0.48, 0.04);
+  d = Math.max(d, -sdRoundBox(px, py + 0.02, 0.48, 0.3, 0.02));
+  const chrome = sdRoundBox(px, py - 0.4, 0.62, 0.16, 0.04);
+  d = Math.min(d, chrome);
+  d = Math.max(d, -(Math.hypot(px + 0.38, py - 0.4) - HOLE_R));
+  d = Math.max(d, -(Math.hypot(px + 0.14, py - 0.4) - HOLE_R));
+  d = Math.max(d, -(Math.hypot(px - 0.1, py - 0.4) - HOLE_R));
+  return d;
+}
+
+/** 圆角板,和预览 slab() 同一条。 */
+function mapWorld(wx: number, wy: number, wz: number): number {
+  const px = (R00 * wx + R01 * wy + R02 * wz) / OBJ_SCALE;
+  const py = (R10 * wx + R11 * wy + R12 * wz) / OBJ_SCALE;
+  const pz = (R20 * wx + R21 * wy + R22 * wz) / OBJ_SCALE;
+  const qx = browserShape(px, py) + 0.03;
+  const qy = Math.abs(pz) - 0.12;
+  const outside = Math.hypot(Math.max(qx, 0), Math.max(qy, 0));
+  return (Math.min(Math.max(qx, qy), 0) + outside - 0.03) * OBJ_SCALE;
+}
+
+/** 物体坐标投到画布像素,y 向下。给测试量孔和标题栏用,和射线是同一套相机。 */
+function projectObject(px: number, py: number, pz: number, w: number, h: number): { x: number; y: number } {
+  const ox = px * OBJ_SCALE;
+  const oy = py * OBJ_SCALE;
+  const oz = pz * OBJ_SCALE;
+  const wx = R00 * ox + R10 * oy + R20 * oz;
+  const wy = R01 * ox + R11 * oy + R21 * oz;
+  const wz = R02 * ox + R12 * oy + R22 * oz;
+  const denom = (wz - CAM_Z) / -2.6;
+  if (denom <= 1e-4) return { x: -1, y: -1 };
+  const uvx = (wx / denom) / 0.92;
+  const uvy = ((wy - CAM_Y) / denom) / 0.92;
+  return {
+    x: uvx * (h * 0.5) + w * 0.5,
+    y: h * 0.5 - uvy * (h * 0.5),
+  };
 }
 
 /**
- * 标量势:两层随时间反向漂移的 value noise。两层的方向相反,涡才会互相
- * 挤压、拉长,而不是整块平移过去。
+ * 透视之后的采样点。孔心在板的正面附近,标题栏取样躲开三颗孔,
+ * 内页取样在挖空的那一块中间。
  */
-function psi(x: number, y: number, t: number): number {
-  return noise(x * 1.6 + t * 0.20, y * 1.6 - t * 0.14)
-       + noise(x * 3.1 - t * 0.11, y * 3.1 + t * 0.17) * 0.5;
+export interface BrowserChromeLayout {
+  holes: ReadonlyArray<{ x: number; y: number; r: number }>;
+  /** 标题栏右侧,应该是实的框 */
+  bar: { x: number; y: number };
+  /** 内页开口的中间,应该比框疏 */
+  page: { x: number; y: number };
 }
 
-/** v = (∂ψ/∂y, -∂ψ/∂x),中心差分。 */
-function speed(x: number, y: number, t: number): number {
-  const e = 0.035;
-  const vx = (psi(x, y + e, t) - psi(x, y - e, t)) / (2 * e);
-  const vy = -(psi(x + e, y, t) - psi(x - e, y, t)) / (2 * e);
-  return Math.hypot(vx, vy);
+export function browserChromeLayout(w: number, h: number): BrowserChromeLayout {
+  const front = 0.02;
+  const holes = [-0.38, -0.14, 0.1].map((hx) => {
+    const center = projectObject(hx, 0.4, front, w, h);
+    const edge = projectObject(hx + HOLE_R, 0.4, front, w, h);
+    return {
+      x: center.x,
+      y: center.y,
+      r: Math.max(1.5, Math.hypot(edge.x - center.x, edge.y - center.y)),
+    };
+  });
+  return {
+    holes,
+    bar: projectObject(0.36, 0.4, front, w, h),
+    page: projectObject(0.02, -0.08, 0, w, h),
+  };
 }
 
 /**
- * 调色板查表。上游是一张 w=STOPS.length 的 DataTexture,LinearFilter +
- * ClampToEdge,按 vec2(t, 0.5) 采样 —— 也就是纹素坐标 t*w-0.5、两端夹住。
- * 这里把同一条公式烤成 256 级查表,省掉每像素的插值。
+ * 一个抖动格的连续亮度。射线打进圆角板,用漫反射 + 边缘光收成 0..1,
+ * 和预览着色器同一条式子。打不中可以留下很淡的地面影子。
+ * Bayer 在这之后才决定墨点,所以边是颗粒,不是硬边。
  */
-function buildPalette(): Uint8Array {
-  const rgb = STOPS.map((h) => [
-    parseInt(h.slice(1, 3), 16),
-    parseInt(h.slice(3, 5), 16),
-    parseInt(h.slice(5, 7), 16),
-  ]);
-  const w = rgb.length;
-  const lut = new Uint8Array(256 * 3);
-  for (let i = 0; i < 256; i++) {
-    const x = (i / 255) * w - 0.5;
-    const i0 = Math.min(Math.max(Math.floor(x), 0), w - 1);
-    const i1 = Math.min(i0 + 1, w - 1);
-    const f = Math.min(Math.max(x - Math.floor(x), 0), 1);
-    for (let k = 0; k < 3; k++) {
-      lut[i * 3 + k] = Math.round((rgb[i0] as number[])[k]! + ((rgb[i1] as number[])[k]! - (rgb[i0] as number[])[k]!) * f);
+function browserTone(x: number, y: number, w: number, h: number): number {
+  const uvx = (x - w * 0.5) / (h * 0.5);
+  const uvy = (h * 0.5 - y) / (h * 0.5);
+  let rdx = uvx * 0.92;
+  let rdy = uvy * 0.92;
+  let rdz = -2.6;
+  const inv = 1 / Math.hypot(rdx, rdy, rdz);
+  rdx *= inv;
+  rdy *= inv;
+  rdz *= inv;
+
+  const b = CAM_Y * rdy + CAM_Z * rdz;
+  const c = CAM_Y * CAM_Y + CAM_Z * CAM_Z - 1.7 * 1.7;
+  const disc = b * b - c;
+  if (disc <= 0) return 0;
+  const reach = Math.sqrt(disc);
+  let dist = Math.max(-b - reach, 0);
+  const tmax = -b + reach;
+
+  let hit = false;
+  for (let i = 0; i < 28; i++) {
+    const d = mapWorld(rdx * dist, CAM_Y + rdy * dist, CAM_Z + rdz * dist);
+    if (d < 0.004) {
+      hit = true;
+      break;
     }
+    dist += d;
+    if (dist > tmax) break;
   }
-  return lut;
-}
-const PALETTE = buildPalette();
 
-/**
- * 颗粒。上游是每像素每帧 hash(gl_FragCoord + time*137, time*91) —— 一秒
- * 几百万次 sin。这里烤成一张 64×64 的白噪表,每帧整体位移一次读:白噪声
- * 位移之后还是白噪声,肉眼分不出,但省掉了那几百万次。
- */
-const GRAIN_N = 64;
-const GRAIN = (() => {
-  const g = new Float32Array(GRAIN_N * GRAIN_N);
-  for (let i = 0; i < g.length; i++) g[i] = hash(i % GRAIN_N, Math.floor(i / GRAIN_N));
-  return g;
-})();
+  if (!hit) {
+    if (rdy >= 0) return 0;
+    const tg = (-0.78 - CAM_Y) / rdy;
+    if (tg <= 0) return 0;
+    const gx = (rdx * tg) / OBJ_SCALE;
+    const gz = (CAM_Z + rdz * tg) / OBJ_SCALE;
+    const fall = Math.hypot(gx - 0.05, (gz - 0.15) * 1.35);
+    if (fall > 0.95) return 0;
+    const t = fall / 0.95;
+    const sh = 1 - t * t * (3 - 2 * t);
+    return sh * 0.16;
+  }
+
+  const wx = rdx * dist;
+  const wy = CAM_Y + rdy * dist;
+  const wz = CAM_Z + rdz * dist;
+  const e = 0.01;
+  const n1 = mapWorld(wx + e, wy - e, wz - e);
+  const n2 = mapWorld(wx - e, wy - e, wz + e);
+  const n3 = mapWorld(wx - e, wy + e, wz - e);
+  const n4 = mapWorld(wx + e, wy + e, wz + e);
+  let nx = n1 - n2 - n3 + n4;
+  let ny = -n1 - n2 + n3 + n4;
+  let nz = -n1 + n2 - n3 + n4;
+  const nlen = Math.hypot(nx, ny, nz) || 1;
+  nx /= nlen;
+  ny /= nlen;
+  nz /= nlen;
+
+  const dif = Math.max(nx * LX + ny * LY + nz * LZ, 0);
+  const ndv = Math.max(-(nx * rdx + ny * rdy + nz * rdz), 0);
+  const shade = 1 - ndv;
+  const rim = shade * shade * shade * 0.25;
+  const lit = clamp01(0.18 + 0.82 * dif + rim);
+  /* 预览的亮度在受光处会稀到几乎消失。小卡上把这段压进
+     仍能认得出窗的颗粒带:受光面约一半墨点,背光面接近铺实。 */
+  const raw = 0.12 + 0.82 * (1 - lit);
+  return clamp01(0.34 + 0.58 * raw);
+}
 
 /** `shade()` 只需要拿到那条字节流 —— 传 `ImageData` 或测试里的替身都行。 */
 export interface LiquidPixels {
@@ -168,51 +271,46 @@ export interface LiquidPixels {
 }
 
 /**
- * 把一帧画进 ImageData。上游 color_frag 的主体,逐行对应。
+ * 把一帧画进 ImageData。每个抖动格要么是近黑墨点,要么全透明。
  *
- * `pixel` 是方格边长:稿子里是写死的 6(84px 一格),产品里按容器宽度走
- * `pixelSizeFor()` —— 唯一跟尺寸有关的数就是它,别的都在 UV 空间里,自己缩放。
+ * 一格 2 CSS 像素,和预览的 `CELL` 一样:亮度在格心采样一次,Bayer 也按格取。
+ * `pixel` 仍是调用约定里的旧方格边长;非有限尺寸不画,有限值也不再把格放大。
  */
 export function shade(img: LiquidPixels, w: number, h: number, t: number, pixel: number): void {
+  if (!Number.isFinite(pixel) || !Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
   const data = img.data;
-  const cols = Math.ceil(w / pixel);
-  const rows = Math.ceil(h / pixel);
-  const gx = Math.floor(t * 137) % GRAIN_N;
-  const gy = Math.floor(t * 91) % GRAIN_N;
+  const cell = DITHER_CELL;
+  /* 矩阵约每秒错 7 次。只有落在 1/17..16/17 的亮度会跟着跳。 */
+  const shimmer = Math.floor(t * 7);
+  const inv17 = 1 / 17;
 
-  for (let by = 0; by < rows; by++) {
-    for (let bx = 0; bx < cols; bx++) {
-      /* pixUV = (floor(uv * pixGrid) + 0.5) / pixGrid —— 方格中心 */
-      const ux = (bx + 0.5) / cols;
-      const uy = (by + 0.5) / rows;
-
-      /* len = clamp(length(vel) * 2.2, 0, 1) */
-      const len = clamp01(speed(ux, uy, t) * GAIN * 2.2);
-
-      /* noiseVal = noise(uv * 6 + uTime * 0.15) * 0.06 - 0.03
-         上游按像素算,这里按方格算:uv*6 在一格 84px 上是 14px 一个周期,
-         恰好一个方格,格内那点差别看不出来。 */
-      const nv = noise(ux * 6 + t * 0.15, uy * 6 + t * 0.15) * 0.06 - 0.03;
-
-      const x0 = bx * pixel, x1 = Math.min(x0 + pixel, w);
-      const y0 = by * pixel, y1 = Math.min(y0 + pixel, h);
-      for (let y = y0; y < y1; y++) {
-        const grainRow = ((y + gy) % GRAIN_N) * GRAIN_N;
-        const bayerRow = (y & 3) * 4;
-        let p = (y * w + x0) * 4;
-        for (let x = x0; x < x1; x++, p += 4) {
-          /* dither = bayer - 0.5;  t = clamp(len + dither*0.12 + noiseVal, 0, 1) */
-          const dither = BAYER[bayerRow + (x & 3)]! - 0.5;
-          const tv = clamp01(len + dither * 0.12 + nv);
-
-          /* col = mix(bgColor.rgb, palette(t), t);  再加颗粒 */
-          const q = (tv * 255) | 0;
-          const grain = (GRAIN[grainRow + ((x + gx) % GRAIN_N)]! - 0.5) * 0.085 * 255;
-          data[p]     = clamp01((BG[0]! + (PALETTE[q * 3]!     - BG[0]!) * tv + grain) / 255) * 255;
-          data[p + 1] = clamp01((BG[1]! + (PALETTE[q * 3 + 1]! - BG[1]!) * tv + grain) / 255) * 255;
-          data[p + 2] = clamp01((BG[2]! + (PALETTE[q * 3 + 2]! - BG[2]!) * tv + grain) / 255) * 255;
-          /* alpha = mix(bgColor.a, 1.0, t),而 light 下 bgColor.a = 0 */
-          data[p + 3] = tv * 255;
+  for (let y = 0; y < h; y += cell) {
+    const qy = ((y / cell) + shimmer * 3) & 3;
+    const cy = y + cell * 0.5;
+    const y1 = Math.min(y + cell, h);
+    for (let x = 0; x < w; x += cell) {
+      const tone = browserTone(x + cell * 0.5, cy, w, h);
+      let on = false;
+      if (tone > 16 * inv17) on = true;
+      else if (tone >= inv17) {
+        const threshold = (BAYER4[qy * 4 + (((x / cell) + shimmer) & 3)]! + 1) * inv17;
+        on = tone >= threshold;
+      }
+      const x1 = Math.min(x + cell, w);
+      for (let yy = y; yy < y1; yy++) {
+        let p = (yy * w + x) * 4;
+        for (let xx = x; xx < x1; xx++, p += 4) {
+          if (on) {
+            data[p] = INK_R;
+            data[p + 1] = INK_G;
+            data[p + 2] = INK_B;
+            data[p + 3] = 255;
+          } else {
+            data[p] = 0;
+            data[p + 1] = 0;
+            data[p + 2] = 0;
+            data[p + 3] = 0;
+          }
         }
       }
     }
