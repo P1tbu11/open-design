@@ -38,6 +38,39 @@ function parseCodebuddyHelpModels(stdout: string) {
   ];
 }
 
+// Inline settings overlay passed to headless `codebuddy -p` runs spawned by
+// OpenDesign. It isolates background design runs from interactive terminal
+// shell hooks (e.g. desktop status-bar sockets or blocking memory hooks on
+// every tool call), disables duplicate CLI auto-memory writes (OpenDesign owns
+// conversation memory), and turns off non-design document/style CLI plugins
+// that bloat `DeferExecuteTool` routing — while preserving user-scope auth and
+// `~/.codebuddy/mcp.json` servers (e.g. TapNow, Figma).
+export const CODEBUDDY_HEADLESS_INLINE_SETTINGS = JSON.stringify({
+  hooks: {
+    PreToolUse: [],
+    PostToolUse: [],
+    SessionStart: [],
+    Stop: [],
+    StopFailure: [],
+    UserPromptSubmit: [],
+    Notification: [],
+  },
+  memory: {
+    autoMemoryEnabled: false,
+  },
+  enabledPlugins: {
+    'ponytail@ponytail': false,
+    'docx@codebuddy-plugins-official': false,
+    'pdf@codebuddy-plugins-official': false,
+    'pptx@codebuddy-plugins-official': false,
+    'xlsx@codebuddy-plugins-official': false,
+    'find-skills@codebuddy-plugins-official': false,
+    'skills-sec-audit@codebuddy-plugins-official': false,
+  },
+});
+
+export const CODEBUDDY_DEFAULT_MAX_TURNS = '45';
+
 export const codebuddyAgentDef = {
     id: 'codebuddy',
     name: 'Codebuddy Code',
@@ -52,7 +85,10 @@ export const codebuddyAgentDef = {
       // the `-p` subcommand help, so we probe `codebuddy -p --help`.
       '--include-partial-messages': 'partialMessages',
       '--add-dir': 'addDir',
+      '--settings': 'inlineSettings',
+      '--max-turns': 'maxTurns',
     },
+    defaultModelEnvVar: 'OD_CODEBUDDY_DEFAULT_MODEL',
     // Codebuddy has no `models` subcommand, but the installed build advertises
     // its supported ids in root help. Parse that version-local catalog instead
     // of surfacing a static list that drifts as Codebuddy updates.
@@ -104,6 +140,12 @@ export const codebuddyAgentDef = {
       );
       if (dirs.length > 0 && caps.addDir !== false) {
         args.push('--add-dir', ...dirs);
+      }
+      if (caps.inlineSettings !== false) {
+        args.push('--settings', CODEBUDDY_HEADLESS_INLINE_SETTINGS);
+      }
+      if (caps.maxTurns !== false) {
+        args.push('--max-turns', CODEBUDDY_DEFAULT_MAX_TURNS);
       }
       // Session continuity: Codebuddy supports `--resume <id>` and
       // `--session-id <uuid>` identically to Claude Code.

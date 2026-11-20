@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { codebuddyAgentDef } from '../../src/runtimes/defs/codebuddy.js';
+import { agentCapabilities } from '../../src/runtimes/capabilities.js';
+import {
+  CODEBUDDY_DEFAULT_MAX_TURNS,
+  CODEBUDDY_HEADLESS_INLINE_SETTINGS,
+  codebuddyAgentDef,
+} from '../../src/runtimes/defs/codebuddy.js';
 
 describe('codebuddy buildArgs', () => {
   it('emits base args with -p, stream-json formats, verbose, and bypassPermissions', () => {
@@ -69,6 +74,44 @@ describe('codebuddy buildArgs', () => {
     expect(args[addDirIndex + 1]).toBe('/repo/skills');
     expect(args.filter((a) => a === '--add-dir').length).toBe(1);
   });
+
+  it('passes headless --settings overlay and --max-turns budget by default', () => {
+    agentCapabilities.delete('codebuddy');
+    const args = codebuddyAgentDef.buildArgs('', [], [], {}, {});
+
+    const settingsIndex = args.indexOf('--settings');
+    expect(settingsIndex).toBeGreaterThanOrEqual(0);
+    expect(args[settingsIndex + 1]).toBe(CODEBUDDY_HEADLESS_INLINE_SETTINGS);
+
+    const parsed = JSON.parse(args[settingsIndex + 1]!) as {
+      hooks: Record<string, unknown[]>;
+      memory: { autoMemoryEnabled: boolean };
+      enabledPlugins: Record<string, boolean>;
+    };
+    expect(parsed.hooks.PreToolUse).toEqual([]);
+    expect(parsed.hooks.PostToolUse).toEqual([]);
+    expect(parsed.hooks.Stop).toEqual([]);
+    expect(parsed.memory.autoMemoryEnabled).toBe(false);
+    expect(parsed.enabledPlugins['ponytail@ponytail']).toBe(false);
+
+    const maxTurnsIndex = args.indexOf('--max-turns');
+    expect(maxTurnsIndex).toBeGreaterThanOrEqual(0);
+    expect(args[maxTurnsIndex + 1]).toBe(CODEBUDDY_DEFAULT_MAX_TURNS);
+  });
+
+  it('omits --settings and --max-turns when capability probe marks them unsupported', () => {
+    agentCapabilities.set('codebuddy', {
+      inlineSettings: false,
+      maxTurns: false,
+    });
+    try {
+      const args = codebuddyAgentDef.buildArgs('', [], [], {}, {});
+      expect(args).not.toContain('--settings');
+      expect(args).not.toContain('--max-turns');
+    } finally {
+      agentCapabilities.delete('codebuddy');
+    }
+  });
 });
 
 describe('codebuddy session resume', () => {
@@ -134,6 +177,9 @@ describe('codebuddy definition metadata', () => {
     expect(codebuddyAgentDef.helpArgs).toEqual(['-p', '--help']);
     expect(codebuddyAgentDef.capabilityFlags).toHaveProperty('--include-partial-messages', 'partialMessages');
     expect(codebuddyAgentDef.capabilityFlags).toHaveProperty('--add-dir', 'addDir');
+    expect(codebuddyAgentDef.capabilityFlags).toHaveProperty('--settings', 'inlineSettings');
+    expect(codebuddyAgentDef.capabilityFlags).toHaveProperty('--max-turns', 'maxTurns');
+    expect(codebuddyAgentDef.defaultModelEnvVar).toBe('OD_CODEBUDDY_DEFAULT_MODEL');
   });
 
   it('provides install and docs URLs', () => {
