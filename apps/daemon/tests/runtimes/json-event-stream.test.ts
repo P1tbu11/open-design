@@ -2404,7 +2404,13 @@ test('antigravity stream maps agy agent_response text, tool steps and the result
       type: 'tool_use',
       id: 'edb1c8c1-50ba-4f3f-87eb-412d0e9d47c3:4',
       name: 'run_command',
-      input: { CommandLine: 'echo hello_headless_demo' },
+      // agy sends PascalCase (`CommandLine`); the whole OD pipeline reads
+      // `command`. See `antigravity-tools.ts` for why the raw object rides
+      // along under `od_tool_args`.
+      input: {
+        command: 'echo hello_headless_demo',
+        od_tool_args: { CommandLine: 'echo hello_headless_demo' },
+      },
     },
     {
       type: 'tool_result',

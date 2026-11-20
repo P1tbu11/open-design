@@ -2294,13 +2294,67 @@ function readRequestRange(input: unknown): ToolRow['readRange'] {
   return range.offset != null || range.limit != null ? range : undefined;
 }
 
+/**
+ * 一家 agent 的入参里可能用**它自己的**键名,而 OD 整条管线读的是规范键。
+ *
+ * 目前只有一家:`agy`(Antigravity)发 PascalCase(`CommandLine` / `Path` /
+ * `AbsolutePath` / `TargetFile` / `toolSummary`),见
+ * `apps/daemon/src/runtimes/antigravity-tools.ts`。daemon 已经在**新流**上归一了,
+ * 但**已经落库的旧消息**里存的还是原始入参 —— 那些行不会因为改 daemon 而变好。
+ * 历史对话是用户天天翻的东西,所以这一层也认一遍。
+ *
+ * 只读、不写:返回一个**新的**对象,原入参一个字节都不改(它是落库内容的镜像,
+ * 详情面板要给人看的就是它)。认不出任何别名时原样返回同一引用,不建中间对象 ——
+ * 这个函数每次落块都会对每一行调用一次。
+ */
+const ALIAS_READERS: ReadonlyArray<(input: Record<string, unknown>) => Record<string, unknown> | null> = [
+  // Antigravity `agy`
+  (input) => {
+    const keys = ['CommandLine', 'Path', 'AbsolutePath', 'TargetFile', 'toolSummary', 'toolAction', 'CodeContent'];
+    if (!keys.some((key) => key in input)) return null;
+    const next: Record<string, unknown> = { ...input };
+    const command = input.CommandLine;
+    if (typeof command === 'string' && command) next.command = command;
+    const filePath = input.Path ?? input.AbsolutePath ?? input.TargetFile;
+    if (typeof filePath === 'string' && filePath) next.file_path = filePath;
+    const description = input.toolSummary ?? input.toolAction;
+    if (typeof description === 'string' && description) next.description = description;
+    // 写文件的内容:归一成 `content`,`diffStat` 才数得出 `+N`。
+    const content = input.CodeContent;
+    if (typeof content === 'string' && content) next.content = content;
+    return next;
+  },
+];
+
+/**
+ * 入参的**归一视图** —— 给分类 / 标题 / 文件名 / 摘要用。
+ *
+ * 详情面板要的是原始入参(`row.input`),不是这一份:那一格回答的是「agent 到底发了
+ * 什么」,把它换成规范键就是替 agent 改口。
+ */
+export function normalizeToolInput(input: unknown): unknown {
+  if (input == null || typeof input !== 'object' || Array.isArray(input)) return input;
+  const rec = input as Record<string, unknown>;
+  for (const read of ALIAS_READERS) {
+    const normalized = read(rec);
+    if (normalized) return normalized;
+  }
+  return input;
+}
+
 function buildToolRow(
   event: Extract<PersistedAgentEvent, { kind: 'tool_use' }>,
   result: Extract<PersistedAgentEvent, { kind: 'tool_result' }> | undefined,
 ): ToolRow | null {
-  const kind = toolKind(event.name, event.input);
-  const command = isCommandTool(event.name) ? commandOf(event.input) : '';
-  const file = fileOf(event.input) ?? (command ? commandFile(command) : null);
+  /*
+   * 分类 / 标题 / 文件名一律读**归一视图**:旧消息里 `agy` 的入参还是 PascalCase,
+   * 不认一遍的话那些行永远停在「裸工具名」(`toolKind` 落到 `other`、`toolTitle`
+   * 退回工具名)。新流的 daemon 已经归一过,这里再认一遍是幂等的。
+   */
+  const view = normalizeToolInput(event.input);
+  const kind = toolKind(event.name, view);
+  const command = isCommandTool(event.name) ? commandOf(view) : '';
+  const file = fileOf(view) ?? (command ? commandFile(command) : null);
   const failed = Boolean(result?.isError);
   const hits = kind === 'search' && !failed && result?.content
     ? result.content.split('\n').filter((l) => l.trim()).length
@@ -2322,13 +2376,19 @@ function buildToolRow(
     pending: result == null,
     tool: kind,
     name: event.name,
-    title: toolTitle(event.name, event.input),
-    rawTitle: isRawCommandTitle(event.name, event.input),
+    title: toolTitle(event.name, view),
+    rawTitle: isRawCommandTitle(event.name, view),
     file,
-    ...(kind === 'read' && file ? { readRange: readRequestRange(event.input) } : {}),
-    pattern: kind === 'search' ? searchPattern(event.name, event.input) : null,
+    ...(kind === 'read' && file ? { readRange: readRequestRange(view) } : {}),
+    /*
+     * 入参原样带上 —— 详情面板要给人看 agent 真正发了什么(命令、路径、参数 JSON)。
+     * 不是给分类用的:分类结果在 `tool` / `file` / `command` 那几格,它们读的是上面的
+     * `view`(归一视图)。两格分工不同,别把它们并成一个。
+     */
+    ...(event.input !== undefined ? { input: event.input } : {}),
+    pattern: kind === 'search' ? searchPattern(event.name, view) : null,
     hits,
-    delta: diffStat(event.name, event.input),
+    delta: diffStat(event.name, view),
     elapsedMs,
     failed,
     failReason: failureReason(failed, result?.content),
@@ -2338,8 +2398,13 @@ function buildToolRow(
      * 一条 57 秒的命令,stdout 是一点点长出来的 —— 只认结算值意味着这 57 秒里
      * 终端框是空的,而 agent 明明已经打印了东西。这里读的是入参上的记号,不是
      * `result`,所以行仍然是 pending:秒表继续走,不会假装跑完了。
+     *
+     * **不再只给 command 那一档**。那个 `command ? … : null` 把每一次
+     * `read_file` / `grep_search` / MCP 调用的返回值丢了 —— 详情面板因此永远空着,
+     * 界面上那些行只剩一个工具名。命令类仍然走 `TerminalOutput`(限高 + 贴底跟随),
+     * 其余走详情面板的输出区,截断各自管各自的。
      */
-    terminal: command ? (result?.content ?? inFlightOutputOf(event.input)) : null,
+    terminal: result?.content ?? inFlightOutputOf(event.input),
   };
 }
 

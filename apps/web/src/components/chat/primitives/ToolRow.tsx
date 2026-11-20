@@ -39,12 +39,15 @@
 import { memo, type ReactElement, type ReactNode } from 'react';
 import { useT } from '../../../i18n';
 import type { ToolRow as ToolRowData } from '../../../runtime/chat/contract';
+import { rowInputIsInspectable } from '../../../runtime/chat/contract';
 import { formatElapsed } from '../../../runtime/chat/format';
 import { openableRecordFilePath, type RecordFileScope } from '../../../runtime/chat/record-file-open';
+import { toolInputPreview } from '../../../runtime/chat/tool-detail';
 import { FileButton } from './FileButton';
 import { Foldable } from './Foldable';
 import { StatusMark } from './StatusMark';
 import { TerminalOutput } from './TerminalOutput';
+import { ToolDetail, hasToolDetail } from './ToolDetail';
 import { toolIcon } from './icons';
 import styles from './record.module.css';
 
@@ -174,6 +177,46 @@ export function ToolRow({
 
   const rowClass = `${styles.tool}${row.failed ? ` ${styles.fail}` : ''}`;
 
+  /**
+   * 这一行展开之后**有没有东西可读** —— 参数与输出两段,任一有内容就算有。
+   *
+   * 判据在 `runtime/chat/tool-detail.ts`,这里只是接线。没有可读内容的行继续是单行:
+   * 一枚展不开的箭头比不画箭头更糟(`failed-file-row-expand.test.tsx` 钉着这条)。
+   *
+   * 「参数算不算可读」还有一条产品裁决挡在前面:写 / 改的入参是整份文件内容,不许铺到
+   * 屏幕上(见 `runtime/chat/contract.ts` 的 `rowInputIsInspectable`)。
+   */
+  /**
+   * 这一行的输出**归谁画**。
+   *
+   * 命令类归终端块(`div.code` 里那条 `Terminal`,限高 + 贴底跟随 + `$` / `✗` 记号);
+   * 其余一切归详情面板的输出区(截断 + 等宽铺开)。分成两条通道是因为它们回答的是两个
+   * 问题:「这条命令在终端里长什么样」vs「这次调用回了什么」。
+   *
+   * 收成一个变量,是因为它有两个读者(`detail` 与 `detailBody`)—— 各写一遍迟早分叉,
+   * 那一分叉的画面上就是同一段输出出现两遍或一遍都不出现。
+   */
+  const detailOutput = row.command ? null : row.terminal;
+  const detail = rowInputIsInspectable(row) && hasToolDetail(row.input, detailOutput);
+
+  /**
+   * 折叠态右侧那句浅色摘要 —— 「参数里最能说明这次调用在干什么的那个标量」。
+   *
+   * 只在**认不出语义动词**的那一档出(`other`):文件行、搜索行自己的名字和命中数
+   * 已经把这件事说完了,再挂一句参数摘要就是同一句话说两遍。
+   *
+   * 命令类也不出:命令原文就在 `.name` 里,摘要只会是它的截断版。
+   */
+  const preview = row.tool === 'other' && !row.failed ? toolInputPreview(row.input) : null;
+  const showPreview = preview && preview !== row.title ? preview : null;
+
+  /** 展开后那两段等宽文字。命令类不走这里(它有自己的终端块)。 */
+  const detailBody = () => (
+    <div className={styles.code}>
+      <ToolDetail input={row.input} output={detailOutput} />
+    </div>
+  );
+
   /* 搜索:显示搜了什么、命中几处。命中数取代耗时 —— 用户关心的是找到没有,不是快不快 */
   if (row.tool === 'search' && row.pattern && !row.failed) {
     return (
@@ -204,11 +247,25 @@ export function ToolRow({
    * 排布不用新写:`.delta` 自带 `margin-inline-end: auto`、`.meta` 自带
    * `margin-left: auto`,两个 auto 把空白让给中间 —— 改动量贴着文件名,耗时靠右,
    * 正好是稿子里那两格各自本来的位置。
+   *
+   * ── 为什么它现在也是折叠块(T59)────────────────────────────────────
+   *
+   * 稿子这一档是单行,`read_file` 只告诉你「读取了 brand.md」—— 读了什么、返回了
+   * 什么,一个字都没有。产品把这件事定成「工具调用要有一等公民的可观测性」之后,
+   * 判据变成:**这一行背后有没有东西可读**。
+   *
+   * ⚠️ **写 / 改不在这里**(`write` / `edit`)。它们的入参里是**整份文件内容**,把
+   * 它铺到 DOM 上就是一条已经裁决过不许开的路:`write-live-preview.test.tsx` 用
+   * 「工具入参的源码一个字都不许出现在页面上」钉着它(N4,推翻
+   * `chat-panel-next.md:674` 那条流式代码卡)。那一档的读法是点开产物,不是看参数。
+   *
+   * 读取 / 删除没有这个问题:读的入参是路径加行区间,删除的入参是一个路径。
    */
   const verb = fileVerb(row, t);
   if (verb && row.file && !row.failed) {
-    return (
-      <div className={rowClass}>
+    const rowIsInspectable = row.tool === 'read' || row.tool === 'delete';
+    const summary = (
+      <>
         {icon}
         <span className={styles.name}>
           {verb} {fileName()}
@@ -221,8 +278,25 @@ export function ToolRow({
             </>
           )
           : metaSlot}
-      </div>
+      </>
     );
+    if (rowIsInspectable && detail) {
+      return (
+        <Foldable
+          summary={summary}
+          /*
+           * **不再传 `elapsed`** —— 摘要里已经有那一格(`metaSlot`)。
+           * `Foldable` 的 `elapsed` 是它**自己**那一格,两处都给就是行尾出现两个
+           * 一模一样的 `0.4s`。命令那一支传它,是因为那边的 summary 没有耗时槽。
+           */
+          lifecycleOpen={lifecycleOpen}
+          deferBody={deferBody}
+        >
+          {detailBody()}
+        </Foldable>
+      );
+    }
+    return <div className={rowClass}>{summary}</div>;
   }
 
   /*
@@ -445,18 +519,47 @@ export function ToolRow({
     );
   }
 
-  /* 兜底:标题原样一行。元工具(ToolSearch 等)走这里,按工具名显示,不硬归类(T4) */
-  return (
-    <div className={rowClass}>
+  /*
+   * 兜底:标题原样一行。元工具(ToolSearch 等)走这里,按工具名显示,不硬归类(T4)。
+   *
+   * ── 这一档是「裸工具名」的原产地(T59)──────────────────────────────
+   *
+   * 认不出语义的行在这里只写一个工具名 —— `ToolSearch`、`manage_task`,以及修之前
+   * **所有** antigravity 调用(`run_command` / `read_file`),因为它的入参是
+   * PascalCase、整条管线读不到 `command`。界面上那一行于是只有名字加一个耗时,
+   * 参数和输出一个字都看不见。
+   *
+   * 两层一起补:
+   *  · 折叠态右侧一句浅色参数摘要(`toolInputPreview`),让这一行**当下**就说出它在干什么;
+   *  · 展开后面板给全部入参与输出,超过 2000 字截断。
+   *
+   * 摘要为空(认不出参数)时退回稿子那一行,不画一句假的。
+   */
+  const fallbackSummary = (
+    <>
       {icon}
       <span className={styles.name}>
         {row.tool === 'other' ? `${row.name} ` : null}
         {row.rawTitle ? <code>{row.title}</code> : row.title}
       </span>
+      {showPreview ? <span className={styles.preview} data-testid="chat-tool-preview">{showPreview}</span> : null}
       {failButton}
       {metaSlot}
-    </div>
+    </>
   );
+  if (detail && !row.failed) {
+    return (
+      <Foldable
+        summary={fallbackSummary}
+        /* 摘要里已经有 `metaSlot` 那一格 —— 同上面文件行那支,不再传 `elapsed` */
+        lifecycleOpen={lifecycleOpen}
+        deferBody={deferBody}
+      >
+        {detailBody()}
+      </Foldable>
+    );
+  }
+  return <div className={rowClass}>{fallbackSummary}</div>;
 }
 
 type Translate = ReturnType<typeof useT>;

@@ -38,6 +38,15 @@ export interface ToolRow {
   file: { path: string; label: string } | null;
   /** Requested Read parameters, not a count or range of lines actually returned. */
   readRange?: { offset?: number; limit?: number };
+  /**
+   * 调用本身收到的入参,原样。
+   *
+   * 详情面板要给人看的是 agent 真正发了什么 —— 命令、路径、参数 JSON。它**不是**给
+   * 分类用的(`tool` / `file` / `command` 那几个字段才是分类结果),所以这一格只读不判。
+   *
+   * 可选:`ToolRow` 在此之前没有任何消费方能拿到它,手搭夹具的行不传也照旧。
+   */
+  input?: unknown;
   /** 搜索行的「搜了什么」与「N 处」(D23) */
   pattern: string | null;
   hits: number | null;
@@ -62,8 +71,31 @@ export interface ToolRow {
   failReason: string | null;
   /** 跑命令专用 */
   command: string | null;
-  /** 终端输出。AMR 上被安全打码 → null(D19) */
+  /**
+   * 这次调用的输出原文。
+   *
+   * 命令类专用了一整节(终端块 + 限高 + 贴底跟随),所以这一格原本只给它们。
+   * 现在**一切工具**都可能带:一个 `read_file` 的返回值、一次 `grep_search` 的命中、
+   * 一个 MCP 调用的结果,都是用户点开这一行想读的东西 —— 而在此之前它们全被丢掉了
+   * (`command ? … : null`),界面上那一行只剩名字。
+   *
+   * AMR 上被安全打码 → null(D19)。
+   */
   terminal: string | null;
+}
+
+/**
+ * 这一行的**入参能不能铺到屏幕上**。
+ *
+ * 写 / 改的入参里是**整份文件内容**,而「工具入参的源码不许出现在页面上」是一条
+ * 已经裁决过的不变式(`write-live-preview.test.tsx` 钉着它,N4)。所以它们不算可读 ——
+ * 要读那个文件就点开产物。
+ *
+ * 其余一切(读 / 删 / 搜 / 认不出语义的)入参只是路径、行区间、查询串或几个标量,
+ * 铺出来正是「这次调用收到了什么」的答案。
+ */
+export function rowInputIsInspectable(row: ToolRow): boolean {
+  return row.tool !== 'write' && row.tool !== 'edit';
 }
 
 /** thinking 落下的文字,以及 done 之前的过程叙述(D43)—— 两者同一种渲染 */

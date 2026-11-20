@@ -312,8 +312,20 @@ export function toolKind(toolName: string, input: unknown): ToolKind {
   return 'other';
 }
 
-const WRITE_TOOLS = /^(write|write_file|create_file|new_file)$/;
-const EDIT_TOOLS = /^(edit|multiedit|edit_file|apply_patch|str_replace|str_replace_editor|notebookedit|notebook_edit)$/;
+const WRITE_TOOLS = /^(write|write_file|create_file|new_file|write_to_file|write_to_file_v2)$/;
+const EDIT_TOOLS = /^(edit|multiedit|edit_file|apply_patch|str_replace|str_replace_editor|notebookedit|notebook_edit|multi_replace_file_content|replace_file_content)$/;
+
+/**
+ * 这个工具名是不是**写文件**。
+ *
+ * 导出是给 `format.ts` 的 `diffStat` 用的:那个函数要数 `+N`,而它认的名字必须和这里
+ * **同一份**。两处各写一遍的下场是真出现过的 —— `write_to_file` 进了这张表、没进
+ * 那一份,于是 Antigravity 的写入行画着「新建 xxx.html」却只挂一个耗时,而同一件事
+ * 在 Claude 上是 `+N −M`。
+ */
+export function isWriteToolName(toolName: string): boolean {
+  return WRITE_TOOLS.test(String(toolName ?? '').toLowerCase());
+}
 /** 「把内容取回来」都算读:本地文件、远端网页,对用户是同一件事 */
 const READ_TOOLS = /^(read|read_file|view_file|webfetch|web_fetch|fetch|read_url|readmediafile)$/;
 /**
@@ -321,8 +333,11 @@ const READ_TOOLS = /^(read|read_file|view_file|webfetch|web_fetch|fetch|read_url
  *
  * **元工具(`ToolSearch` 一类)不在这里** —— 它们该归哪一类是 T4,产品还没拍。
  * 现在它们走 `other`,行首拿兜底图标,不谎报成某一类。
+ *
+ * `grep_search` / `code_search` / `moma_search` 是 Antigravity 的真实名字:修之前它们
+ * 走 `other`,一行「搜索」被画成裸名字。
  */
-const SEARCH_TOOLS = /^(grep|glob|search|file_search|codebase_search|search_files|websearch|web_search)$/;
+const SEARCH_TOOLS = /^(grep|glob|search|file_search|codebase_search|search_files|websearch|web_search|grep_search|code_search|moma_search|find_by_name)$/;
 
 /**
  * 跑命令的工具。PowerShell 漏在名单外过一次 —— 一整轮十条 PowerShell 全被判成

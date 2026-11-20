@@ -5823,6 +5823,15 @@ export interface Dict {
   'chat.record.failed': string;
   'chat.record.hits': string;
   /**
+   * 工具调用详情面板的两段标签与截断提示。
+   *
+   * 面板本身是 `primitives/ToolDetail.tsx`;「参数 / 输出」这两个词在中文里是
+   * 开发者的日常说法,但仍是**界面上的字**,所以照样走 i18n —— 19 个语言都要有。
+   */
+  'chat.record.input': string;
+  'chat.record.output': string;
+  'chat.record.truncated': string;
+  /**
    * S12「上游响应慢，已等 N 秒」。**2026-08-27 起没有调用点** —— 产品把这句文案从壳头
    * 撤回了(裁决原文在 `components/chat/ExecutionShell.tsx` 的 `head` 注释里),
    * 但明确要求「后续可能会用到,只不过用别的展现形式」。

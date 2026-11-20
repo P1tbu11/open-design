@@ -5,6 +5,7 @@
  * codex 的 `tool_use` 在 `item.completed` 才发出,和 `tool_result` 同时到达,
  * 算出来的耗时是 0 —— 那不是「跑得快」,是「不知道」(规格 §2.2b / W10)。
  */
+import { isWriteToolName } from './tool-kind';
 
 /** 调用与结果同批到达时算出来的差值,不是真耗时 */
 export const UNKNOWN_ELAPSED_BELOW_MS = 100;
@@ -128,7 +129,12 @@ export function diffStat(toolName: string, input: unknown): DiffStat | null {
     if (added != null && removed != null) return { added, removed };
     return null;
   }
-  if ((name === 'write' || name === 'write_file') && typeof rec.content === 'string') {
+  /*
+   * 名字表要和 `tool-kind.ts` 的写工具名单**同一份**:那一边认下来的写工具,这里必须
+   * 数得出改动量,否则同一行会被画成「写入」却只挂一个耗时。`write_to_file` 就是这么
+   * 漏的 —— 它是 Antigravity 的真实名字。
+   */
+  if (isWriteToolName(name) && typeof rec.content === 'string') {
     return { added: rec.content.split('\n').length, removed: 0 };
   }
   if (name === 'edit' && typeof rec.old_string === 'string') {

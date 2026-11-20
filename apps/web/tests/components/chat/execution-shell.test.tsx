@@ -194,7 +194,15 @@ describe('没有清单:平铺', () => {
       ...call('t2', 'Bash', { command: 'grep -n gap a.css' }, { content: 'a.css:1: gap' }),
     ], 'succeeded');
     render(shellView(shell as ShellData));
-    expect(document.querySelectorAll('details details')).toHaveLength(0);
+    /*
+     * 「不出分段」= 壳里没有**步骤抽屉**。这里原来断言的是 `details details` 为 0,
+     * 那在当时等价(工具行都是 `div.tool` 或扁平命令折叠块,谁都不嵌套)。
+     *
+     * 工具调用有了详情面板之后(展开是参数与输出),文件类 / 元工具类的行**自己**
+     * 就是一层 `<details>` —— 于是「壳 → 行」也是 `details details`。判据换成正面
+     * 的:壳 body 的直接子代里不许有 `stepRow`(那一层只属于清单里的步骤)。
+     */
+    expect(document.querySelectorAll('details [class*="stepRow"]')).toHaveLength(0);
     expect(screen.getByText('读取')).toBeTruthy();
     expect(screen.getByText('搜索')).toBeTruthy();
   });

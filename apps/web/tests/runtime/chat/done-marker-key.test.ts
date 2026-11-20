@@ -228,6 +228,21 @@ describe('旧数据兼容 · 没有 key 的历史消息落块与改动前一致'
    * 同步重刷基线。基线一旦欠着,它就从「守护栏」退化成「噪音」,下次真回归也拦不住。
    * 2026-09-02 这次也一样:`e8bd2a726d` 同步改了 `build-turn-blocks.test.ts`、新写了
    * `pending-tool-row.test.ts` 和 `tool-row-running.test.tsx`,唯独漏了这个基线。
+   *
+   * **2026-11-21 第三次刷,只动两个字段** —— 工具调用详情面板(T59):
+   *
+   *  · 每行多一个 `input`(`tool_use` 的入参原样)。展开面板要给的是 agent 真正发了什么,
+   *    而在此之前**没有任何前端消费方拿得到它**;
+   *  · `terminal` 从 `null` 变成 `"ok"`。那一格原来是 `command ? result.content : null`
+   *    —— 只给命令类。于是每一次 `read_file` / `grep_search` / MCP 调用的返回值全被丢掉,
+   *    界面上那些行只剩一个工具名。夹具里每条 `call()` 的 `content` 正好是 `'ok'`。
+   *
+   * 逐行核过:`call()` 助手没有 `command` 字段,所以七条工具行都是文件类 / 元工具类,
+   * `terminal` 全部从 `null` 变成夹具的 `'ok'`;落块的数量、顺序、归属、耗时、todo
+   * 状态**一处没变**(脚本逐字段对比过,差异有且只有这两项)。
+   *
+   * 基线要重新生成时:**先逐字段核清差异**,再覆盖 —— 整体重导会把「实现现在输出什么」
+   * 直接抄成「实现应该输出什么」,尺子就废了。
    */
   it('九种历史轮次:落块与改动前逐字一致', () => {
     for (const [name, input] of Object.entries(HISTORICAL_TURN_FIXTURES)) {

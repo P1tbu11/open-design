@@ -782,6 +782,74 @@
    失败行哪天要换整行底色时,文件名不会跟着漂。 */
 .tool.fail .file code { color: var(--chat-text-strong); }
 
+/* ── 详情面板(工具调用的入参 / 输出)──────────────────────────
+ *
+ * 展开一块**不是命令**的调用时,正文用它:两段等宽文字,各自带一个标签。
+ *
+ * 为什么不复用 `.term`:
+ *  · `.term` 是**终端**那一档(贴底跟随、`max-height: 104px`、行首 `$` / `✗` 记号),
+ *    它回答的是「这条命令在终端里长什么样」。参数 JSON 和一次 `read_file` 的返回值
+ *    既没有那种记号的语义,也不该被 104px 掐住 —— 用户点开就是为了读完整。
+ *  · 截断归数据/格式化那一层(`runtime/chat/tool-detail.ts` 的 2000 字符),这一层
+ *    只负责换行与横向滚动。
+ *
+ * 墨色用 `--chat-text` 那一档:参数和返回值是**正文**,不是注脚 —— 用户点开就是为了
+ * 读它。不新起 token(`--chat-terminal-ink` 是 `.term` 自己的那一枚,只属于终端块)。
+ */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 0 4px;
+}
+.detailSection {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+/* 标签是注脚,和整块内容同一个左缘 */
+.detailLabel {
+  font-size: var(--chat-t-cap);
+  font-weight: 600;
+  color: var(--chat-text-muted);
+}
+.detailText {
+  margin: 0;
+  padding: 7px 9px;
+  border-radius: var(--chat-radius-sm);
+  background: var(--chat-bg-subtle);
+  font-family: var(--chat-font-mono);
+  font-size: var(--chat-t-cap);
+  line-height: 1.65;
+  color: var(--chat-text);
+  /* 长路径、token、base64 要能断行;但参数 JSON 的缩进是语义,所以只折行不重排 */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* 超长行(单行 4000 字符的 JSON)也不许把侧栏撑出横向滚动 */
+  max-height: 320px;
+  overflow: auto;
+}
+/* 截断提示自己一行,和正文分开读 */
+.detailMore {
+  font-size: var(--chat-t-cap);
+  color: var(--chat-text-muted);
+}
+
+/* ── 折叠态那一句摘要预览 ──────────────────────────────────
+ * 「读取 brand.md」后面那半句:一行、浅色、靠省略号截断。
+ * 和 `.name` 抢地方时它先让位 —— `.name` 是这一行在干什么,摘要只是补充。
+ */
+.preview {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--chat-t-cap);
+  color: var(--chat-text-soft);
+}
+
 /* ── 状态记号 ───────────────────────────────────────────────── */
 
 /*

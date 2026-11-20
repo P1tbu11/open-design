@@ -1,4 +1,8 @@
 import {
+  antigravityCommandFailed,
+  normalizeAntigravityToolParameters,
+} from './antigravity-tools.js';
+import {
   createOpenCodeRootTaskEvidenceCollector,
   type OpenCodeTaskTerminalCandidate,
 } from './opencode-child-evidence.js';
@@ -34,6 +38,8 @@ type ParserState = {
   // `<conversation_id>:<step_index>`, and whether any agent_response text
   // streamed (the terminal result repeats the full response).
   antigravityToolUses: Set<string>;
+  /** Antigravity: tool steps whose settled `tool_result` was already emitted. */
+  antigravityToolResults: Set<string>;
   antigravityTextEmitted: boolean;
 };
 
@@ -432,6 +438,22 @@ function handleGeminiEvent(obj: unknown, onEvent: StreamEventHandler, state: Par
 // docs and recorded agy 1.3.1 output (tests/fixtures/antigravity-stream-json).
 // Frames without `event` fall back to the Gemini-CLI JSONL branch, which some
 // agy-compatible builds print.
+//
+// ── Tool steps: why the parameters get normalized ──────────────────────────
+//
+// `tool_info.parameters` is PascalCase (`CommandLine`, `TargetFile`, `Path`,
+// `CodeContent`, `toolSummary`) while the whole OD pipeline reads canonical
+// lowercase keys. Passing it through untouched made every antigravity call land
+// on `ToolKind: 'other'` with a bare tool name as its title — no command, no
+// file, no diff, no output. `normalizeAntigravityToolParameters` reads agy's own
+// argument precedence (same list its `describeToolCall` uses) into the canonical
+// keys and preserves the raw object as `od_tool_args` for the detail panel.
+//
+// A running call is announced as `tool_in_flight` (the ACP early form) and
+// retired into exactly one settled `tool_use` + `tool_result` when the step
+// reaches a terminal state. That is the one shape the client already knows how
+// to collapse, so a call cannot become two rows — and a frame that carries
+// partial `output` still shows it while the clock runs.
 function handleAntigravityEvent(obj: unknown, onEvent: StreamEventHandler, state: ParserState): boolean {
   if (!isRecord(obj)) return false;
   if (typeof obj.event !== 'string') return handleGeminiEvent(obj, onEvent, state);
@@ -463,18 +485,55 @@ function handleAntigravityEvent(obj: unknown, onEvent: StreamEventHandler, state
           ? step.tool_name
           : 'tool';
       const id = `${String(step.conversation_id ?? obj.conversation_id ?? '')}:${String(step.step_index ?? '')}`;
-      if (!state.antigravityToolUses.has(id)) {
-        state.antigravityToolUses.add(id);
-        onEvent({ type: 'tool_use', id, name, input: toolInfo.parameters ?? null });
-      }
+      const parameters = isRecord(toolInfo.parameters)
+        ? toolInfo.parameters
+        : isRecord(step.parameters)
+          ? step.parameters
+          : null;
+      const input = normalizeAntigravityToolParameters(name, parameters);
+      const rawOutput = toolInfo.output ?? step.output ?? step.tool_output;
+      const output = typeof rawOutput === 'string' ? rawOutput : stringifyContent(rawOutput ?? '');
+
       if (step.state === 'DONE' || step.state === 'ERROR') {
+        if (!state.antigravityToolUses.has(id)) {
+          state.antigravityToolUses.add(id);
+          onEvent({ type: 'tool_use', id, name, input });
+        }
+        // A repeated terminal frame for the same step must not append a second
+        // result — the step's identity is `<conversation>:<index>`, and the
+        // client pairs by id.
+        if (!state.antigravityToolResults.has(id)) {
+          state.antigravityToolResults.add(id);
+          onEvent({
+            type: 'tool_result',
+            toolUseId: id,
+            content: output,
+            // A non-zero `Command exited with code N` is the only witness that the
+            // command itself failed while agy still considered the step complete.
+            isError: step.state === 'ERROR' || antigravityCommandFailed(output),
+          });
+        }
+        return true;
+      }
+
+      /*
+       * Not terminal yet: the call is running. `agy` really does send these —
+       * across 55 settled calls in a recorded run, 49 carried a genuine span,
+       * which only happens when the tool is announced before its `DONE` frame.
+       *
+       * `tool_in_flight` is the generic early form (not ACP-only): the client
+       * retires it into the settled `tool_use` that shares its id, so this is
+       * one row with one clock rather than a second row, and the start time the
+       * gateway stamps here survives into the settled row. Partial output rides
+       * along so a long build shows something while it runs.
+       */
+      if (!state.antigravityToolUses.has(id)) {
         onEvent({
-          type: 'tool_result',
-          toolUseId: id,
-          content: typeof toolInfo.output === 'string'
-            ? toolInfo.output
-            : stringifyContent(toolInfo.output ?? ''),
-          isError: step.state === 'ERROR',
+          type: 'tool_in_flight',
+          id,
+          name,
+          input: input ?? {},
+          ...(output ? { output } : {}),
         });
       }
       return true;
@@ -1458,6 +1517,7 @@ function createParserState(): ParserState {
     artifactOpenCandidate: '',
     pendingArtifactText: '',
     antigravityToolUses: new Set<string>(),
+    antigravityToolResults: new Set<string>(),
     antigravityTextEmitted: false,
   };
 }

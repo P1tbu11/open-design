@@ -26,6 +26,9 @@
             "path": "/p/index.html",
             "label": "index.html"
           },
+          "input": {
+            "file_path": "/p/index.html"
+          },
           "pattern": null,
           "hits": null,
           "delta": null,
@@ -33,7 +36,7 @@
           "failed": false,
           "failReason": null,
           "command": null,
-          "terminal": null
+          "terminal": "ok"
         },
         {
           "kind": "plan",
@@ -67,6 +70,9 @@
                   "path": "/p/index.html",
                   "label": "index.html"
                 },
+                "input": {
+                  "file_path": "/p/index.html"
+                },
                 "pattern": null,
                 "hits": null,
                 "delta": null,
@@ -74,7 +80,7 @@
                 "failed": false,
                 "failReason": null,
                 "command": null,
-                "terminal": null
+                "terminal": "ok"
               }
             ],
             "elapsedMs": 1200
@@ -117,6 +123,9 @@
                 "path": "/p/index.html",
                 "label": "index.html"
               },
+              "input": {
+                "file_path": "/p/index.html"
+              },
               "pattern": null,
               "hits": null,
               "delta": null,
@@ -124,7 +133,7 @@
               "failed": false,
               "failReason": null,
               "command": null,
-              "terminal": null
+              "terminal": "ok"
             }
           ],
           "elapsedMs": 1200
@@ -188,6 +197,9 @@
                   "path": "/p/index.html",
                   "label": "index.html"
                 },
+                "input": {
+                  "file_path": "/p/index.html"
+                },
                 "pattern": null,
                 "hits": null,
                 "delta": null,
@@ -195,7 +207,7 @@
                 "failed": false,
                 "failReason": null,
                 "command": null,
-                "terminal": null
+                "terminal": "ok"
               }
             ],
             "elapsedMs": 1200
@@ -238,6 +250,9 @@
                 "path": "/p/index.html",
                 "label": "index.html"
               },
+              "input": {
+                "file_path": "/p/index.html"
+              },
               "pattern": null,
               "hits": null,
               "delta": null,
@@ -245,7 +260,7 @@
               "failed": false,
               "failReason": null,
               "command": null,
-              "terminal": null
+              "terminal": "ok"
             }
           ],
           "elapsedMs": 1200
@@ -308,6 +323,9 @@
                   "path": "/p/tokens.css",
                   "label": "tokens.css"
                 },
+                "input": {
+                  "file_path": "/p/tokens.css"
+                },
                 "pattern": null,
                 "hits": null,
                 "delta": null,
@@ -315,7 +333,7 @@
                 "failed": false,
                 "failReason": null,
                 "command": null,
-                "terminal": null
+                "terminal": "ok"
               }
             ],
             "elapsedMs": 1200
@@ -346,6 +364,9 @@
                 "path": "/p/tokens.css",
                 "label": "tokens.css"
               },
+              "input": {
+                "file_path": "/p/tokens.css"
+              },
               "pattern": null,
               "hits": null,
               "delta": null,
@@ -353,7 +374,7 @@
               "failed": false,
               "failReason": null,
               "command": null,
-              "terminal": null
+              "terminal": "ok"
             }
           ],
           "elapsedMs": 1200
