@@ -10,9 +10,55 @@ import { dirname, join } from 'node:path';
 
 import { DEFAULT_MODEL_OPTION } from './shared.js';
 import { agentCapabilities } from '../capabilities.js';
-import type { RuntimeAgentDef } from '../types.js';
+import type { RuntimeAgentDef, RuntimeModelOption } from '../types.js';
 
 const ANTIGRAVITY_SKIP_PERMISSIONS_FLAG = '--dangerously-skip-permissions';
+const ANTIGRAVITY_MODEL_FLAG = '--model';
+
+const ANSI_ESCAPE_RE = /\x1b(?:\[[0-9;?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/g;
+const MODEL_SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9._/:@-]*$/;
+const GLOG_LINE_RE = /^[IWEF]\d{4}\s+\d{2}:\d{2}:\d{2}\.\d+/;
+
+export function parseAntigravityModels(stdout: string): RuntimeModelOption[] | null {
+  const cleaned = String(stdout || '').replace(ANSI_ESCAPE_RE, '');
+  const lines = cleaned
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith('#'));
+  if (lines.length === 0) return null;
+
+  const out: RuntimeModelOption[] = [DEFAULT_MODEL_OPTION];
+  const seen = new Set<string>([DEFAULT_MODEL_OPTION.id]);
+
+  for (const line of lines) {
+    if (
+      /^fetching available models/i.test(line)
+      || /^(available models|models):?$/i.test(line)
+      || /^(error|warning):/i.test(line)
+      || /no models available|not logged in|authentication required/i.test(line)
+      || GLOG_LINE_RE.test(line)
+    ) {
+      continue;
+    }
+
+    const tabIndex = line.indexOf('\t');
+    if (tabIndex !== -1) {
+      const id = line.slice(0, tabIndex).trim();
+      const label = line.slice(tabIndex + 1).trim() || id;
+      if (!id || !MODEL_SLUG_RE.test(id) || seen.has(id)) continue;
+      seen.add(id);
+      out.push({ id, label });
+      continue;
+    }
+
+    if (MODEL_SLUG_RE.test(line) && !seen.has(line)) {
+      seen.add(line);
+      out.push({ id: line, label: line });
+    }
+  }
+
+  return out.length > 1 ? out : null;
+}
 
 // Headless runs use agy's documented stdin channel (agy >= 1.1.15):
 //   agy --input-format stream-json --output-format stream-json
@@ -36,33 +82,20 @@ export function encodeAntigravityStdinPrompt(prompt: string): string {
   return `${JSON.stringify({ event: 'user', message: { content: prompt } })}\n`;
 }
 
-// `agy` v1.0.3 still has no `--model` flag (upstream issue #35), but the
-// TUI's Switch-Model picker writes the choice to its settings.json, and
-// every headless `agy` invocation re-reads that file on startup — verified by
-// capturing the `--log-file` line `Propagating selected model override to
-// backend: label="<model>"`. So we can route OD's model picker through
-// settings.json: when the user picks a concrete model in Settings, the
-// daemon writes the label into agy's settings.json right before spawn,
-// and the resulting headless run uses that model.
+// Model discovery & selection across `agy` versions:
+//   - `agy >= 1.0.5` exposes `agy models` (`<slug>\t<label>` on stdout) and
+//     per-session `--model <slug|label>`. Detection populates a live model
+//     list via `listModels` and `buildArgs` forwards `--model` on argv without
+//     touching the user's global `settings.json`.
+//   - `agy < 1.0.5` (e.g. v1.0.3 / v1.0.4, upstream issue #35) had neither
+//     `agy models` nor `--model`, so when `--help` does not advertise
+//     `--model` we fall back to `fallbackModels` and write the selected label
+//     into `~/.gemini/antigravity-cli/settings.json` before spawn.
+//   - `'default'` leaves both argv and `settings.json` untouched so `agy`
+//     uses whatever model the user last picked in its own TUI.
 //
-// Two ids the picker exposes are special:
-//   - 'default'         : leave settings.json untouched, so agy keeps
-//                         whatever the user last picked in its own TUI.
-//                         (Respects user choice when they switch models
-//                         from `agy` directly.)
-//   - any other id      : the literal display label agy expects (e.g.
-//                         "Gemini 3.1 Pro (High)", "Claude Sonnet 4.6
-//                         (Thinking)"). We persist it before spawn.
-//
-// `supportsCustomModel: false` because the label set is a server-side
-// enum — a typed id agy doesn't recognise resolves to a silent
-// `availableModels` cache miss + empty headless output, which surfaces
-// to the user as a generic "empty response" error.
-//
-// The 8 model labels mirror what `Switch Model` in agy's TUI lists for
-// consumer-tier accounts as of 2026-05-28. The set is small and stable
-// enough to ship statically until upstream adds a programmatic
-// `agy models` subcommand (also tracked under issue #35).
+// `supportsCustomModel: false` stays set because `agy`'s catalog is an
+// account-scoped server-side enum exposed by `agy models`.
 const ANTIGRAVITY_SETTINGS_PATH = join(
   homedir(),
   '.gemini',
@@ -199,6 +232,19 @@ export const antigravityAgentDef = {
   helpArgs: ['--help'],
   capabilityFlags: {
     [ANTIGRAVITY_SKIP_PERMISSIONS_FLAG]: 'skipPermissions',
+    [ANTIGRAVITY_MODEL_FLAG]: 'model',
+  },
+  // `agy models` (agy >= 1.0.5) queries the signed-in account's catalog and
+  // prints `<slug>\t<label>` per line on stdout. Cold-starting the embedded
+  // language server + two upstream RPCs (`loadCodeAssist` +
+  // `fetchAvailableModels`) takes ~3–5s, so match the 15s budget used by
+  // network-backed model listings (`opencode`, ACP adapters). When the user
+  // is signed out or on an older build, `parseAntigravityModels` returns null
+  // and detection falls back to `fallbackModels`.
+  listModels: {
+    args: ['models'],
+    timeoutMs: 15_000,
+    parse: parseAntigravityModels,
   },
   fallbackModels: [
     DEFAULT_MODEL_OPTION,
@@ -236,16 +282,25 @@ export const antigravityAgentDef = {
     options = {},
     runtimeContext = {},
   ) => {
-    if (options.model && options.model !== DEFAULT_MODEL_OPTION.id) {
+    const caps = agentCapabilities.get('antigravity');
+    const selectedModel =
+      options.model && options.model !== DEFAULT_MODEL_OPTION.id
+        ? options.model
+        : null;
+    // `agy >= 1.0.5` accepts `--model <slug|label>` per session without
+    // mutating the user's global `~/.gemini/antigravity-cli/settings.json`.
+    // Keep the settings.json rewrite only as a fallback when `--help` did not
+    // advertise `--model` (e.g. `agy` 1.0.3 / 1.0.4).
+    if (selectedModel && !caps?.model) {
       writeAntigravityModelSelection(
-        options.model,
+        selectedModel,
         runtimeContext.antigravitySettingsPath,
       );
     }
     const args: string[] = [];
     // Always opt into `--log-file` when the daemon supplied a path: the
-    // model lock in server.ts waits for agy to log the settings.json model
-    // override there, and the connection test folds its tail into auth /
+    // legacy model lock in server.ts waits for agy to log the settings.json
+    // model override there, and the connection test folds its tail into auth /
     // quota classification.
     //
     // Flag order is load-bearing on agy: put `--log-file` first so
@@ -254,8 +309,11 @@ export const antigravityAgentDef = {
       args.push('--log-file', runtimeContext.agentLogFilePath);
     }
     // Daemon-managed headless runs have no interactive approval channel.
-    if (agentCapabilities.get('antigravity')?.skipPermissions) {
+    if (caps?.skipPermissions) {
       args.push(ANTIGRAVITY_SKIP_PERMISSIONS_FLAG);
+    }
+    if (selectedModel && caps?.model) {
+      args.push(ANTIGRAVITY_MODEL_FLAG, selectedModel);
     }
     args.push(...ANTIGRAVITY_STREAM_JSON_ARGS);
     return args;

@@ -3,7 +3,10 @@ import { test } from 'vitest';
 import {
   AGENT_DEFS, aider, antigravity, assert, claude, codex, copilot, cursorAgent, deepseek, devin, detectAgents, grokBuild, join, kilo, kimi, kiro, mkdtempSync, opencode, pi, qoder, qwen, rmSync, spawnEnvForAgent, tmpdir, vibe, writeFileSync, chmodSync,
 } from './helpers/test-helpers.js';
-import { writeAntigravityModelSelection } from '../../src/runtimes/defs/antigravity.js';
+import {
+  parseAntigravityModels,
+  writeAntigravityModelSelection,
+} from '../../src/runtimes/defs/antigravity.js';
 import { parseOpenCodeModels } from '../../src/runtimes/defs/opencode.js';
 import { agentCapabilities } from '../../src/runtimes/capabilities.js';
 import {
@@ -777,23 +780,80 @@ test('antigravity keeps a large prompt out of argv and delivers it intact in the
   assert.equal(frame.message.content, prompt);
 });
 
-test('antigravity gates non-interactive permission bypass on the detected CLI capability', () => {
+test('antigravity gates non-interactive permission bypass and --model on the detected CLI capability', () => {
   agentCapabilities.delete('antigravity');
   assert.deepEqual(antigravity.helpArgs, ['--help']);
   assert.deepEqual(antigravity.capabilityFlags, {
     '--dangerously-skip-permissions': 'skipPermissions',
+    '--model': 'model',
   });
   assert.deepEqual(antigravity.buildArgs('', [], [], {}), AGY_STREAM_JSON_ARGS);
 
-  agentCapabilities.set('antigravity', { skipPermissions: true });
+  agentCapabilities.set('antigravity', { skipPermissions: true, model: true });
+  const settingsDir = mkdtempSync(join(tmpdir(), 'od-agy-model-flag-'));
   try {
-    assert.deepEqual(antigravity.buildArgs('', [], [], {}), [
-      '--dangerously-skip-permissions',
-      ...AGY_STREAM_JSON_ARGS,
-    ]);
+    const settingsPath = join(settingsDir, 'settings.json');
+    assert.deepEqual(
+      antigravity.buildArgs(
+        '',
+        [],
+        [],
+        { model: 'gemini-3.8-flash-high' },
+        {
+          agentLogFilePath: '/tmp/od-agy-test.log',
+          antigravitySettingsPath: settingsPath,
+        },
+      ),
+      [
+        '--log-file',
+        '/tmp/od-agy-test.log',
+        '--dangerously-skip-permissions',
+        '--model',
+        'gemini-3.8-flash-high',
+        ...AGY_STREAM_JSON_ARGS,
+      ],
+    );
+    // When --model is supported by the CLI, buildArgs must not rewrite
+    // ~/.gemini/antigravity-cli/settings.json.
+    assert.equal(existsSync(settingsPath), false);
   } finally {
     agentCapabilities.delete('antigravity');
+    rmSync(settingsDir, { recursive: true, force: true });
   }
+});
+
+test('parseAntigravityModels parses agy models TSV output and ignores progress/error noise', () => {
+  assert.deepEqual(antigravity.listModels?.args, ['models']);
+  assert.equal(antigravity.listModels?.timeoutMs, 15_000);
+
+  const parsed = parseAntigravityModels(
+    [
+      'Fetching available models...',
+      'I1120 22:31:50.814160 1 model_config_manager.go:375] Propagating selected model override',
+      'gemini-3.8-flash-high\tGemini 3.8 Flash (High)',
+      'gemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)',
+      'gemini-3.8-flash-low\tGemini 3.8 Flash (Low)',
+      'claude-sonnet-4-6\tClaude Sonnet 4.6 (Thinking)',
+      'claude-opus-4-6-thinking\tClaude Opus 4.6 (Thinking)',
+      'gpt-oss-120b-medium\tGPT-OSS 120B (Medium)',
+    ].join('\n'),
+  );
+  assert.deepEqual(parsed, [
+    { id: 'default', label: 'Default (CLI config)' },
+    { id: 'gemini-3.8-flash-high', label: 'Gemini 3.8 Flash (High)' },
+    { id: 'gemini-3.8-flash-medium', label: 'Gemini 3.8 Flash (Medium)' },
+    { id: 'gemini-3.8-flash-low', label: 'Gemini 3.8 Flash (Low)' },
+    { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Thinking)' },
+    { id: 'claude-opus-4-6-thinking', label: 'Claude Opus 4.6 (Thinking)' },
+    { id: 'gpt-oss-120b-medium', label: 'GPT-OSS 120B (Medium)' },
+  ]);
+
+  assert.equal(parseAntigravityModels(''), null);
+  assert.equal(
+    parseAntigravityModels('Fetching available models...\nError: You are not logged into Antigravity.\n'),
+    null,
+  );
+  assert.equal(parseAntigravityModels('No models available for this account.'), null);
 });
 
 test('antigravity keeps log argv order when permission bypass is unavailable', () => {

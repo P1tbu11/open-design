@@ -43,6 +43,20 @@ if (args.includes('--version')) {
   process.exit(0);
 }
 
+if (args.includes('--help')) {
+  process.stderr.write('--dangerously-skip-permissions\\n--model\\n');
+  process.exit(0);
+}
+
+if (args[0] === 'models') {
+  if (mode === 'auth-required') {
+    process.stderr.write('Error: You are not logged into Antigravity.\\n');
+    process.exit(1);
+  }
+  process.stdout.write('gemini-3.8-flash-high\\tGemini 3.8 Flash (High)\\n');
+  process.exit(0);
+}
+
 const logFile = readFlag('--log-file');
 appendLog(logFile, ['INFO booting agy headless stream-json']);
 

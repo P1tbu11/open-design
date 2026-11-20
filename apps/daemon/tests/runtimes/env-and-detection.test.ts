@@ -1043,19 +1043,32 @@ test('detectAgents applies configured env while probing the CLI', async () => {
   }
 });
 
-test('detectAgents records Antigravity permission capability from stderr help output', async () => {
+test('detectAgents records Antigravity capabilities from stderr help and live models from agy models', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'od-antigravity-capability-'));
   try {
     await withEnvSnapshot(['PATH', 'OD_AGENT_HOME'], async () => {
-      const bin = join(dir, 'agy');
-      writeFileSync(
-        bin,
-        '#!/bin/sh\n' +
-          'if [ "$1" = "--version" ]; then echo "agy 1.0.3"; exit 0; fi\n' +
-          'if [ "$1" = "--help" ]; then echo "--dangerously-skip-permissions" >&2; exit 0; fi\n' +
-          'exit 0\n',
-      );
-      chmodSync(bin, 0o755);
+      const bin = join(dir, process.platform === 'win32' ? 'agy.cmd' : 'agy');
+      if (process.platform === 'win32') {
+        const scriptPath = join(dir, 'agy-fake.mjs');
+        writeFileSync(
+          scriptPath,
+          'const a = process.argv[2];\n' +
+            'if (a === "--version") { console.log("1.5.13"); process.exit(0); }\n' +
+            'if (a === "--help") { console.error("--dangerously-skip-permissions\\n--model"); process.exit(0); }\n' +
+            'if (a === "models") { process.stdout.write("gemini-3.8-flash-high\\tGemini 3.8 Flash (High)\\nclaude-sonnet-4-6\\tClaude Sonnet 4.6 (Thinking)\\n"); process.exit(0); }\n',
+        );
+        writeFileSync(bin, `@echo off\r\n"${process.execPath}" "${scriptPath}" %*\r\n`);
+      } else {
+        writeFileSync(
+          bin,
+          '#!/bin/sh\n' +
+            'if [ "$1" = "--version" ]; then echo "1.5.13"; exit 0; fi\n' +
+            'if [ "$1" = "--help" ]; then printf "%s\\n" "--dangerously-skip-permissions" "--model" >&2; exit 0; fi\n' +
+            'if [ "$1" = "models" ]; then printf "gemini-3.8-flash-high\\tGemini 3.8 Flash (High)\\nclaude-sonnet-4-6\\tClaude Sonnet 4.6 (Thinking)\\n"; exit 0; fi\n' +
+            'exit 0\n',
+        );
+        chmodSync(bin, 0o755);
+      }
       process.env.PATH = dir;
       process.env.OD_AGENT_HOME = dir;
       agentCapabilities.delete('antigravity');
@@ -1064,8 +1077,15 @@ test('detectAgents records Antigravity permission capability from stderr help ou
       const detected = agents.find((agent) => agent.id === 'antigravity');
 
       assert.equal(detected?.available, true);
+      assert.equal(detected?.modelsSource, 'live');
+      assert.deepEqual(detected?.models, [
+        { id: 'default', label: 'Default (CLI config)' },
+        { id: 'gemini-3.8-flash-high', label: 'Gemini 3.8 Flash (High)' },
+        { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Thinking)' },
+      ]);
       assert.deepEqual(agentCapabilities.get('antigravity'), {
         skipPermissions: true,
+        model: true,
       });
       assert.ok(
         antigravity.buildArgs('', [], [], {}).includes('--dangerously-skip-permissions'),

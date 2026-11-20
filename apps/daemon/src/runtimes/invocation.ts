@@ -34,7 +34,7 @@ export function execAgentFile(
           args,
         },
   );
-  return execFileP(invocation.command, invocation.args, {
+  const pending = execFileP(invocation.command, invocation.args, {
     // `timeout` alone is not a settle guarantee. execFile only *signals* on
     // expiry, and the promise settles on 'close' — which needs the child to
     // actually exit. A CLI that traps SIGTERM therefore leaves a probe pending
@@ -46,4 +46,6 @@ export function execAgentFile(
     cwd: options.cwd ?? os.tmpdir(),
     windowsVerbatimArguments: invocation.windowsVerbatimArguments,
   });
+  pending.child?.stdin?.end();
+  return pending;
 }

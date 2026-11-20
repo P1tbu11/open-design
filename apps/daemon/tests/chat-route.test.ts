@@ -3208,7 +3208,15 @@ process.exit(1);
   const FAKE_AGY_CONTRACT = `
 const args = process.argv.slice(2);
 if (args[0] === '--version') {
-  console.log('1.3.1');
+  console.log('1.5.13');
+  process.exit(0);
+}
+if (args[0] === '--help') {
+  process.stderr.write('--dangerously-skip-permissions\\n--model\\n');
+  process.exit(0);
+}
+if (args[0] === 'models') {
+  process.stdout.write('gemini-3.8-flash-high\\tGemini 3.8 Flash (High)\\n');
   process.exit(0);
 }
 if (args.includes('-p') || args.includes('--print') || args.includes('--prompt')) {
@@ -3236,7 +3244,7 @@ process.stdin.on('end', () => {
   }
   const content = messages[0].message.content;
   emit({ event: 'step_update', step_update: { conversation_id, step_index: 0, state: 'DONE', step_type: 'user_input' } });
-  const reply = 'RECEIVED ' + content.length + ' chars ending ' + JSON.stringify(content.slice(-40));
+    const reply = 'MODEL=' + (args.includes('--model') ? args[args.indexOf('--model') + 1] : 'default') + ' RECEIVED ' + content.length + ' chars ending ' + JSON.stringify(content.slice(-40));
   emit({ event: 'step_update', step_update: { conversation_id, step_index: 1, state: 'DONE', step_type: 'agent_response', text_delta: reply, duration_seconds: 0.5, usage: { input_tokens: 9, output_tokens: 3, thinking_tokens: 0, cache_read_tokens: 0, total_tokens: 12 } } });
   emit({ event: 'result', result: { conversation_id, status: 'SUCCESS', response: reply, duration_seconds: 0.6, num_turns: 1, usage: { input_tokens: 9, output_tokens: 3, thinking_tokens: 0, cache_read_tokens: 0, total_tokens: 12 } } });
   process.exit(0);
@@ -3270,6 +3278,7 @@ process.stdin.on('end', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentId: 'antigravity',
+          model: 'gemini-3.8-flash-high',
           message: `${'Pad the composed prompt past the Windows command-line cap. '.repeat(700)}${marker}`,
         }),
       });
@@ -3284,7 +3293,7 @@ process.stdin.on('end', () => {
       eventsController.abort();
       const statusBody = await waitForRunStatus(baseUrl, runId);
 
-      expect(eventsBody).toContain('"type":"text_delta","delta":"RECEIVED ');
+      expect(eventsBody).toContain('"type":"text_delta","delta":"MODEL=gemini-3.8-flash-high RECEIVED ');
       expect(eventsBody).toContain(marker);
       expect(eventsBody).not.toContain('I do not see any instructions');
       expect(eventsBody).not.toContain('event: stdout');

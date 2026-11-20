@@ -506,6 +506,7 @@ import {
   getDetectedRuntimeVersions,
   ensureDetectedRuntimeCapabilities,
 } from './runtimes/detection.js';
+import { agentCapabilities } from './runtimes/capabilities.js';
 
 import {
   antigravityQuotaGuidance,
@@ -14532,16 +14533,30 @@ export async function startServer({
       }
     }
 
-    // Serialize antigravity spawns whose buildArgs writes a concrete
-    // model into settings.json. Two concurrent runs with different
-    // models would otherwise race the file: A writes model A, B writes
-    // model B, then A's agy reads model B. The lock is acquired BEFORE
-    // buildArgs (which performs the write) and released asynchronously
-    // AFTER agy's --log-file confirms the model was propagated. See
-    // `antigravity.ts` for the chain implementation.
+    // Optional argv flags are gated on the `--help` capability map, which used
+    // to be filled only by `GET /api/agents`. Probe it before lock acquisition
+    // and buildArgs so Antigravity knows whether `agy` supports `--model`
+    // (agy >= 1.0.5, per-process argv) or requires the legacy `settings.json`
+    // write + cross-run lock (agy < 1.0.5).
+    try {
+      await ensureDetectedRuntimeCapabilities(def.id, configuredAgentEnv);
+    } catch (err) {
+      cleanupPromptFile();
+      throw err;
+    }
+
+    // Serialize legacy antigravity spawns (agy < 1.0.5 without `--model`)
+    // whose buildArgs writes a concrete model into settings.json. Two
+    // concurrent runs with different models would otherwise race the file:
+    // A writes model A, B writes model B, then A's agy reads model B. The
+    // lock is acquired BEFORE buildArgs (which performs the write) and
+    // released asynchronously AFTER agy's --log-file confirms the model was
+    // propagated. Runs on `agy >= 1.0.5` pass `--model` on argv and skip
+    // both settings.json mutation and this lock.
     let antigravityModelLockRelease: (() => void) | null = null;
     const antigravityConcreteModel =
       def.id === 'antigravity'
+      && !agentCapabilities.get('antigravity')?.model
       && typeof agentOptions.model === 'string'
       && agentOptions.model.length > 0
       && agentOptions.model !== 'default'
@@ -14558,10 +14573,6 @@ export async function startServer({
     const observeClaudeNativeChildBehavior =
       def.id === 'claude' && strategyTaskAtStart !== null;
     try {
-      // Optional argv flags are gated on the `--help` capability map, which used
-      // to be filled only by `GET /api/agents`. Probe it here so a daemon that
-      // has never served that route still builds the same argv as one that has.
-      await ensureDetectedRuntimeCapabilities(def.id, configuredAgentEnv);
       args = def.buildArgs(
         composed,
         promptImagePaths,
@@ -14584,6 +14595,7 @@ export async function startServer({
         },
       );
     } catch (err) {
+      antigravityModelLockRelease?.();
       cleanupPromptFile();
       throw err;
     }
