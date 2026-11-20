@@ -113,6 +113,10 @@ import {
   splitFileName,
 } from '../runtime/chat/attachment';
 import {
+  isCandidateForClipboardSlimming,
+  slimClipboardPasteFiles,
+} from '../runtime/chat/clipboard-image-slim';
+import {
   attachmentNavDelta,
   attachmentNavState,
   type AttachmentNavState,
@@ -2596,7 +2600,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
           files.push(new File([blob], `clipboard-screenshot-${stamp}.${extension}`, { type: imageType }));
         }
         if (files.length === 0) return false;
-        await uploadFiles(files);
+        const prepared = await slimClipboardPasteFiles(files);
+        await uploadFiles(prepared);
         return true;
       } catch (err) {
         console.warn('Could not read image from clipboard', err);
@@ -2845,9 +2850,18 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     // the clipboard exposed synchronously; when empty we fall back to the
     // async Clipboard API to recover pasted screenshots that some browsers
     // only surface through `navigator.clipboard.read()`.
+    // Only clipboard-pasted >4 MiB fully opaque screenshots are slimmed here;
+    // file-picker and drag-drop uploads pass straight to `uploadFiles` untouched.
     function handlePasteFiles(files: File[]) {
       if (files.length > 0) {
-        void uploadFiles(files);
+        if (!files.some((file) => isCandidateForClipboardSlimming(file))) {
+          void uploadFiles(files);
+          return;
+        }
+        void (async () => {
+          const prepared = await slimClipboardPasteFiles(files);
+          await uploadFiles(prepared);
+        })();
         return;
       }
       void uploadClipboardImagesFromAsyncClipboard();

@@ -43,6 +43,10 @@ import {
   previewFallbackIcon,
   resolveFileTypeIcon,
 } from './FileTypeIcon';
+import {
+  isCandidateForClipboardSlimming,
+  slimClipboardPasteFiles,
+} from '../runtime/chat/clipboard-image-slim';
 import { useAnalytics } from '../analytics/provider';
 import {
   trackContextLinkResult,
@@ -1298,6 +1302,18 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
     onAddFiles(files);
   }
 
+  function handlePasteFiles(files: File[]) {
+    if (files.length === 0) return;
+    if (!files.some((file) => isCandidateForClipboardSlimming(file))) {
+      handleFiles(files);
+      return;
+    }
+    void (async () => {
+      const prepared = await slimClipboardPasteFiles(files);
+      handleFiles(prepared);
+    })();
+  }
+
   // "Import from library": the home composer has no project yet, so we fetch
   // each picked asset's bytes and stage them as regular files. They ride the
   // existing upload-on-submit path into the new project's design files.
@@ -2019,7 +2035,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
               }}
               onTrigger={handleTrigger}
               onEnterSend={handleSend}
-              onPasteFiles={handleFiles}
+              onPasteFiles={handlePasteFiles}
               // Backspace with the caret before the first character eats the
               // template chip leading the line — same effect as its ×, which
               // is easy to miss while typing. Guarded exactly like that ×: an

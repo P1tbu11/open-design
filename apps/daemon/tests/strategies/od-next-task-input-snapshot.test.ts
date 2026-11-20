@@ -1,3 +1,6 @@
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   chmodSync,
   existsSync,
@@ -19,6 +22,8 @@ import {
   buildOdNextTaskConfigurationV1,
   createOdNextRunInputProjection,
   createOdNextTaskInputSnapshot,
+  DEFAULT_OD_NEXT_ATTACHMENT_FILE_CAP_BYTES,
+  DEFAULT_OD_NEXT_ATTACHMENT_TOTAL_CAP_BYTES,
   loadOdNextTaskInputSnapshot,
   OdNextTaskInputSnapshotError,
   removeOdNextTaskInputSnapshot,
@@ -657,6 +662,218 @@ describe('OD Next task-scoped input snapshots', () => {
     writeFileSync(manifest, `${readFileSync(manifest, 'utf8')} `);
     expect(() => loadOdNextTaskInputSnapshot(descriptor, f.snapshotsRoot))
       .toThrow(/manifest digest mismatch/);
+  });
+
+  it('raises raw safety byte caps to 64 MiB per file and 128 MiB total', () => {
+    expect(DEFAULT_OD_NEXT_ATTACHMENT_FILE_CAP_BYTES).toBe(64 * 1024 * 1024);
+    expect(DEFAULT_OD_NEXT_ATTACHMENT_TOTAL_CAP_BYTES).toBe(128 * 1024 * 1024);
+  });
+
+  it('downsamples >8 MiB multi-screenshot attachments into lightweight ≤2560px snapshot copies while keeping workspace files 100% intact', () => {
+    const f = fixture();
+    const ffmpegBin = process.env.HYPERFRAMES_FFMPEG_PATH?.trim() || ffmpegInstaller.path;
+
+    // Generate an ~18 MiB uncompressed 3840x2160 opaque RGBA PNG (exceeds old 16 MiB per-file cap;
+    // 3 screenshots exceed old 32 MiB total cap).
+    const opaqueRetinaPng = spawnSync(
+      ffmpegBin,
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-f',
+        'lavfi',
+        '-i',
+        'testsrc2=s=3840x2160:r=1:d=1,noise=alls=35:allf=u,format=rgba',
+        '-frames:v',
+        '1',
+        '-c:v',
+        'png',
+        '-compression_level',
+        '0',
+        '-f',
+        'image2pipe',
+        'pipe:1',
+      ],
+      { maxBuffer: 128 * 1024 * 1024 },
+    ).stdout;
+    expect(opaqueRetinaPng.length).toBeGreaterThan(16 * 1024 * 1024);
+    const originalSha = createHash('sha256').update(opaqueRetinaPng).digest('hex');
+
+    const names = ['pixpin-1.png', 'pixpin-2.png', 'pixpin-3.png'];
+    for (const name of names) {
+      writeFileSync(path.join(f.projectRoot, name), opaqueRetinaPng);
+    }
+
+    const descriptor = createOdNextTaskInputSnapshot({
+      ...f,
+      taskExecutionId: 'odnext_multi_retina_opaque',
+      projectAttachments: names,
+    });
+
+    // 1. Workspace files remain 100% bit-for-bit intact at full 3840x2160 resolution!
+    for (const name of names) {
+      const workspaceBytes = readFileSync(path.join(f.projectRoot, name));
+      expect(workspaceBytes.length).toBe(opaqueRetinaPng.length);
+      expect(createHash('sha256').update(workspaceBytes).digest('hex')).toBe(originalSha);
+    }
+
+    // 2. Snapshot copies are lightweight ≤2560px JPEGs verified by load & run projection.
+    const loaded = loadOdNextTaskInputSnapshot(descriptor, f.snapshotsRoot);
+    expect(loaded.files).toHaveLength(3);
+    for (const file of loaded.files) {
+      expect(file.mediaType).toBe('image/jpeg');
+      expect(file.relativePath).toMatch(/\.jpg$/);
+      expect(file.bytes).toBeLessThan(4 * 1024 * 1024);
+    }
+    const probe = spawnSync(
+      ffmpegBin,
+      ['-hide_banner', '-i', 'pipe:0'],
+      { input: loaded.files[0]!.content, maxBuffer: 16 * 1024 * 1024 },
+    );
+    expect(probe.stderr.toString('utf8')).toContain('2560x1440');
+
+    const projectionsRoot = path.join(f.root, 'data', 'run-inputs');
+    const projection = createOdNextRunInputProjection({
+      descriptor,
+      snapshotsRoot: f.snapshotsRoot,
+      projectionsRoot,
+      runId: 'run-retina',
+    });
+    expect(projection.attachmentPaths).toHaveLength(3);
+    removeOdNextRunInputProjection(projection);
+  });
+
+  it('preserves alpha channel as PNG when downsampling >8 MiB transparent layer images into the snapshot', () => {
+    const f = fixture();
+    const ffmpegBin = process.env.HYPERFRAMES_FFMPEG_PATH?.trim() || ffmpegInstaller.path;
+
+    // 3840x2160 RGBA PNG (>8 MiB) with semi-transparent alpha (0.5 -> alpha ~ 127).
+    const transparentLayerPng = spawnSync(
+      ffmpegBin,
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-f',
+        'lavfi',
+        '-i',
+        'color=c=0x4488ff@0.5:s=3840x2160:r=1:d=1,format=rgba',
+        '-frames:v',
+        '1',
+        '-c:v',
+        'png',
+        '-compression_level',
+        '0',
+        '-f',
+        'image2pipe',
+        'pipe:1',
+      ],
+      { maxBuffer: 128 * 1024 * 1024 },
+    ).stdout;
+    expect(transparentLayerPng.length).toBeGreaterThan(8 * 1024 * 1024);
+    const originalLayerSha = createHash('sha256').update(transparentLayerPng).digest('hex');
+
+    const layerRel = 'layers/character-layer.png';
+    mkdirSync(path.join(f.projectRoot, 'layers'), { recursive: true });
+    writeFileSync(path.join(f.projectRoot, layerRel), transparentLayerPng);
+
+    const descriptor = createOdNextTaskInputSnapshot({
+      ...f,
+      taskExecutionId: 'odnext_transparent_layer',
+      projectAttachments: [layerRel],
+    });
+
+    // Workspace original stays 100% intact.
+    const workspaceLayer = readFileSync(path.join(f.projectRoot, layerRel));
+    expect(createHash('sha256').update(workspaceLayer).digest('hex')).toBe(originalLayerSha);
+
+    // Snapshot copy is resized to 2560x1440 AND retains PNG alpha (<255).
+    const loaded = loadOdNextTaskInputSnapshot(descriptor, f.snapshotsRoot);
+    expect(loaded.files).toHaveLength(1);
+    expect(loaded.files[0]!.mediaType).toBe('image/png');
+    expect(loaded.files[0]!.relativePath).toMatch(/\.png$/);
+    expect(loaded.files[0]!.bytes).toBeLessThan(transparentLayerPng.length);
+
+    const alphaCheck = spawnSync(
+      ffmpegBin,
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-i',
+        'pipe:0',
+        '-frames:v',
+        '1',
+        '-vf',
+        'format=rgba,alphaextract',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'gray',
+        'pipe:1',
+      ],
+      { input: loaded.files[0]!.content, maxBuffer: 32 * 1024 * 1024 },
+    );
+    expect(alphaCheck.status).toBe(0);
+    expect(alphaCheck.stdout.length).toBe(2560 * 1440);
+    expect(alphaCheck.stdout[0]).toBeLessThan(200);
+  });
+
+  it('downsamples image attachments when aggregate snapshot budget would overflow and deduplicates deterministically across inherited turns', () => {
+    const f = fixture();
+    const ffmpegBin = process.env.HYPERFRAMES_FFMPEG_PATH?.trim() || ffmpegInstaller.path;
+
+    // ~3 MiB uncompressed 1920x1080 opaque PNG (under 8 MiB per-file threshold,
+    // but 2 copies exceed a custom 4 MiB totalCapBytes).
+    const mediumPng = spawnSync(
+      ffmpegBin,
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-f',
+        'lavfi',
+        '-i',
+        'testsrc2=s=1920x1080:r=1:d=1,noise=alls=25:allf=u,format=rgba',
+        '-frames:v',
+        '1',
+        '-c:v',
+        'png',
+        '-compression_level',
+        '0',
+        '-f',
+        'image2pipe',
+        'pipe:1',
+      ],
+      { maxBuffer: 32 * 1024 * 1024 },
+    ).stdout;
+    expect(mediumPng.length).toBeGreaterThan(2 * 1024 * 1024);
+    expect(mediumPng.length).toBeLessThan(8 * 1024 * 1024);
+
+    writeFileSync(path.join(f.projectRoot, 'a.png'), mediumPng);
+    writeFileSync(path.join(f.projectRoot, 'b.png'), mediumPng);
+
+    const turn1 = createOdNextTaskInputSnapshot({
+      ...f,
+      taskExecutionId: 'odnext_agg_turn1',
+      projectAttachments: ['a.png', 'b.png'],
+      totalCapBytes: Math.floor(mediumPng.length * 1.4),
+    });
+    const loaded1 = loadOdNextTaskInputSnapshot(turn1, f.snapshotsRoot);
+    expect(loaded1.files).toHaveLength(2);
+    expect(loaded1.files[1]!.mediaType).toBe('image/jpeg');
+
+    // Deterministic downsampling deduplicates cleanly against inheritedSnapshot on turn 2.
+    const turn2 = createOdNextTaskInputSnapshot({
+      ...f,
+      taskExecutionId: 'odnext_agg_turn2',
+      inheritedSnapshot: turn1,
+      projectAttachments: ['b.png'],
+      imageDownsampleThresholdBytes: 1024,
+    });
+    const loaded2 = loadOdNextTaskInputSnapshot(turn2, f.snapshotsRoot);
+    expect(loaded2.files).toHaveLength(2);
   });
 });
 

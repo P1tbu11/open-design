@@ -16,10 +16,21 @@ import { createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { redactSecrets } from '../../redact.js';
+import {
+  DEFAULT_OD_NEXT_SNAPSHOT_IMAGE_DOWNSAMPLE_BYTES,
+  DEFAULT_OD_NEXT_SNAPSHOT_IMAGE_MAX_EDGE_PX,
+  downsampleSnapshotImageBytes,
+  isDownsampleableSnapshotImageType,
+} from './snapshot-image-downsample.js';
+
+export {
+  DEFAULT_OD_NEXT_SNAPSHOT_IMAGE_DOWNSAMPLE_BYTES,
+  DEFAULT_OD_NEXT_SNAPSHOT_IMAGE_MAX_EDGE_PX,
+};
 
 const SNAPSHOT_SCHEMA = 'open-design.od-next-task-input-snapshot/v1' as const;
-export const DEFAULT_OD_NEXT_ATTACHMENT_FILE_CAP_BYTES = 16 * 1024 * 1024;
-export const DEFAULT_OD_NEXT_ATTACHMENT_TOTAL_CAP_BYTES = 32 * 1024 * 1024;
+export const DEFAULT_OD_NEXT_ATTACHMENT_FILE_CAP_BYTES = 64 * 1024 * 1024;
+export const DEFAULT_OD_NEXT_ATTACHMENT_TOTAL_CAP_BYTES = 128 * 1024 * 1024;
 export const DEFAULT_OD_NEXT_ATTACHMENT_COUNT_CAP = 32;
 export const DEFAULT_OD_NEXT_INPUT_MANIFEST_CAP_BYTES = 1024 * 1024;
 
@@ -584,6 +595,8 @@ export function createOdNextTaskInputSnapshot(input: {
   fileCapBytes?: number;
   totalCapBytes?: number;
   countCap?: number;
+  imageDownsampleThresholdBytes?: number;
+  imageMaxEdgePx?: number;
   beforeOpenSource?: (sourcePath: string) => void;
   afterReadSource?: (sourcePath: string) => void;
 }): OdNextTaskInputSnapshotDescriptor {
@@ -613,6 +626,11 @@ export function createOdNextTaskInputSnapshot(input: {
   const attachmentsDir = path.join(snapshotDir, 'attachments');
   const fileCap = input.fileCapBytes ?? DEFAULT_OD_NEXT_ATTACHMENT_FILE_CAP_BYTES;
   const totalCap = input.totalCapBytes ?? DEFAULT_OD_NEXT_ATTACHMENT_TOTAL_CAP_BYTES;
+  const imageDownsampleThreshold = Math.min(
+    input.imageDownsampleThresholdBytes ?? DEFAULT_OD_NEXT_SNAPSHOT_IMAGE_DOWNSAMPLE_BYTES,
+    fileCap,
+  );
+  const imageMaxEdgePx = input.imageMaxEdgePx ?? DEFAULT_OD_NEXT_SNAPSHOT_IMAGE_MAX_EDGE_PX;
   const files: SnapshotFile[] = [];
   const facts: OdNextAttachmentFactV1[] = [];
   let total = 0;
@@ -670,6 +688,24 @@ export function createOdNextTaskInputSnapshot(input: {
           'OD Next attachment could not be read and frozen safely.',
         );
       }
+      let type = mediaTypeFromBytes(bytes);
+      if (source.kind === 'image' && !type.mediaType.startsWith('image/')) {
+        throw new OdNextTaskInputSnapshotError('OD Next image attachment bytes are not a supported image type.', 'OD_NEXT_INPUT_SNAPSHOT_TYPE_MISMATCH');
+      }
+      if (
+        !('content' in source)
+        && isDownsampleableSnapshotImageType(type.mediaType)
+        && (bytes.length > imageDownsampleThreshold || total + bytes.length > totalCap)
+      ) {
+        const downsampled = downsampleSnapshotImageBytes(bytes, type.mediaType, imageMaxEdgePx);
+        if (downsampled !== bytes) {
+          const nextType = mediaTypeFromBytes(downsampled);
+          if (nextType.mediaType.startsWith('image/')) {
+            bytes = downsampled;
+            type = nextType;
+          }
+        }
+      }
       const identity = sha256(bytes);
       if ('content' in source && files.some(file => file.kind === source.kind && file.sha256 === identity)) return;
       if (files.length >= countCap || bytes.length > fileCap) {
@@ -678,10 +714,6 @@ export function createOdNextTaskInputSnapshot(input: {
       total += bytes.length;
       if (total > totalCap) {
         throw new OdNextTaskInputSnapshotError('OD Next attachments exceed the task byte cap.', 'OD_NEXT_INPUT_SNAPSHOT_OVERSIZE');
-      }
-      const type = mediaTypeFromBytes(bytes);
-      if (source.kind === 'image' && !type.mediaType.startsWith('image/')) {
-        throw new OdNextTaskInputSnapshotError('OD Next image attachment bytes are not a supported image type.', 'OD_NEXT_INPUT_SNAPSHOT_TYPE_MISMATCH');
       }
       const index = files.length;
       const id = `attachment-${String(index + 1).padStart(3, '0')}`;
