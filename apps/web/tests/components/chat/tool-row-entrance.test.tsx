@@ -149,14 +149,47 @@ describe('样式:入场只动合成层属性,且能关掉', () => {
     expect(body).toMatch(/filter:\s*blur/);
   });
 
-  it('缓动走仓库基线 `--chat-ease-out`', () => {
+  it('缓动写死基线那一串 —— **不许**用 var,未定义的 var 会让整条简写失效', () => {
+    /*
+     * 实测(2026-11-21,真 Chrome):`animation: x 240ms var(--undefined) both` 在
+     * var 未定义时,浏览器把**整条简写判为无效并丢弃**,`animationName` 读出来是空串,
+     * 动画静默不跑。而这个 token(`--chat-ease-out`)定义在别的 Module 里,
+     * 本文件被单独引用时就不存在。
+     *
+     * 所以这里钉的是**反面**:简写里不许出现 var。
+     */
     const m = /\.entrance\s*\{([^}]*)\}/.exec(CSS);
-    expect(m?.[1]).toMatch(/var\(--chat-ease-out\)/);
+    const body = m?.[1] ?? '';
+    expect(body, 'animation 简写里出现了 var —— 未定义时整条规则会静默失效').not.toMatch(/animation:[^;]*var\(/);
+    // 但缓动值仍然必须是仓库基线那一串
+    expect(body).toMatch(/cubic-bezier\(0\.23, 1, 0\.32, 1\)/);
   });
 
   it('prefers-reduced-motion 命中时 `animation: none`(不是更慢的淡入)', () => {
     const m = /@media \(prefers-reduced-motion: reduce\) \{\s*\.entrance\s*\{([^}]*)\}/.exec(CSS);
     expect(m, '缺少 reduced-motion 关断').not.toBeNull();
     expect(m![1]).toMatch(/animation:\s*none/);
+  });
+
+  /*
+   * ── 全文件守卫:animation 简写里不许出现 var() ──────────────────────
+   *
+   * 这是实测出来的静默失败:真 Chrome 里 `animation: x 240ms var(--undefined) both`
+   * 会把**整条简写判为无效并丢弃**,`animationName` 变空串,动画完全不跑,而且
+   * 控制台**没有任何警告**。
+   *
+   * 本文件是 CSS Module,`--chat-*` 全定义在 `ChatRoot.module.css`。凡是只引用
+   * `record.module.css` 的场合(陈列页、几何探针、这一族自己的样式测试),
+   * 那些 token 就不存在 —— 于是规则静默失效,而单测因为只读文本、不跑层叠,
+   * 照样绿。
+   *
+   * 2026-11-21 实际踩到过两次:`.fold[open] > .body`(新加)与 `.dots i`(存量)。
+   */
+  it('全文件:没有一条 animation 简写把 var() 放在里面', () => {
+    const offenders = [...CSS.matchAll(/animation:\s*([^;}]+)/g)]
+      .map((m) => m[1]?.trim() ?? '')
+      .filter((decl) => decl.includes('var('));
+    expect(offenders, `这些 animation 简写含 var(),未定义时整条会静默失效:\n${offenders.join('\n')}`)
+      .toEqual([]);
   });
 });

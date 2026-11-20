@@ -175,6 +175,58 @@
  * **单测绿在这件事上不是证据**。守卫在
  * `tests/components/chat/shell-collapse-on-done.test.tsx` 的「不许再包一层格式化上下文」。
  */
+/* ── 展开:正文淡入 ────────────────────────────────────────────
+ *
+ * 原生 `<details>` 的内容是**瞬现**的 —— 箭头转、正文「啪」地出来。这是这一族
+ * 最后一块还不连贯的地方(文字有逐字化开、工具行有入场与流光,只有面板是硬的)。
+ *
+ * ## 为什么只动 opacity / transform
+ *
+ * 本文件 `record.module.css:160` 附近记着一次失败尝试:给壳加
+ * `grid-template-rows: 0fr → 1fr` 的过渡,结果思考正文那个限高盒(`.body.scroll`)
+ * 滚不到底,最后一行被裁在下沿,后来整段撤掉了。
+ *
+ * `grid-template-rows` 之所以危险,是它把 `.body` 变成**栅格项**并在外面多一层
+ * `overflow: hidden` —— 限高盒的格式化上下文跟着变,`max-height` 与滚动位置的计算
+ * 就偏了。`opacity` 与 `transform` **都不参与布局**、不建立格式化上下文,
+ * 所以那条事故的成因在这里不存在。
+ *
+ * 但「设计意图不是证据」—— 判据在真 Chrome 里量
+ * (`fold-body-animation-layout.test.ts`:限高仍 96px、内容确实溢出、滚到底后
+ * 最后一行完整可见)。
+ *
+ * ## 为什么不用 grid-template-rows 做高度过渡
+ *
+ * 除了上面那次事故,还有一个实际理由:展开高度**可能是 2000 字符的日志**,
+ * 从 0 推到自动高度需要 `interpolate-size` 或 JS 测量,而这一族有嵌套
+ * (壳 → 抽屉 → 命令块),每层各测一遍等于每次展开都强制同步布局。
+ * 淡入 + 4px 上浮拿到的是「它出现了」这个信号,代价是常数级的。
+ */
+/*
+ * ## ⚠️ 缓动为什么写死字面量,不用 `var(--chat-ease-out)`
+ *
+ * 实测(2026-11-21,真 Chrome):`animation: fold-body-in 200ms var(--x) both` 在
+ * `--x` **未定义**时,浏览器会把**整条简写判为无效**并丢弃 —— `animationName`
+ * 读出来是空串,动画完全不跑,而且**没有任何报错**。
+ *
+ * 这个 token 定义在 `ChatRoot.module.css`,本文件单独被引用时(陈列页、几何探针、
+ * 任何只取 `record.module.css` 的地方)它就不存在。仓库的 UI 动效基线本来就是
+ * `cubic-bezier(0.23, 1, 0.32, 1)` 这一个值(`AGENTS.md`),写死它换来的确定性强过
+ * 一层间接。
+ *
+ * 同一族的 `.entrance` / `.live::after` 也因此不把 var 放进简写里。
+ */
+.fold[open] > .body {
+  animation: fold-body-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes fold-body-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fold[open] > .body { animation: none; }
+}
+
 /*
  * 任务进度那一族的墨色 —— **正文深色**,不是静音灰。
  *
@@ -922,7 +974,7 @@
  * 是否重渲染,比读 JS 的 `matchMedia` 更可靠。
  */
 .entrance {
-  animation: tool-row-entrance 240ms var(--chat-ease-out) both;
+  animation: tool-row-entrance 240ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 @keyframes tool-row-entrance {
   from { opacity: 0; transform: translateY(-4px); filter: blur(4px); }
@@ -930,6 +982,65 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .entrance { animation: none; }
+}
+
+/* ── 执行中的那一行:流光 ──────────────────────────────────────
+ *
+ * 技法沿用壳头的 `.shimmer`(`background-size: 300%` + 位移 `background-position`),
+ * 但有三处刻意的不同 —— 它扫的是**整行的一条光带**,不是文字本身:
+ *
+ *  1. 壳头那句是**棱镜五色**(`--chat-dia-1..5`),因为它是「进行中」这个状态本身,
+ *     该抢眼。工具行的流光只是「还在动」的旁白,五色会把一屏十几行炸开花。
+ *     这里只用**同一种墨**的低透明度起一条窄光带。
+ *  2. 不给文字上 `background-clip: text`:工具行里是文件名、命令、秒表混排,
+ *     逐字染色会让它们深浅不一,读起来像加载失败。
+ *  3. 用 `::after` 铺一层,`pointer-events: none`,所以它不参与命中、不改布局,
+ *     也不会盖住行尾那枚箭头。
+ *
+ * ## 为什么是 2.4s 而不是 `.shimmer` 的 2.5s
+ *
+ * 那条是**文字**扫光,和读字速度绑定;这条是背景,**慢一点才像「在流动」而不是
+ * 「在闪」**。2.4s 与壳头那 2.5s 几乎同相,一屏里两处同时出现时不会互相打拍子。
+ *
+ * ## 关掉动效的人
+ *
+ * 光带整个不出现(`display: none`)—— 静止的一条亮带读起来像「这块被选中了」,
+ * 比没有更误导。执行中的提示由行首那颗球和走动的秒表承担,它们本来就不动效。
+ */
+.live {
+  position: relative;
+  /* 光带压在内容下面:它是一层背景,不是覆盖层 */
+  isolation: isolate;
+}
+.live::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  /*
+   * 一条窄的亮带在中间、两侧透明。`--chat-text-strong` 取 6% —— 再高一行里就
+   * 只剩那道光了,文件名的墨色被吃掉。
+   */
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 42%,
+    color-mix(in srgb, var(--chat-text-strong) 6%, transparent) 50%,
+    transparent 58%,
+    transparent 100%
+  );
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  animation: tool-row-stream 2.4s linear infinite;
+}
+@keyframes tool-row-stream {
+  from { background-position: 100% 0; }
+  to   { background-position: 0% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live::after { display: none; }
 }
 
 /* ── 折叠态那一句摘要预览 ──────────────────────────────────
@@ -1332,7 +1443,7 @@
   height: 3px;
   border-radius: 50%;
   background: var(--chat-text-muted);
-  animation: chat-record-dot 1.2s var(--chat-ease-out) infinite;
+  animation: chat-record-dot 1.2s cubic-bezier(0.23, 1, 0.32, 1) infinite;
 }
 .dots i:nth-child(2) { animation-delay: 0.15s; }
 .dots i:nth-child(3) { animation-delay: 0.3s; }

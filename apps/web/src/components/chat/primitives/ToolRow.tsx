@@ -126,27 +126,23 @@ export function ToolRow({
    *
    * 两条各有各的理由,而且**判据不同**:
    *
-   *  · **此刻真的在跑** → 摊开。输出正一行行长出来,收着就等于让用户对着一行静止的
-   *    字干等几十秒(稿子 `body-components.html:1010` 的 `<details class="fold" open>`)。
-   *
-   *    判据是 `row.pending && running`,**两个都要**。`row.pending` 的定义是
-   *    `result == null` —— 「这次调用**从来没有回来过**」,不是「它此刻还在跑」。
-   *    用户按停止时那条在飞的调用永远等不到 `tool_result`,`pending` 就永远为真;
-   *    只看它,那一行会**永远摊着**,而且以后每次重载这条老会话都还摊着(装依赖那种
-   *    几百行输出的,一条顶掉整屏)。`running` 才是「此刻」——
-   *    `ExecutionShell:78` 的 `shell.status === 'running' && !shell.stopped`。
-   *
-   *    ⚠️ 别改成「轮次终止时把 `row.pending` 清掉」:行首那一格靠它分档
-   *    (见上面 `icon`),清掉就等于给一次没跑完的调用画上跑完的工具图标 ——
-   *    `build-turn-blocks` 的 `closeRunningSegments` 把这条规矩写在 todo 那一半上,
-   *    逐字是「标成完成是替 agent 说了它没说过的话」。工具行同理。
-   *
    *  · **失败** → 摊开。报错原文是这时候唯一要读的东西(稿子 `:1018` 的
    *    `fold is-fail open`)。这一条和轮次跑没跑**无关**:失败是结算过的终态。
    *
-   * 判据钉在 `tests/components/chat/stopped-run-row-collapse.test.tsx`。
+   *  · **命令类执行中** → 摊开。这条是**为命令立的**(稿子 `body-components.html:1010`
+   *    的 `<details class="fold" open>`):它的正文是正在一行行长出来的终端输出,
+   *    收着等于让用户对着一行静止的字干等几十秒。
+   *
+   * ⚠️ **详情面板不参与这一条**(T61)。参数与返回值在跑完之前一个字都不会变,
+   * 摊开没有新信息可看 —— 提前摊开只会在屏幕上铺一大块面板,而唯一还在动的
+   * 是角落里一颗 15px 的球。执行中的信号交给那层流光(`.live`);面板要读时点开,
+   * 不读就只是一行。
+   *
+   * 判据 `command` 就是这条分界:命令类走终端块那一支(它有 `command`),
+   * 详情面板那一支没有。判据钉在 `tool-row-detail.test.tsx` 与
+   * `running-command-open.test.tsx`(两边各一条正反对照)。
    */
-  const lifecycleOpen = (row.pending && running) || row.failed;
+  const lifecycleOpen = row.failed || (Boolean(row.command) && row.pending && running);
 
   /**
    * 这次失败**有没有原文可给**。
@@ -187,12 +183,33 @@ export function ToolRow({
       ? <span className={styles.why}>{t('chat.record.failed')}</span>
       : null;
 
-  const rowClass = `${styles.tool}${row.failed ? ` ${styles.fail}` : ''}${entrance ? ` ${styles.entrance}` : ''}`;
+  /**
+   * **这一行此刻正在执行** —— 决定它要不要有那层流光。
+   *
+   * 判据是 `pending && running` 两个都要:`pending` 的定义是「结果从来没回来过」,
+   * 用户按停止之后它永远为真;只看它,停住的残行会一直流光,读成「还在跑」。
+   * 和上面 `icon` 那一格(`running ? 'running' : 'pending'`)用的是同一对量。
+   */
+  const live = row.pending && running;
+
+  /**
+   * 行根元素的类。
+   *
+   * `entrance` 是刚开出来的那一下入场(`.entrance`),`live` 是**执行中**那层流光
+   * (`.live`)。两者覆盖同一条时间线的两段:入场 240ms 之后,流光接着在跑,
+   * 直到结果回来。
+   *
+   * ⚠️ 这两个类都挂在**行自己的根**上,不包 wrapper —— 理由见 `entrance` 的注释
+   * (`.fold .body.stack > *` 的 reset 与 `.tool + .tool` 的 6px 行距都按相邻关系命中)。
+   */
+  const rowFlags = [entrance ? styles.entrance : null, live ? styles.live : null]
+    .filter(Boolean).join(' ');
+  const rowClass = `${styles.tool}${row.failed ? ` ${styles.fail}` : ''}${rowFlags ? ` ${rowFlags}` : ''}`;
   /**
    * 折叠块那一支的 className。`Foldable` 的 `className` 会并进 `details.fold` 自己的
-   * class 列表,所以入场动画同样落在**这一行自己的根元素**上,不多一层节点。
+   * class 列表,所以入场与流光同样落在**这一行自己的根元素**上,不多一层节点。
    */
-  const foldClass = entrance ? styles.entrance : undefined;
+  const foldClass = rowFlags || undefined;
 
   /**
    * 这一行展开之后**有没有东西可读** —— 参数与输出两段,任一有内容就算有。
@@ -217,34 +234,22 @@ export function ToolRow({
   const detail = rowInputIsInspectable(row) && hasToolDetail(row.input, detailOutput);
 
   /**
-   * **执行中的行保持紧凑单行,不摊开详情面板。**
+   * 这一行现在该不该是折叠块 —— **有东西可读就是折叠块,执行中也一样**。
    *
-   * ── 为什么 ────────────────────────────────────────────────────────────
+   * ── 为什么不再按「执行中」把面板收掉 ──────────────────────────────────
    *
-   * 详情面板上线之后,`read_file` / `search` / 裸工具名这几档也成了折叠块,于是
-   * `lifecycleOpen`(下面那条 `row.pending && running`)**一出现就把它们摊开** ——
-   * 屏幕上是一大块参数 + 输出,只有左上角一颗 15px 的球在转。视觉重心全散了,
-   * 读起来就是「动画不如原生细腻」。
+   * 上一版执行中退回单行(`collapsible = detail && !runningCompact`),理由是
+   * 「参数和返回值在跑完之前一个字都不会变,提前摊开没有新信息可看」。
    *
-   * 而「执行中自动摊开」这条裁决本来是**为命令类立的**(稿子 `:1010`
-   * 的 `<details class="fold" open>`):那里的正文是正在一行行长出来的终端输出,
-   * 收着等于让人对着一行静止的字干等几十秒。文件行 / 搜索行 / 元工具没有这个性质 ——
-   * 它们的参数和返回值在跑完之前**一个字都不会变**,提前摊开没有新信息可看。
+   * 那段推理只对了一半:**摊开**确实没新信息,但**能摊开**本身是那一行的可观测性。
+   * 用户在真实页面上看到的是——球在转、秒表在走,却点不开任何东西,而这一行跑完
+   * 之后才突然长出箭头。中间那几十秒里「它在干什么」完全问不到答案。
    *
-   * ── 边界 ─────────────────────────────────────────────────────────────
-   *
-   * 只作用于**非命令**的那几支(命令类继续走它自己那条,见下面各 `Foldable` 的
-   * `lifecycleOpen`)。行本身仍然一发出就上屏(OPEND-2419 的红线):球在转、秒表在走、
-   * 摘要一行 —— 只是不摊开面板。跑完那一刻才换成折叠块,**默认收起**,由用户决定
-   * 要不要读参数。
-   *
-   * ⚠️ 别把判据写成只看 `row.pending`:它的定义是「结果从来没回来过」,用户按停止
-   * 之后它永远为真,那样这些行会**永远**回不到折叠块形态(也就永远读不到参数了)。
-   * 要的是「此刻真的在跑」,所以 `running` 必须在。
+   * 现在改成:执行中也给箭头与面板,只是**默认不自动摊开**(`lifecycleOpen` 仍然
+   * 只认命令类)。想要「看得见在跑」的信号由那层流光负责(`.live`),不再靠
+   * 「什么都不给你看」。
    */
-  const runningCompact = row.pending && running;
-  /** 这一行现在该不该是折叠块 —— 执行中一律不是,跑完才轮到 `detail` 说话 */
-  const collapsible = detail && !runningCompact;
+  const collapsible = detail;
 
   /**
    * 折叠态右侧那句浅色摘要 —— 「参数里最能说明这次调用在干什么的那个标量」。

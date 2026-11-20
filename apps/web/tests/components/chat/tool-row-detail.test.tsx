@@ -165,42 +165,62 @@ describe('展开态 —— 参数(Input)与输出(Output)', () => {
   });
 
   /*
-   * ── 执行中保持紧凑单行(T60)────────────────────────────────────────
+   * ── 执行中也给箭头与面板,只是**默认不自动摊开**(T61)──────────────────
    *
-   * 详情面板上线之后这几档也成了折叠块,于是 `lifecycleOpen` 一出现就把它们摊开 ——
-   * 屏幕上是一大块参数 + 输出,只有左上角一颗 15px 的球在转。「执行中自动摊开」这条
-   * 裁决本来是**为命令类立的**(稿子 `:1010`,正文是正在长出来的终端输出);
-   * 文件行 / 搜索行 / 元工具的参数和返回值在跑完之前一个字都不会变,提前摊开没有
-   * 新信息可看,只会把视觉重心打散。
+   * 上一版执行中退回单行,理由是「参数和返回值在跑完之前一个字都不会变,提前摊开
+   * 没有新信息可看」。那段推理只对了一半:**摊开**确实没新信息,但**能摊开**本身
+   * 是那一行的可观测性 —— 用户看到的是球在转、秒表在走,却点不开任何东西,
+   * 而这一行跑完之后才突然长出箭头。中间那几十秒里「它在干什么」完全问不到答案。
    *
-   * 行本身仍然一发出就上屏(OPEND-2419 的红线):球在转、秒表在走、摘要一行。
+   * 「看得见在跑」的信号改由那层流光(`.live`)承担,不再靠「什么都不给你看」。
    */
-  it('执行中(轮次还活着):紧凑单行,不摊开面板 —— 但行本身在,球在转', () => {
+  it('执行中就有箭头、点开能读参数 —— 但不自动摊开', () => {
     const { container } = render(<ToolRow running row={inspectable({ pending: true, elapsedMs: 4_100 })} />);
-    expect(fold(), '执行中不该摊开详情面板').toBeNull();
-    // 红线:行必须在屏幕上,而且说得出在干什么
+    const el = fold();
+    expect(el, '执行中也该是可展开的卡片').not.toBeNull();
+    expect(el!.open, '但不自动摊开(摊开没有新信息)').toBe(false);
+
+    // 行本身仍然一发出就上屏(OPEND-2419 的红线)
     expect(container.textContent).toContain('brand.md');
     expect(container.textContent).toContain('4.1s');
+
+    clickSummary(el!);
+    expect(screen.getByTestId('chat-tool-detail-input'), '执行中点开也要读得到参数').toBeTruthy();
   });
 
-  it('跑完那一刻才变成折叠块,而且默认收起', () => {
+  it('执行中的行带流光类;跑完之后流光撤掉', () => {
     const { container, rerender } = render(<ToolRow running row={inspectable({ pending: true })} />);
-    expect(fold()).toBeNull();
+    expect(
+      [...container.querySelectorAll('[class*="live"]')].length,
+      '执行中该有流光',
+    ).toBeGreaterThan(0);
 
     rerender(<ToolRow row={inspectable({ pending: false, elapsedMs: 400 })} />);
-    expect(fold(), '跑完该变成可展开的卡片').not.toBeNull();
-    expect(fold()!.open, '跑完默认收起').toBe(false);
-    expect(container.textContent).toContain('brand.md');
+    expect(
+      [...container.querySelectorAll('[class*="live"]')].length,
+      '跑完流光要撤掉',
+    ).toBe(0);
+  });
+
+  /*
+   * ⚠️ 判据是 `pending && running`,**两个都要**。只看 `pending` 的话,用户按停止
+   * 之后它永远为真 —— 那些行会一直流光,读成「还在跑」,而它其实早就不会动了。
+   */
+  it('轮次停了但调用没回来:流光必须撤掉(否则读成还在跑)', () => {
+    const { container } = render(<ToolRow row={inspectable({ pending: true })} />);
+    expect([...container.querySelectorAll('[class*="live"]')].length).toBe(0);
+    expect(fold(), '但仍然可展开,参数读得到').not.toBeNull();
   });
 
   it('反向对照:认不出语义的行同样遵守这条', () => {
     const other = (over: Partial<ToolRowData> = {}) =>
       row({ tool: 'other', name: 'manage_task', title: 'manage_task', input: { Query: 'x' }, ...over });
     const { rerender } = render(<ToolRow running row={other({ pending: true })} />);
-    expect(fold(), '执行中的元工具也不摊开').toBeNull();
+    expect(fold(), '执行中的元工具也可展开').not.toBeNull();
+    expect(fold()!.open, '但默认收起').toBe(false);
 
     rerender(<ToolRow row={other({ pending: false })} />);
-    expect(fold(), '跑完才可展开').not.toBeNull();
+    expect(fold(), '跑完照旧可展开').not.toBeNull();
   });
 
   /*
