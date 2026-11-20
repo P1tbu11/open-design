@@ -380,6 +380,7 @@ export function ExecutionShell({
             thinkingTokens: shell.thinkingTokens ?? null,
             deferCollapsedBodies,
             liveTextIndex: liveTextIndexOf(items, running),
+            latestLiveToolIndex: latestLiveToolIndex(items, running),
             firstThoughtsStack,
             mutedThoughtsIndex: mutedThoughtsIndexOf(items, shell.items, firstThoughtsStack),
             odCardScope, onBrandBrowserAssistConfirm,
@@ -390,6 +391,29 @@ export function ExecutionShell({
     open={open} onToggle={onToggle} expandable={items.length > 0 || children != null}
     deferBody={deferCollapsedBodies}
     className={hasTodo ? `${styles.turnHead} ${styles.hasTodo}` : styles.turnHead}>{body}</Foldable>;
+}
+
+/**
+ * **这一摞**里「还在往里头写 / 刚开出来」的那一项排第几 —— 只有它做入场动画。
+ *
+ * 判据和 `liveTextIndexOf` 是同一条思路(「还在动的只可能是结尾」),但对象不同:
+ * 那个挑的是**文字**,这个挑的是**最新的那一行工具调用**。
+ *
+ * ── 为什么只给最后一项(产品 2026-09-03 口述「最近一个在执行的工具」)────────
+ *
+ * 一屏几十行历史如果各自浮入一次,读起来是「整块在动」—— 动效本身成了噪音。
+ * 真正需要「它来了」这个信号的只有**刚发生的那个动作**,历史行该是静止的。
+ *
+ * 判据三条,缺一不可:
+ *  · `running`:轮次停了就没有「刚发生」可言(历史重渲染、被停掉的残行都不该动);
+ *  · 是最后一项:前面已经压上别的条目,说明这一行写完了;
+ *  · 是**工具行**:文字有它自己的逐字化开(`useCharReveal`),生图行有它自己那一套
+ *    大格淡入 —— 两套机制同时作用在同一项上会互相抢。
+ */
+function latestLiveToolIndex(items: GroupedShellItem[], running: boolean): number {
+  if (!running) return -1;
+  const last = items.length - 1;
+  return last >= 0 && items[last]?.kind === 'tool' ? last : -1;
 }
 
 /**
@@ -489,6 +513,11 @@ interface RenderCtx {
   firstThoughtsStack: ShellItem[] | null;
   /** **这一摞**里被压住时长的那一格排第几;`-1` = 不在这一摞 */
   mutedThoughtsIndex: number;
+  /**
+   * **这一摞**里刚开出来的那一行工具调用排第几 —— 只有它做入场动画(`-1` = 没有)。
+   * 判据见 `latestLiveToolIndex`。
+   */
+  latestLiveToolIndex: number;
   /** 壳内散文里的 `<od-card>` 要的两样 —— 说明在 `ExecutionShellProps` 上 */
   odCardScope?: string;
   onBrandBrowserAssistConfirm?: BrandBrowserAssistConfirm;
@@ -528,6 +557,12 @@ function renderItem(item: GroupedShellItem, index: number, ctx: RenderCtx): Reac
         deferBody={ctx.deferCollapsedBodies}
         /* 没回来的调用画成转圈还是中性灰,取决于这一轮还在不在跑 */
         running={ctx.running}
+        /*
+         * 只有**刚开出来的那一行**浮入。判据与理由都在 `latestLiveToolIndex`;
+         * 动画本身挂在行自己身上,不包 wrapper —— 包一层会打断
+         * `.fold .body.stack > *` 的 reset 和 `.tool + .tool` 的间距。
+         */
+        entrance={index === ctx.latestLiveToolIndex}
       />
     );
   }
@@ -952,6 +987,8 @@ function TodoRow({ segment, ctx }: { segment: TodoSegment; ctx: RenderCtx }): Re
               : undefined,
             /* 抽屉里那一摞有自己的顺序:还在写的那一段只可能在**进行中**那条 todo 的末尾 */
             liveTextIndex: liveTextIndexOf(items, ctx.running && segment.status === 'in_progress'),
+            /* 同上:刚开出来的那一行也只可能在抽屉的末尾,而且那一抽屉得是进行中的 */
+            latestLiveToolIndex: latestLiveToolIndex(items, ctx.running && segment.status === 'in_progress'),
             /* 整轮头一格可能就落在这条抽屉里(有清单时推理进 in_progress 那条) */
             mutedThoughtsIndex: mutedThoughtsIndexOf(items, segment.items, ctx.firstThoughtsStack),
           }))

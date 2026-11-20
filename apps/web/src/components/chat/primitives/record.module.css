@@ -891,6 +891,47 @@
   color: var(--chat-text-muted);
 }
 
+/* ── 入场:刚开出来的那一行工具调用 ────────────────────────────
+ *
+ * 执行记录里其它东西都有自己的入场 —— 文字逐字化开(`useCharReveal`)、思考有球、
+ * 生图行有大格淡入 —— 唯独工具行是**硬出现**的。一轮跑到一半,新行「啪」地插进列表。
+ *
+ * 产品 2026-09-03 口述只要「最近一个在执行的工具」有动效:一屏几十行各自浮入一次,
+ * 动效本身就成了噪音。判据在 `ExecutionShell` 的 `latestLiveToolIndex`
+ * (轮次还在跑 + 是最后一项 + 是工具行),这里只管画。
+ *
+ * ## 为什么只动这三样
+ *
+ * `opacity` / `transform` / `filter` 都不参与布局 —— 新行插入时下面的内容被推开是
+ * 浏览器原生重排(和插入一个 `<div>` 同价),而动画本身不会每帧触发重排。
+ * 改 `height` / `margin` 才会,那正是这一族最贵的地方(轮次跑着时每秒 tick)。
+ *
+ * ## 值从哪来
+ *
+ * · 缓动 `var(--chat-ease-out)` = 仓库 `AGENTS.md` 的 UI 基线
+ *   `cubic-bezier(0.23, 1, 0.32, 1)`;
+ * · 240ms:进场取 200ms 那一档的稍长值 —— 这一行还带一次 blur,太快会看见残影;
+ * · `y: -4px` 从**上方**落下。新行追加在末尾,顺着阅读方向滑进来;从下方升起会让人
+ *   以为它把下面的东西顶开了;
+ * · blur 只 4px。这一族是 12–13px 的小字,逐字化开那档的 10px 在单行上是糊一片,
+ *   不是「化开」。
+ *
+ * ## 关掉动效的人
+ *
+ * `animation: none` 而不是「更慢的淡入」—— 直接出现。这条在样式层生效,不依赖组件
+ * 是否重渲染,比读 JS 的 `matchMedia` 更可靠。
+ */
+.entrance {
+  animation: tool-row-entrance 240ms var(--chat-ease-out) both;
+}
+@keyframes tool-row-entrance {
+  from { opacity: 0; transform: translateY(-4px); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .entrance { animation: none; }
+}
+
 /* ── 折叠态那一句摘要预览 ──────────────────────────────────
  * 「读取 brand.md」后面那半句:一行、浅色、靠省略号截断。
  *

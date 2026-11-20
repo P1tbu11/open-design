@@ -77,6 +77,17 @@ export interface ToolRowProps {
    * 默认 false:轮次停了还转圈是新 bug,拿不到上下文时宁可画中性灰。
    */
   running?: boolean;
+  /**
+   * 这一行是不是**刚开出来的那一个** —— 只有它会做一次入场。
+   *
+   * 判据在 `ExecutionShell` 的 `latestLiveToolIndex`(轮次还在跑 + 是最后一项 +
+   * 是工具行)。这里只负责挂类名,动画在 `record.module.css` 的 `.entrance` 上。
+   *
+   * ⚠️ **不许改成包一层 wrapper**:这一族有两条规则按相邻兄弟 / 直接子代命中
+   * (`.fold .body.stack > *` 的 reset、`.tool + .tool` 的 6px 行距),
+   * 包一层会让它们全部失配 —— 壳内的边框底色会漏出来,行距也会塌掉。
+   */
+  entrance?: boolean;
 }
 
 export function ToolRow({
@@ -86,6 +97,7 @@ export function ToolRow({
   onShowFailure,
   deferBody = true,
   running = false,
+  entrance = false,
 }: ToolRowProps): ReactElement {
   const t = useT();
   const elapsed = formatElapsed(row.elapsedMs);
@@ -175,7 +187,12 @@ export function ToolRow({
       ? <span className={styles.why}>{t('chat.record.failed')}</span>
       : null;
 
-  const rowClass = `${styles.tool}${row.failed ? ` ${styles.fail}` : ''}`;
+  const rowClass = `${styles.tool}${row.failed ? ` ${styles.fail}` : ''}${entrance ? ` ${styles.entrance}` : ''}`;
+  /**
+   * 折叠块那一支的 className。`Foldable` 的 `className` 会并进 `details.fold` 自己的
+   * class 列表,所以入场动画同样落在**这一行自己的根元素**上,不多一层节点。
+   */
+  const foldClass = entrance ? styles.entrance : undefined;
 
   /**
    * 这一行展开之后**有没有东西可读** —— 参数与输出两段,任一有内容就算有。
@@ -314,6 +331,7 @@ export function ToolRow({
       return (
         <Foldable
           summary={summary}
+          className={foldClass}
           /*
            * **不再传 `elapsed`** —— 摘要里已经有那一格(`metaSlot`)。
            * `Foldable` 的 `elapsed` 是它**自己**那一格,两处都给就是行尾出现两个
@@ -453,7 +471,7 @@ export function ToolRow({
          * 那枚「失败」标记反推,而「整行静音灰」的例外(稿子 `:not(.is-fail)`)
          * 正是挂在这个类上的。
          */
-        className={row.failed ? styles.fail : undefined}
+        className={[row.failed ? styles.fail : null, foldClass].filter(Boolean).join(' ') || undefined}
       >
         <div className={styles.code}>
           <div className={`${styles.term} ${styles.cmd}`}><div>{row.command}</div></div>
@@ -540,6 +558,7 @@ export function ToolRow({
         elapsed={elapsed ?? (row.pending ? '' : undefined)}
         lifecycleOpen={lifecycleOpen}
         deferBody={deferBody}
+        className={foldClass}
       >
         <div className={styles.code}>
           <div className={`${styles.term} ${styles.cmd}`}><div>{row.command}</div></div>
@@ -581,6 +600,7 @@ export function ToolRow({
     return (
       <Foldable
         summary={fallbackSummary}
+        className={foldClass}
         /* 摘要里已经有 `metaSlot` 那一格 —— 同上面文件行那支,不再传 `elapsed` */
         lifecycleOpen={lifecycleOpen}
         deferBody={deferBody}
