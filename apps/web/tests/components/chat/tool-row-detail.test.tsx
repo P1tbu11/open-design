@@ -164,6 +164,82 @@ describe('展开态 —— 参数(Input)与输出(Output)', () => {
     expect(screen.getByText('失败')).toBeTruthy();
   });
 
+  /*
+   * ── 执行中保持紧凑单行(T60)────────────────────────────────────────
+   *
+   * 详情面板上线之后这几档也成了折叠块,于是 `lifecycleOpen` 一出现就把它们摊开 ——
+   * 屏幕上是一大块参数 + 输出,只有左上角一颗 15px 的球在转。「执行中自动摊开」这条
+   * 裁决本来是**为命令类立的**(稿子 `:1010`,正文是正在长出来的终端输出);
+   * 文件行 / 搜索行 / 元工具的参数和返回值在跑完之前一个字都不会变,提前摊开没有
+   * 新信息可看,只会把视觉重心打散。
+   *
+   * 行本身仍然一发出就上屏(OPEND-2419 的红线):球在转、秒表在走、摘要一行。
+   */
+  it('执行中(轮次还活着):紧凑单行,不摊开面板 —— 但行本身在,球在转', () => {
+    const { container } = render(<ToolRow running row={inspectable({ pending: true, elapsedMs: 4_100 })} />);
+    expect(fold(), '执行中不该摊开详情面板').toBeNull();
+    // 红线:行必须在屏幕上,而且说得出在干什么
+    expect(container.textContent).toContain('brand.md');
+    expect(container.textContent).toContain('4.1s');
+  });
+
+  it('跑完那一刻才变成折叠块,而且默认收起', () => {
+    const { container, rerender } = render(<ToolRow running row={inspectable({ pending: true })} />);
+    expect(fold()).toBeNull();
+
+    rerender(<ToolRow row={inspectable({ pending: false, elapsedMs: 400 })} />);
+    expect(fold(), '跑完该变成可展开的卡片').not.toBeNull();
+    expect(fold()!.open, '跑完默认收起').toBe(false);
+    expect(container.textContent).toContain('brand.md');
+  });
+
+  it('反向对照:认不出语义的行同样遵守这条', () => {
+    const other = (over: Partial<ToolRowData> = {}) =>
+      row({ tool: 'other', name: 'manage_task', title: 'manage_task', input: { Query: 'x' }, ...over });
+    const { rerender } = render(<ToolRow running row={other({ pending: true })} />);
+    expect(fold(), '执行中的元工具也不摊开').toBeNull();
+
+    rerender(<ToolRow row={other({ pending: false })} />);
+    expect(fold(), '跑完才可展开').not.toBeNull();
+  });
+
+  /*
+   * ⚠️ 判据不能只看 `row.pending`:它的定义是「结果从来没回来过」,用户按停止之后
+   * 它永远为真。只看它,这些行会**永远**停在「紧凑单行」—— 参数也就永远读不到。
+   *
+   * 正确形态:轮次停了 → 不再是「此刻在跑」→ 变回折叠块,但**默认收起**
+   * (`lifecycleOpen` 仍然为假,因为它要求 `running`)。用户想看参数能点开,
+   * 不想看就只是一行。
+   */
+  it('轮次停了但调用没回来:变回折叠块,但默认收起 —— 参数仍然读得到', () => {
+    // 轮次已停(不传 running),result 永远等不到
+    const { container } = render(<ToolRow row={inspectable({ pending: true })} />);
+    const el = fold();
+    expect(el, '轮次停了就该是可展开的卡片(否则参数永远读不到)').not.toBeNull();
+    expect(el!.open, '但不再自动摊着').toBe(false);
+    expect(container.textContent).toContain('brand.md');
+
+    clickSummary(el!);
+    expect(screen.getByTestId('chat-tool-detail-input'), '点开就能读参数').toBeTruthy();
+  });
+
+  it('命令类不受这条影响 —— 它执行中仍然自动摊开(既有裁决)', () => {
+    const { container } = render(<ToolRow running row={row({
+      tool: 'exec',
+      name: 'Bash',
+      title: '构建',
+      rawTitle: false,
+      command: 'npm run build',
+      terminal: 'vite building…',
+      pending: true,
+      elapsedMs: 4_100,
+    })} />);
+    const el = fold();
+    expect(el, '命令行该是折叠块').not.toBeNull();
+    expect(el!.open, '执行中的命令自动摊开:在途输出要看得见').toBe(true);
+    expect(container.textContent).toContain('vite building…');
+  });
+
   it('每一行只出现**一个**耗时 —— `Foldable` 那一格和摘要里的 `metaSlot` 不许同时给', () => {
     /*
      * 这条是实际渲染出来才发现的:文件行那一支的 `summary` 里本来就有 `metaSlot`

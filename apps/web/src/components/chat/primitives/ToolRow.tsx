@@ -200,6 +200,36 @@ export function ToolRow({
   const detail = rowInputIsInspectable(row) && hasToolDetail(row.input, detailOutput);
 
   /**
+   * **执行中的行保持紧凑单行,不摊开详情面板。**
+   *
+   * ── 为什么 ────────────────────────────────────────────────────────────
+   *
+   * 详情面板上线之后,`read_file` / `search` / 裸工具名这几档也成了折叠块,于是
+   * `lifecycleOpen`(下面那条 `row.pending && running`)**一出现就把它们摊开** ——
+   * 屏幕上是一大块参数 + 输出,只有左上角一颗 15px 的球在转。视觉重心全散了,
+   * 读起来就是「动画不如原生细腻」。
+   *
+   * 而「执行中自动摊开」这条裁决本来是**为命令类立的**(稿子 `:1010`
+   * 的 `<details class="fold" open>`):那里的正文是正在一行行长出来的终端输出,
+   * 收着等于让人对着一行静止的字干等几十秒。文件行 / 搜索行 / 元工具没有这个性质 ——
+   * 它们的参数和返回值在跑完之前**一个字都不会变**,提前摊开没有新信息可看。
+   *
+   * ── 边界 ─────────────────────────────────────────────────────────────
+   *
+   * 只作用于**非命令**的那几支(命令类继续走它自己那条,见下面各 `Foldable` 的
+   * `lifecycleOpen`)。行本身仍然一发出就上屏(OPEND-2419 的红线):球在转、秒表在走、
+   * 摘要一行 —— 只是不摊开面板。跑完那一刻才换成折叠块,**默认收起**,由用户决定
+   * 要不要读参数。
+   *
+   * ⚠️ 别把判据写成只看 `row.pending`:它的定义是「结果从来没回来过」,用户按停止
+   * 之后它永远为真,那样这些行会**永远**回不到折叠块形态(也就永远读不到参数了)。
+   * 要的是「此刻真的在跑」,所以 `running` 必须在。
+   */
+  const runningCompact = row.pending && running;
+  /** 这一行现在该不该是折叠块 —— 执行中一律不是,跑完才轮到 `detail` 说话 */
+  const collapsible = detail && !runningCompact;
+
+  /**
    * 折叠态右侧那句浅色摘要 —— 「参数里最能说明这次调用在干什么的那个标量」。
    *
    * 只在**认不出语义动词**的那一档出(`other`):文件行、搜索行自己的名字和命中数
@@ -280,7 +310,7 @@ export function ToolRow({
           : metaSlot}
       </>
     );
-    if (rowIsInspectable && detail) {
+    if (rowIsInspectable && collapsible) {
       return (
         <Foldable
           summary={summary}
@@ -547,7 +577,7 @@ export function ToolRow({
       {metaSlot}
     </>
   );
-  if (detail && !row.failed) {
+  if (collapsible && !row.failed) {
     return (
       <Foldable
         summary={fallbackSummary}
