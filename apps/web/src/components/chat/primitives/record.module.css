@@ -793,10 +793,29 @@
  *  · 截断归数据/格式化那一层(`runtime/chat/tool-detail.ts` 的 2000 字符),这一层
  *    只负责换行与横向滚动。
  *
+ * ⚠️ **三处跟的是这一族既有的量法,不是新挑的数**(下面各条分别写清了出处):
+ *  · 限高走 `--chat-window-h`(同一屏所有「够看但不占屏」的窗口都是这一档);
+ *  · 滚动条自己一条车道(OPEND-2643:Chromium 的覆盖式滚动条会画在字上);
+ *  · 标签与正文分两档字号(2026-09-02 掉头:整族同色之后靠字号分档)。
+ *
  * 墨色用 `--chat-text` 那一档:参数和返回值是**正文**,不是注脚 —— 用户点开就是为了
  * 读它。不新起 token(`--chat-terminal-ink` 是 `.term` 自己的那一枚,只属于终端块)。
  */
+/*
+ * 「够看但不占屏」的窗口高度 —— **这一屏只有这一个出处**。
+ *
+ * 交付稿第 1252 行 `.fold .body.mod-scroll { max-height: 96px }`,3674 行那条注释把
+ * 这个数说死:「96px ≈ 5 行,和折叠块里 `.mod-scroll` 用的是同一个高度,这一屏里所有
+ * 『够看但不占屏』的窗口都是这一档」。原话与本文件下方 `.body.scroll` 那段相同。
+ *
+ * 详情面板是**第二个**这样的窗口,所以它吃同一枚变量,而不是自己挑一个 320px:
+ * 同一屏里两个「限高窗口」差三倍高度,用户读起来就是两套规矩。
+ *
+ * 写在 `.detail` 上而不是 `.detailText`:后者是它的子代,继承即可;将来面板里多一段
+ * (比如 diff 预览)也自动同一档。
+ */
 .detail {
+  --chat-window-h: 96px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -808,7 +827,16 @@
   gap: 3px;
   min-width: 0;
 }
-/* 标签是注脚,和整块内容同一个左缘 */
+/*
+ * 标签是**注脚**,正文是**正文** —— 两档字号,不是两档字重。
+ *
+ * 2026-09-02 那一轮掉头(`104fc5c5dc`)把这一族从「注脚退到静音灰」改成「整族同色」,
+ * 之后主次只由字号和字重承担。同一次改动的稿子逐字:`小结 12px / 400`、
+ * `耗时 12px / 500`,而正文是 13px。
+ *
+ * 上一版这里两段都是 `--chat-t-cap`(12px),层级只剩一个 600 字重 —— 等于把
+ * 「靠字号分档」这条又退回成「靠字重分档」,和刚掉头的方向相反。
+ */
 .detailLabel {
   font-size: var(--chat-t-cap);
   font-weight: 600;
@@ -820,15 +848,42 @@
   border-radius: var(--chat-radius-sm);
   background: var(--chat-bg-subtle);
   font-family: var(--chat-font-mono);
-  font-size: var(--chat-t-cap);
+  /* 正文那一档(13px),和标签(12px)拉开一档 */
+  font-size: var(--chat-t-body);
   line-height: 1.65;
   color: var(--chat-text);
   /* 长路径、token、base64 要能断行;但参数 JSON 的缩进是语义,所以只折行不重排 */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  /* 超长行(单行 4000 字符的 JSON)也不许把侧栏撑出横向滚动 */
-  max-height: 320px;
+  /*
+   * 限高 + 滚动条**自己一条车道**(OPEND-2643)。
+   *
+   * 这一族的 `.body.scroll` 上有一段很长的注释记着同一个坑:Chromium 在 macOS 默认用
+   * **覆盖式滚动条**,不占布局、直接画在 padding box 的右缘,悬停还会变宽 —— 正文右边缘
+   * 就在那几像素里,滚动条会压住最右侧的字。根治的办法是给 `::-webkit-scrollbar` 一个
+   * **显式宽度**:Blink 一旦看到自定义滚动条就不再给覆盖式那一套,它开始占布局。
+   * 再加 `scrollbar-gutter: stable`,内容从「不滚」变成「要滚」时正文不会横跳。
+   *
+   * ⚠️ **不要**在这里加 `scrollbar-width` / `scrollbar-color`:Chromium 121 起,这两个
+   * 标准属性一旦给了非 `auto` 的值,上面那套 `::-webkit-scrollbar` 整体失效 ——
+   * 缺陷原样回来,而且没有任何报错。
+   */
+  max-height: var(--chat-window-h);
   overflow: auto;
+  scrollbar-gutter: stable;
+}
+.detailText::-webkit-scrollbar {
+  width: 8px;
+}
+.detailText::-webkit-scrollbar-track {
+  background: transparent;
+}
+.detailText::-webkit-scrollbar-thumb {
+  /* 车道 8px,拇指靠 2px 透明边收成 4px 居中 —— 和字之间因此还剩一段空,不是「贴着」 */
+  border: 2px solid transparent;
+  border-radius: var(--chat-radius-pill);
+  background: color-mix(in srgb, var(--chat-text-muted) 30%, transparent);
+  background-clip: padding-box;
 }
 /* 截断提示自己一行,和正文分开读 */
 .detailMore {
@@ -838,10 +893,19 @@
 
 /* ── 折叠态那一句摘要预览 ──────────────────────────────────
  * 「读取 brand.md」后面那半句:一行、浅色、靠省略号截断。
- * 和 `.name` 抢地方时它先让位 —— `.name` 是这一行在干什么,摘要只是补充。
+ *
+ * **让位顺序**:摘要是**补充信息**,标题才是这一行在干什么。两者都是
+ * `flex: 0 1 auto` 的话,收缩按基础宽度成比例分给两家 —— 长标题 + 长摘要时
+ * 标题被截掉一半,而那句可有可无的摘要还占着位置,读起来像标题写不下。
+ * 所以把 `flex-shrink` 抬高:`flex-shrink` 是**加权**的,数字越大分到的收缩份额越多,
+ * 摘要因此先归零(配合 `min-width: 0` 由省略号收场),标题到最后才让位。
+ *
+ * 只在 `.fold > summary` 里出现(`ToolRow` 的 `other` 那一支),所以基础 `.name`
+ * 的 `flex: 1` 在 `div.tool` 那一档仍然有效 —— 那里标题本来就该吃满整行。
  */
 .preview {
   flex: 0 1 auto;
+  flex-shrink: 10;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
