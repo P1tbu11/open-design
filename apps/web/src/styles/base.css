@@ -104,6 +104,28 @@ body {
       Chromium 121+ disables all `::-webkit-scrollbar*` pseudo-elements whenever
       `scrollbar-width` or `scrollbar-color` is non-`auto`.
    ============================================================ */
+@property --scrollbar-thumb-bg {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0);
+}
+
+:where(*) {
+  --scrollbar-thumb-bg: rgba(0, 0, 0, 0);
+  transition: --scrollbar-thumb-bg 100ms linear;
+}
+
+:where(*:hover, *:focus-visible) {
+  --scrollbar-thumb-bg: var(--scrollbar-thumb);
+  transition-duration: 80ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(*, *:hover, *:focus-visible) {
+    transition: none;
+  }
+}
+
 ::-webkit-scrollbar {
   width: var(--scrollbar-size);
   height: var(--scrollbar-size);
@@ -120,7 +142,7 @@ body {
 ::-webkit-scrollbar-thumb {
   border: var(--scrollbar-thumb-inset) solid transparent;
   border-radius: var(--radius-pill);
-  background-color: var(--scrollbar-thumb);
+  background-color: var(--scrollbar-thumb-bg, transparent);
   background-clip: padding-box;
 }
 
@@ -135,6 +157,11 @@ body {
 @supports not selector(::-webkit-scrollbar) {
   * {
     scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  *:hover,
+  *:focus-visible {
     scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   }
 }

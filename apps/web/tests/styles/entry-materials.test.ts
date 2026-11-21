@@ -263,23 +263,16 @@ describe('entry layout materials (styles/home/entry-layout.css)', () => {
     );
   });
 
-  it('hides the nav group divider at rest and fades it in snappily on rail hover while preserving spacing', () => {
+  it('separates primary nav (首页/社区) from destination items (全部项目…设置) by vertical spacing with no divider at rest or on hover', () => {
     const teamSection = declarations(entryLayoutCss, '.entry-nav-rail__team-section');
     expect(teamSection).toMatch(/margin-top:\s*10px/);
     expect(teamSection).toMatch(/padding-top:\s*10px/);
-    expect(teamSection).toMatch(/border-top:\s*1px solid transparent/);
-    expect(teamSection).toMatch(/transition:\s*border-top-color 100ms linear/);
+    expect(teamSection).not.toMatch(/border/);
+    expect(entryLayoutCss).not.toContain('.entry-nav-rail:hover .entry-nav-rail__team-section');
 
-    const hoverSection = declarations(entryLayoutCss, '.entry-nav-rail:hover .entry-nav-rail__team-section');
-    expect(hoverSection).toMatch(/border-top-color:\s*var\(--material-separator\)/);
-    expect(hoverSection).toMatch(/transition-duration:\s*80ms/);
-
-    const reducedMotion = declarationsInside(
-      entryLayoutCss,
-      '@media (prefers-reduced-motion: reduce)',
-      '.entry-nav-rail__team-section',
-    );
-    expect(reducedMotion).toMatch(/transition:\s*none/);
+    const railRecentHover = declarations(entryLayoutCss, '.entry-nav-rail:hover .entry-nav-rail__recent-list');
+    expect(railRecentHover).toMatch(/--scrollbar-thumb-bg:\s*var\(--scrollbar-thumb\)/);
+    expect(railRecentHover).toMatch(/transition-duration:\s*80ms/);
   });
 });
 

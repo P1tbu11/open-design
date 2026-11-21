@@ -184,19 +184,28 @@ export function buildSpeakerNotesPresenterHtml(options: {
       color: #f3f3f3;
       font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
+    @property --scrollbar-thumb-bg {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: rgba(0, 0, 0, 0);
+    }
+    :where(*) { --scrollbar-thumb-bg: rgba(0, 0, 0, 0); transition: --scrollbar-thumb-bg 100ms linear; }
+    :where(*:hover, *:focus-visible) { --scrollbar-thumb-bg: rgba(255, 255, 255, 0.18); transition-duration: 80ms; }
+    @media (prefers-reduced-motion: reduce) { :where(*, *:hover, *:focus-visible) { transition: none; } }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-corner { background: transparent; }
     ::-webkit-scrollbar-thumb {
       border: 2px solid transparent;
       border-radius: 999px;
-      background-color: rgba(255, 255, 255, 0.18);
+      background-color: var(--scrollbar-thumb-bg, transparent);
       background-clip: padding-box;
     }
     ::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.30); }
     ::-webkit-scrollbar-thumb:active { background-color: rgba(255, 255, 255, 0.42); }
     @supports not selector(::-webkit-scrollbar) {
-      * { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
+      * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+      *:hover, *:focus-visible { scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
     }
     body {
       margin: 0;

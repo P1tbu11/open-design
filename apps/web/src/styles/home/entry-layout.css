@@ -248,8 +248,7 @@
     transition: none;
     transform: none;
   }
-  .entry-nav-rail__team-section,
-  .entry-nav-rail:hover .entry-nav-rail__team-section {
+  .entry-nav-rail:hover .entry-nav-rail__recent-list {
     transition: none;
   }
   .entry:not(.entry--rail-open) .entry-nav-rail__group > *,
@@ -985,6 +984,10 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+.entry-nav-rail:hover .entry-nav-rail__recent-list {
+  --scrollbar-thumb-bg: var(--scrollbar-thumb);
+  transition-duration: 80ms;
+}
 /* The flex chain that lets the list above shrink with the window: each box
    between the group and the list opts out of the `min-height: auto` floor and
    passes the constraint down. The section and the disclosure never GROW —
@@ -1601,19 +1604,13 @@
 .entry-nav-rail__search input::placeholder { color: var(--text-faint); }
 
 /* Team switcher row */
-/* Hidden at rest; snaps in on rail hover while preserving vertical spacing. */
+/* Separate navigation groups by vertical spacing alone. */
 .entry-nav-rail__team-section {
   display: flex;
   flex-direction: column;
   gap: 2px;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid transparent;
-  transition: border-top-color 100ms linear;
-}
-.entry-nav-rail:hover .entry-nav-rail__team-section {
-  border-top-color: var(--material-separator);
-  transition-duration: 80ms;
 }
 .entry-nav-rail__team {
   position: relative;
