@@ -2597,9 +2597,9 @@ export function EntryNavRail({
           </div>
         ) : (
           /* Same section wrapper as the signed-in branch (OPEND-3140): it
-             carries the vertical spacing under 社区 and the collapse stagger, so
-             the two destination lists read the same. The name is historical —
-             nothing in it is team-specific. */
+             reveals the divider under 社区 on rail hover and carries the
+             collapse stagger, so the two destination lists read the same. The
+             name is historical — nothing in it is team-specific. */
           <div className="entry-nav-rail__team-section">
             {/* 项目 is a destination on BOTH branches (OPEND-3140): the local
                 shell's project list is the same page the signed-in 项目 item

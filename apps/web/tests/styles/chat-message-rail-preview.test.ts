@@ -26,10 +26,14 @@ function seamScopeBlock(css: string, selector: string): string {
 }
 
 describe('chat message rail preview card and floating-card dark seam', () => {
-  it('right-aligns to the transcript and reads the floating-card seam tokens', () => {
+  it('anchors the rail 2px from the pane edge and keeps the preview card aligned to the 20px transcript boundary', () => {
+    const railRule = chatCss.match(/\.chat-message-rail\s*\{([^}]*)\}/)?.[1];
+    expect(railRule).toBeTruthy();
+    expect(railRule).toMatch(/right:\s*2px;/);
+
     const previewRule = chatCss.match(/\.chat-message-rail__preview\s*\{([^}]*)\}/)?.[1];
     expect(previewRule).toBeTruthy();
-    expect(previewRule).toMatch(/right:\s*16px;/);
+    expect(previewRule).toMatch(/right:\s*18px;/);
     expect(previewRule).toMatch(/background:\s*var\(--chat-floating-card-bg\);/);
     expect(previewRule).toMatch(/color:\s*var\(--chat-floating-card-text\);/);
     expect(previewRule).not.toMatch(/linear-gradient|backdrop-filter/);

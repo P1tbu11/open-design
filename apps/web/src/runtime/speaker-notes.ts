@@ -179,9 +179,24 @@ export function buildSpeakerNotesPresenterHtml(options: {
       min-width: var(--presenter-min-width);
       min-height: var(--presenter-min-height);
       overflow: auto;
+      color-scheme: dark;
       background: #171717;
       color: #f3f3f3;
       font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-corner { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: 999px;
+      background-color: rgba(255, 255, 255, 0.18);
+      background-clip: padding-box;
+    }
+    ::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.30); }
+    ::-webkit-scrollbar-thumb:active { background-color: rgba(255, 255, 255, 0.42); }
+    @supports not selector(::-webkit-scrollbar) {
+      * { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
     }
     body {
       margin: 0;

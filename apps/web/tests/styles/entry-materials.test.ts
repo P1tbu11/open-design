@@ -263,11 +263,23 @@ describe('entry layout materials (styles/home/entry-layout.css)', () => {
     );
   });
 
-  it('separates primary nav (首页/社区) from destination items (全部项目…设置) by vertical spacing without a divider line', () => {
+  it('hides the nav group divider at rest and fades it in snappily on rail hover while preserving spacing', () => {
     const teamSection = declarations(entryLayoutCss, '.entry-nav-rail__team-section');
     expect(teamSection).toMatch(/margin-top:\s*10px/);
     expect(teamSection).toMatch(/padding-top:\s*10px/);
-    expect(teamSection).not.toMatch(/border/);
+    expect(teamSection).toMatch(/border-top:\s*1px solid transparent/);
+    expect(teamSection).toMatch(/transition:\s*border-top-color 100ms linear/);
+
+    const hoverSection = declarations(entryLayoutCss, '.entry-nav-rail:hover .entry-nav-rail__team-section');
+    expect(hoverSection).toMatch(/border-top-color:\s*var\(--material-separator\)/);
+    expect(hoverSection).toMatch(/transition-duration:\s*80ms/);
+
+    const reducedMotion = declarationsInside(
+      entryLayoutCss,
+      '@media (prefers-reduced-motion: reduce)',
+      '.entry-nav-rail__team-section',
+    );
+    expect(reducedMotion).toMatch(/transition:\s*none/);
   });
 });
 

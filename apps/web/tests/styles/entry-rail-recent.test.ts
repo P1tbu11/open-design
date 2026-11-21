@@ -48,7 +48,8 @@ describe('entry rail — 最近浏览过 rows', () => {
 
     const list = declarations('.entry-nav-rail__recent-list');
     expect(list).toMatch(/gap:\s*2px/);
-    expect(list).toMatch(/padding:\s*2px 0 0/);
+    expect(list).toMatch(/margin:\s*0 -6px 0 0/);
+    expect(list).toMatch(/padding:\s*2px 6px 0 0/);
 
     const item = declarations('.entry-nav-rail__recent-item');
     expect(item).toMatch(/padding:\s*10px 10px 10px 16px/);

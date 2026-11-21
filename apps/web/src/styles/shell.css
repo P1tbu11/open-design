@@ -642,6 +642,8 @@ html.od-radial-open .workspace-shell {
 .workspace-tabs-list {
   min-height: 0;
   max-height: 500px;
+  margin-right: -8px;
+  padding-right: 8px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;

@@ -294,7 +294,7 @@
 }
 .chat-message-rail {
   position: absolute;
-  right: 4px;
+  right: 2px;
   /* The nav is the hover hit zone: it spans the whole log viewport — from
      just under the project header (history icons) down to the composer top —
      while the visible wheel stays centered inside it. */
@@ -388,9 +388,9 @@
 }
 .chat-message-rail__preview {
   position: absolute;
-  /* The rail's right edge is 4px inside the pane. A 16px inset puts this
+  /* The rail's right edge is 2px inside the pane. An 18px inset puts this
      card's right edge on the transcript's 20px content boundary. */
-  right: 16px;
+  right: 18px;
   top: var(--chat-message-rail-y);
   width: min(280px, calc(100vw - 88px));
   max-width: 280px;

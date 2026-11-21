@@ -484,13 +484,27 @@ describe('5. Unified global scrollbar contract (WebKit primary + @supports stand
     expect(foundSupportsFallback).toBe(true);
   });
 
-  it('forbids stray scrollbar-width: thin/auto, scrollbar-color, or bespoke ::-webkit-scrollbar* rules outside base.css', () => {
+  it('forbids stray scrollbar-width/scrollbar-color, bespoke ::-webkit-scrollbar* rules, or unapproved vertical scrollbar suppression across apps/web and packages/components', () => {
+    const REPO_ROOT = resolve(WEB_ROOT, '../..');
+    const COMPONENTS_SRC = resolve(REPO_ROOT, 'packages/components/src');
+    const allUiCssFiles = [...collectCssFiles(SRC_ROOT), ...collectCssFiles(COMPONENTS_SRC)];
+
+    // Only horizontal strips whose `overflow-x: auto` lives in a base selector
+    // or vertical scrollports with a dedicated custom rail / masked live
+    // auto-follow viewport may suppress native scrollbars.
+    const ALLOWED_HIDDEN_SCROLLBAR_SELECTORS = new Set([
+      '.app .ws-tabs-bar',
+      '.chat-log',
+      '.chat-message-rail__track',
+      '.liveViewport.liveViewport.liveViewport.liveViewport.liveViewport',
+    ]);
+
     const violations: string[] = [];
 
-    for (const file of collectCssFiles(SRC_ROOT)) {
-      const rel = relative(WEB_ROOT, file);
+    for (const file of allUiCssFiles) {
+      const rel = relative(REPO_ROOT, file);
       const root = postcss.parse(readFileSync(file, 'utf8'));
-      const isBaseCss = rel === 'src/styles/base.css';
+      const isBaseCss = rel === 'apps/web/src/styles/base.css';
 
       root.walkRules((rule) => {
         const inSupportsWebkitFallback =
@@ -499,18 +513,35 @@ describe('5. Unified global scrollbar contract (WebKit primary + @supports stand
           (rule.parent as AtRule).name === 'supports' &&
           (rule.parent as AtRule).params.includes('not selector(::-webkit-scrollbar)');
 
+        let hasHorizontalScroll = false;
+        let hidesScrollbarWidth = false;
+
         rule.walkDecls((decl) => {
+          if (decl.prop === 'overflow-x' && /^(auto|scroll)$/.test(decl.value.trim())) {
+            hasHorizontalScroll = true;
+          }
           if (decl.prop === 'scrollbar-color' && !inSupportsWebkitFallback) {
             violations.push(`${rel} :: ${rule.selector} -> scrollbar-color: ${decl.value}`);
           }
-          if (
-            decl.prop === 'scrollbar-width' &&
-            decl.value.trim() !== 'none' &&
-            !inSupportsWebkitFallback
-          ) {
-            violations.push(`${rel} :: ${rule.selector} -> scrollbar-width: ${decl.value}`);
+          if (decl.prop === 'scrollbar-width') {
+            const val = decl.value.trim();
+            if (val === 'none') {
+              hidesScrollbarWidth = true;
+            } else if (!inSupportsWebkitFallback) {
+              violations.push(`${rel} :: ${rule.selector} -> scrollbar-width: ${decl.value}`);
+            }
           }
         });
+
+        if (
+          hidesScrollbarWidth &&
+          !hasHorizontalScroll &&
+          !rule.selectors.every((s) => ALLOWED_HIDDEN_SCROLLBAR_SELECTORS.has(s.trim()))
+        ) {
+          violations.push(
+            `${rel} :: ${rule.selector} -> vertical scrollbar-width: none without custom rail`,
+          );
+        }
 
         if (!isBaseCss && rule.selector.includes('::-webkit-scrollbar')) {
           if (
@@ -537,5 +568,9 @@ describe('5. Unified global scrollbar contract (WebKit primary + @supports stand
     }
 
     expect(violations).toEqual([]);
+
+    const speakerNotesSource = readWebFile('src/runtime/speaker-notes.ts');
+    expect(speakerNotesSource).toContain('::-webkit-scrollbar { width: 8px; height: 8px; }');
+    expect(speakerNotesSource).toContain('@supports not selector(::-webkit-scrollbar)');
   });
 });

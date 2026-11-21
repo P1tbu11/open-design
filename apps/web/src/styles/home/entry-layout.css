@@ -248,6 +248,10 @@
     transition: none;
     transform: none;
   }
+  .entry-nav-rail__team-section,
+  .entry-nav-rail:hover .entry-nav-rail__team-section {
+    transition: none;
+  }
   .entry:not(.entry--rail-open) .entry-nav-rail__group > *,
   .entry:not(.entry--rail-open) .entry-nav-rail__team-section > * { transition-delay: 0ms; }
   .entry:not(.entry--rail-open) .entry-nav-rail__footer { transition-delay: 0ms; }
@@ -958,8 +962,12 @@
 }
 .entry-nav-rail__recent-list {
   list-style: none;
-  margin: 0;
-  padding: 2px 0 0;
+  /* Bleed across `.entry-nav-rail__panel`'s 6px right margin so the 8px
+     scrollbar lane sits flush against the rail's right edge (2px thumb inset
+     from the content-card border) while matching right padding keeps row
+     widths unchanged. */
+  margin: 0 -6px 0 0;
+  padding: 2px 6px 0 0;
   display: flex;
   flex-direction: column;
   /* 2px between the rows (per product) — the same rhythm the destinations
@@ -1593,13 +1601,19 @@
 .entry-nav-rail__search input::placeholder { color: var(--text-faint); }
 
 /* Team switcher row */
-/* Separate navigation groups by vertical spacing alone. */
+/* Hidden at rest; snaps in on rail hover while preserving vertical spacing. */
 .entry-nav-rail__team-section {
   display: flex;
   flex-direction: column;
   gap: 2px;
   margin-top: 10px;
   padding-top: 10px;
+  border-top: 1px solid transparent;
+  transition: border-top-color 100ms linear;
+}
+.entry-nav-rail:hover .entry-nav-rail__team-section {
+  border-top-color: var(--material-separator);
+  transition-duration: 80ms;
 }
 .entry-nav-rail__team {
   position: relative;
@@ -7095,6 +7109,7 @@ body[data-web-modal-scroll-lock] .entry-main--scroll {
 .entry-nav-rail__workspace-list {
   min-height: 0;
   max-height: 170px;
+  margin-right: -6px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
