@@ -646,7 +646,6 @@ html.od-radial-open .workspace-shell {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  scrollbar-width: thin;
   contain: layout style paint;
 }
 .workspace-tabs-list__item {

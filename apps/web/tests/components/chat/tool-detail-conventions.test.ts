@@ -14,14 +14,23 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+const HERE = dirname(fileURLToPath(import.meta.url));
 const CSS = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), '../../../src/components/chat/primitives/record.module.css'),
+  resolve(HERE, '../../../src/components/chat/primitives/record.module.css'),
   'utf-8',
 ).replace(/\/\*[\s\S]*?\*\//g, '');
+const BASE_CSS = readFileSync(resolve(HERE, '../../../src/styles/base.css'), 'utf-8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+);
+const TOKENS_CSS = readFileSync(resolve(HERE, '../../../src/styles/tokens.css'), 'utf-8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+);
 
 /** 取某条规则的声明块;选择器可以给多个(逗号分隔的那几条都拼在一起看) */
-function bodyOf(selector: string): string {
-  for (const m of CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+function bodyOfFrom(sheet: string, selector: string): string {
+  for (const m of sheet.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     for (const one of (m[1] ?? '').split(',')) {
       if (one.split(/\s+/).join(' ').trim() === selector) return m[2] ?? '';
     }
@@ -29,11 +38,19 @@ function bodyOf(selector: string): string {
   throw new Error(`找不到规则:${selector}`);
 }
 
+function bodyOf(selector: string): string {
+  return bodyOfFrom(CSS, selector);
+}
+
 /** 声明块里某条属性值(只处理本文件用到的单值形态) */
-function declOf(selector: string, prop: string): string | null {
-  const body = bodyOf(selector).replace(/\s+/g, ' ');
+function declOfFrom(sheet: string, selector: string, prop: string): string | null {
+  const body = bodyOfFrom(sheet, selector).replace(/\s+/g, ' ');
   const m = new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`).exec(body);
   return m?.[1]?.trim() ?? null;
+}
+
+function declOf(selector: string, prop: string): string | null {
+  return declOfFrom(CSS, selector, prop);
 }
 
 describe('详情面板:限高走这一屏唯一的那一档', () => {
@@ -53,9 +70,10 @@ describe('详情面板:限高走这一屏唯一的那一档', () => {
   });
 });
 
-describe('详情面板:滚动条自己一条车道(OPEND-2643)', () => {
-  it('给 ::-webkit-scrollbar 显式宽度 —— 否则 Chromium 用覆盖式滚动条压住字', () => {
-    expect(declOf('.detailText::-webkit-scrollbar', 'width')).toBe('8px');
+describe('详情面板:滚动条自己一条车道(OPEND-2643,收拢至全局 base.css)', () => {
+  it('全局 ::-webkit-scrollbar 给显式 8px 宽度 —— 否则 Chromium 用覆盖式滚动条压住字', () => {
+    expect(declOfFrom(BASE_CSS, '::-webkit-scrollbar', 'width')).toBe('var(--scrollbar-size)');
+    expect(declOfFrom(TOKENS_CSS, ':root', '--scrollbar-size')).toBe('8px');
   });
 
   it('scrollbar-gutter: stable —— 内容从「不滚」变「要滚」时正文不横跳', () => {
@@ -63,10 +81,12 @@ describe('详情面板:滚动条自己一条车道(OPEND-2643)', () => {
   });
 
   it('拇指靠透明边收窄,和字之间留空', () => {
-    expect(bodyOf('.detailText::-webkit-scrollbar-thumb')).toMatch(/background-clip:\s*padding-box/);
+    expect(bodyOfFrom(BASE_CSS, '::-webkit-scrollbar-thumb')).toMatch(
+      /background-clip:\s*padding-box/,
+    );
   });
 
-  it('**不许**加 scrollbar-width / scrollbar-color —— 那会让上面那套整体失效', () => {
+  it('**不许**加未受 @supports 保护的 scrollbar-width / scrollbar-color —— 那会让上面那套整体失效', () => {
     // Chromium 121 起,这两个标准属性一旦给了非 auto 的值,::-webkit-scrollbar 静默失效。
     const body = bodyOf('.detailText').replace(/\s+/g, ' ');
     expect(body).not.toMatch(/scrollbar-width/);

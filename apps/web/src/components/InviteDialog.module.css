@@ -59,9 +59,7 @@
 .onboarding .labels > span { font-size:12px;line-height:18px;color:#5c5c5c; }
 .onboarding .labels > span:first-child { position:relative;top:6px; }
 .onboarding .labels > span:last-child { padding-left:13px; }
-.onboarding .rows { display:flex;flex-direction:column;gap:12px;width:calc(100% + 38px);margin-left:-4px;padding:4px 42px 4px 4px;box-sizing:border-box;max-height:176px;overflow-x:hidden;scroll-padding-block:4px;scrollbar-gutter:stable;scrollbar-width:auto; }
-.onboarding .rows::-webkit-scrollbar { width:6px; }
-.onboarding .rows::-webkit-scrollbar-thumb { background:#c7c7c7;border-radius:4px; }
+.onboarding .rows { display:flex;flex-direction:column;gap:12px;width:calc(100% + 38px);margin-left:-4px;padding:4px 42px 4px 4px;box-sizing:border-box;max-height:176px;overflow-x:hidden;scroll-padding-block:4px;scrollbar-gutter:stable; }
 .onboarding .input,.onboarding .role,.onboarding .fixedRole { height:48px;min-height:48px;font-size:14px;font-weight:600;line-height:17.5px;border-radius:9px; }
 /* Fixed member roles follow B03 plain text; align with the registration role label. */
 .onboarding .fixedRole { margin-inline-start:13px;padding:0;border:0;border-radius:0;background:transparent;color:var(--invite-note);font-size:13px;font-weight:500;line-height:20px; }

@@ -421,3 +421,121 @@ describe('4. Core workspace, chat user bubble, viewer, library & share dark surf
     expect(ruleDecls(dsTab, '.itemRowActive').background).toBe('var(--bg)');
   });
 });
+
+describe('5. Unified global scrollbar contract (WebKit primary + @supports standard fallback)', () => {
+  it('defines transparent-track, low-alpha neutral --scrollbar-* tokens in light, dark, and system-dark', () => {
+    const tokens = postcss.parse(readWebFile('src/styles/tokens.css'));
+    const rootVars = customPropsInSelector(tokens, ':root');
+    const darkVars = customPropsInSelector(tokens, '[data-theme="dark"]');
+    const systemDarkVars = customPropsInSelector(
+      tokens,
+      'html:not([data-theme])',
+      'prefers-color-scheme: dark',
+    );
+
+    expect(rootVars.get('--scrollbar-size')).toBe('8px');
+    expect(rootVars.get('--scrollbar-thumb-inset')).toBe('2px');
+    expect(rootVars.get('--scrollbar-track')).toBe('transparent');
+    expect(rootVars.get('--scrollbar-thumb')).toMatch(/^rgba\(\s*0,\s*0,\s*0,/);
+    expect(rootVars.get('--scrollbar-thumb-hover')).toMatch(/^rgba\(\s*0,\s*0,\s*0,/);
+    expect(rootVars.get('--scrollbar-thumb-active')).toMatch(/^rgba\(\s*0,\s*0,\s*0,/);
+
+    for (const vars of [darkVars, systemDarkVars]) {
+      expect(vars.get('--scrollbar-track')).toBe('transparent');
+      expect(vars.get('--scrollbar-thumb')).toMatch(/^rgba\(\s*255,\s*255,\s*255,/);
+      expect(vars.get('--scrollbar-thumb-hover')).toMatch(/^rgba\(\s*255,\s*255,\s*255,/);
+      expect(vars.get('--scrollbar-thumb-active')).toMatch(/^rgba\(\s*255,\s*255,\s*255,/);
+    }
+  });
+
+  it('defines ::-webkit-scrollbar* in base.css and gates standard scrollbar-width/color inside @supports not selector(::-webkit-scrollbar)', () => {
+    const base = postcss.parse(readWebFile('src/styles/base.css'));
+    expect(ruleDecls(base, '::-webkit-scrollbar').width).toBe('var(--scrollbar-size)');
+    expect(ruleDecls(base, '::-webkit-scrollbar').height).toBe('var(--scrollbar-size)');
+    expect(ruleDecls(base, '::-webkit-scrollbar-track').background).toBe('var(--scrollbar-track)');
+    expect(ruleDecls(base, '::-webkit-scrollbar-corner').background).toBe('transparent');
+    expect(ruleDecls(base, '::-webkit-scrollbar-thumb')['background-color']).toBe(
+      'var(--scrollbar-thumb)',
+    );
+    expect(ruleDecls(base, '::-webkit-scrollbar-thumb')['background-clip']).toBe('padding-box');
+    expect(ruleDecls(base, '::-webkit-scrollbar-thumb:hover')['background-color']).toBe(
+      'var(--scrollbar-thumb-hover)',
+    );
+    expect(ruleDecls(base, '::-webkit-scrollbar-thumb:active')['background-color']).toBe(
+      'var(--scrollbar-thumb-active)',
+    );
+
+    let foundSupportsFallback = false;
+    base.walkAtRules('supports', (atRule) => {
+      if (atRule.params.replace(/\s+/g, ' ').trim() === 'not selector(::-webkit-scrollbar)') {
+        atRule.walkRules((rule) => {
+          if (rule.selector.trim() === '*') {
+            const decls: Record<string, string> = {};
+            rule.walkDecls((d) => {
+              decls[d.prop] = d.value.trim();
+            });
+            expect(decls['scrollbar-width']).toBe('thin');
+            expect(decls['scrollbar-color']).toBe('var(--scrollbar-thumb) var(--scrollbar-track)');
+            foundSupportsFallback = true;
+          }
+        });
+      }
+    });
+    expect(foundSupportsFallback).toBe(true);
+  });
+
+  it('forbids stray scrollbar-width: thin/auto, scrollbar-color, or bespoke ::-webkit-scrollbar* rules outside base.css', () => {
+    const violations: string[] = [];
+
+    for (const file of collectCssFiles(SRC_ROOT)) {
+      const rel = relative(WEB_ROOT, file);
+      const root = postcss.parse(readFileSync(file, 'utf8'));
+      const isBaseCss = rel === 'src/styles/base.css';
+
+      root.walkRules((rule) => {
+        const inSupportsWebkitFallback =
+          isBaseCss &&
+          rule.parent?.type === 'atrule' &&
+          (rule.parent as AtRule).name === 'supports' &&
+          (rule.parent as AtRule).params.includes('not selector(::-webkit-scrollbar)');
+
+        rule.walkDecls((decl) => {
+          if (decl.prop === 'scrollbar-color' && !inSupportsWebkitFallback) {
+            violations.push(`${rel} :: ${rule.selector} -> scrollbar-color: ${decl.value}`);
+          }
+          if (
+            decl.prop === 'scrollbar-width' &&
+            decl.value.trim() !== 'none' &&
+            !inSupportsWebkitFallback
+          ) {
+            violations.push(`${rel} :: ${rule.selector} -> scrollbar-width: ${decl.value}`);
+          }
+        });
+
+        if (!isBaseCss && rule.selector.includes('::-webkit-scrollbar')) {
+          if (
+            rule.selector.includes('::-webkit-scrollbar-thumb') ||
+            rule.selector.includes('::-webkit-scrollbar-track') ||
+            rule.selector.includes('::-webkit-scrollbar-corner')
+          ) {
+            violations.push(`${rel} :: ${rule.selector} -> bespoke webkit scrollbar part`);
+            return;
+          }
+          let hidesScrollbar = false;
+          rule.walkDecls((decl) => {
+            if (decl.prop === 'display' && decl.value.trim() === 'none') {
+              hidesScrollbar = true;
+            }
+          });
+          if (!hidesScrollbar) {
+            violations.push(
+              `${rel} :: ${rule.selector} -> ::-webkit-scrollbar without display: none`,
+            );
+          }
+        }
+      });
+    }
+
+    expect(violations).toEqual([]);
+  });
+});

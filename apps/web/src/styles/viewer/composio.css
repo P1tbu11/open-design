@@ -1601,7 +1601,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   border-top: 1px solid var(--border);
-  scrollbar-width: thin;
 }
 .qf-select-more-list[hidden] {
   display: none;

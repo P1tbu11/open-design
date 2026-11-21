@@ -219,6 +219,16 @@
   --code-body-bg: #fafafa;
   --code-font-size: 13px;
   --code-line-height: 1.65;
+
+  /* Unified global scrollbar contract (see styles/base.css):
+     8px lane − 2×2px transparent border (`background-clip: padding-box`) = 4px
+     centered capsule thumb over a 100% transparent track. */
+  --scrollbar-size: 8px;
+  --scrollbar-thumb-inset: 2px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(0, 0, 0, 0.16);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.28);
+  --scrollbar-thumb-active: rgba(0, 0, 0, 0.38);
 }
 
 /* Dark theme variables — shared between explicit [data-theme="dark"] and the
@@ -295,6 +305,11 @@
 
   --code-header-bg: #1e1e20;
   --code-body-bg: #18181b;
+
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.30);
+  --scrollbar-thumb-active: rgba(255, 255, 255, 0.42);
 }
 
 /* System mode: follow OS preference when no explicit data-theme is set. */
@@ -371,5 +386,10 @@
 
     --code-header-bg: #1e1e20;
     --code-body-bg: #18181b;
+
+    --scrollbar-track: transparent;
+    --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.30);
+    --scrollbar-thumb-active: rgba(255, 255, 255, 0.42);
   }
 }

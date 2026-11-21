@@ -555,7 +555,6 @@
 }
 .flyoutScroll {
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 .flyoutSectionLabel {
   padding: 8px 8px 4px;

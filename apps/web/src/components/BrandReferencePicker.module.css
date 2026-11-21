@@ -314,7 +314,6 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
   /* Symmetric bleed room: side padding ≥ the cards' 9px hover bleed so the
      bleed renders inside the scrollport instead of forcing a horizontal
      scrollbar, and the matching negative margin cancels it so card content

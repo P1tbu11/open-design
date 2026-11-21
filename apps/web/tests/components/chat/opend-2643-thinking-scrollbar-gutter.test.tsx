@@ -193,26 +193,26 @@ describe('OPEND-2643 思考过程的限高滚动盒', () => {
     ).toBe('stable');
   });
 
-  it('滚动条退出覆盖式 —— 显式宽度,否则 gutter 在 macOS 上是空转的', () => {
-    const scoped = scopeModule(RECORD_CSS, recordStyles);
-    const selector = `.${cls('scroll')}::-webkit-scrollbar`;
-    const block = new RegExp(
-      `[^{}]*${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`,
-    ).exec(stripComments(scoped))?.[1];
-    expect(block, '滚动盒没有钉住滚动条宽度,Chromium 会继续用覆盖式滚动条画在正文上').toBeTruthy();
-    expect(block).toMatch(/width:\s*\d+px/);
+  it('滚动条退出覆盖式 —— 全局 base.css 给显式宽度,否则 gutter 在 macOS 上是空转的', () => {
+    const baseClean = stripComments(read('styles/base.css'));
+    const tokensClean = stripComments(read('styles/tokens.css'));
+    const block = /(?:^|\})\s*::-webkit-scrollbar\s*\{([^}]*)\}/.exec(baseClean)?.[1];
+    expect(block, 'base.css 没有钉住全局滚动条宽度,Chromium 会继续用覆盖式滚动条画在正文上').toBeTruthy();
+    expect(block).toMatch(/width:\s*var\(--scrollbar-size\)/);
+    expect(tokensClean).toMatch(/--scrollbar-size:\s*8px\s*;/);
   });
 
-  it('没人给这只盒子写 `scrollbar-width` / `scrollbar-color` —— 写了会把上一条静默撤销', () => {
+  it('没人给这只盒子写未受 @supports 保护的 `scrollbar-width` / `scrollbar-color` —— 写了会把上一条静默撤销', () => {
     /*
      * Chromium 121 起,这两个标准属性只要给了非 `auto` 的值,
      * `::-webkit-scrollbar` 那一套对该元素整体失效 —— 于是盒子退回系统的
      * 覆盖式滚动条,OPEND-2643 原样回来,而且样式表看上去「更标准了」。
-     * 这条守的就是那次好心的改动。
+     * 全局标准回退必须关在 `@supports not selector(::-webkit-scrollbar)` 里,
+     * 顶层规则在任何样式表里都不许命中这只盒子。
      */
     const box = thinkingScrollBox();
-    const scoped = scopeModule(RECORD_CSS, recordStyles);
-    const offenders = parseRules(scoped, 0).rules.filter((rule) => {
+    const allTopLevelRules = SHEETS.flatMap((sheet, idx) => parseRules(sheet, idx * 10_000).rules);
+    const offenders = allTopLevelRules.filter((rule) => {
       const hits = rule.selector
         .split(/,(?![^()]*\))/)
         .some((branch) => {

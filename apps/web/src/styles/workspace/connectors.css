@@ -446,7 +446,6 @@
      the rest scrolls instead of pushing the popover off-screen. */
   max-height: 248px;
   overflow-y: auto;
-  scrollbar-width: thin;
   display: flex;
   flex-direction: column;
   padding: 4px;

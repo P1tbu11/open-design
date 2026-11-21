@@ -949,19 +949,6 @@
   overflow: auto;
   scrollbar-gutter: stable;
 }
-.detailText::-webkit-scrollbar {
-  width: 8px;
-}
-.detailText::-webkit-scrollbar-track {
-  background: transparent;
-}
-.detailText::-webkit-scrollbar-thumb {
-  /* 车道 8px,拇指靠 2px 透明边收成 4px 居中 —— 和字之间因此还剩一段空,不是「贴着」 */
-  border: 2px solid transparent;
-  border-radius: var(--chat-radius-pill);
-  background: color-mix(in srgb, var(--chat-text-muted) 30%, transparent);
-  background-clip: padding-box;
-}
 /* 截断提示自己一行,和正文分开读 */
 .detailMore {
   font-size: var(--chat-t-cap);
@@ -1743,20 +1730,6 @@
   min-width: 0;
   overflow-x: auto;
 }
-/* Like the Thinking scrollport below, use a layout-consuming Blink scrollbar.
-   A native overlay covers these 34px previews while scrolling on macOS. */
-.strip::-webkit-scrollbar {
-  height: 8px;
-}
-.strip::-webkit-scrollbar-track {
-  background: transparent;
-}
-.strip::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: var(--chat-radius-pill);
-  background: color-mix(in srgb, var(--chat-text-muted) 30%, transparent);
-  background-clip: padding-box;
-}
 .strip .th {
   position: relative;
   flex-shrink: 0;
@@ -2120,18 +2093,4 @@
    */
   scrollbar-gutter: stable;
 }
-.fold .body.scroll::-webkit-scrollbar {
-  width: 8px;
-}
-.fold .body.scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-.fold .body.scroll::-webkit-scrollbar-thumb {
-  /* 车道 8px,拇指靠 2px 透明边收成 4px 居中 —— 和字之间因此还剩一段空,
-     不是「贴着」。同 `styles/home/entry-layout.css` 的
-     `.onboarding-view__select-options` 那套写法。 */
-  border: 2px solid transparent;
-  border-radius: var(--chat-radius-pill);
-  background: color-mix(in srgb, var(--chat-text-muted) 30%, transparent);
-  background-clip: padding-box;
-}
+

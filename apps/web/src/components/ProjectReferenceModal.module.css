@@ -107,7 +107,6 @@
   flex-direction: column;
   gap: 4px;
   overflow: auto;
-  scrollbar-width: thin;
 }
 
 .item {

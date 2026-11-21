@@ -221,11 +221,7 @@
 }
 .workspaceMenu :global(.entry-nav-rail__workspace-list) {
   max-height: 180px;
-  scrollbar-width: thin;
-  scrollbar-color: #c8c8c4 transparent;
 }
-.workspaceMenu :global(.entry-nav-rail__workspace-list)::-webkit-scrollbar { width: 4px; }
-.workspaceMenu :global(.entry-nav-rail__workspace-list)::-webkit-scrollbar-thumb { border-radius: 4px; background: #c8c8c4; }
 .workspaceCreateLimited:global(.entry-nav-rail__menu-item) {
   color: var(--text-faint, #999);
   cursor: not-allowed;

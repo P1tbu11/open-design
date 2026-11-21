@@ -317,17 +317,6 @@
   font-size: 12.5px;
   line-height: var(--code-line-height);
 }
-.markdown-rendered .markdown-code-block pre::-webkit-scrollbar {
-  height: 10px;
-}
-.markdown-rendered .markdown-code-block pre::-webkit-scrollbar-track {
-  background: transparent;
-}
-.markdown-rendered .markdown-code-block pre::-webkit-scrollbar-thumb {
-  border: 3px solid var(--markdown-code-bg);
-  border-radius: var(--radius-pill);
-  background: rgba(148, 163, 184, 0.34);
-}
 .markdown-rendered :where(p, li, blockquote, th, td, h1, h2, h3, h4, h5, h6) > code {
   padding: 0.13em 0.38em;
   border: 1px solid var(--markdown-inline-code-border);

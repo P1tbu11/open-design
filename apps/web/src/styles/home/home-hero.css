@@ -1839,7 +1839,6 @@
   min-height: 0;
   max-height: 240px;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 .home-hero__plus-divider {
   height: 1px;
@@ -3140,8 +3139,6 @@
   max-height: calc(4 * var(--preset-row-h));
   overflow-y: auto;
   padding: 1px 0 8px;
-  /* No visible scrollbar — wheel/trackpad covers it, as on the rail before. */
-  scrollbar-width: none;
 }
 .home-hero__plugin-preset-row {
   appearance: none;
@@ -3353,7 +3350,6 @@
 .home-hero__plugin-preset-row:disabled {
   cursor: not-allowed;
 }
-.home-hero__plugin-presets::-webkit-scrollbar { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .home-hero__plugin-preset-row-arrow {
@@ -3831,7 +3827,6 @@
   overflow-x: auto;
   overflow-y: visible;
   overscroll-behavior-x: contain;
-  scrollbar-width: thin;
 }
 
 /* Edge hover zones: hovering an edge auto-scrolls the rail in that direction so
