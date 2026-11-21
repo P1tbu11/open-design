@@ -246,8 +246,8 @@
   font-weight: 600;
   padding: 2px 6px 2px 5px;
   border-radius: 999px;
-  color: var(--kind-tint, #374151);
-  background: rgba(255, 255, 255, 0.92);
+  color: var(--kind-tint, var(--text));
+  background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
   -webkit-backdrop-filter: var(--scrim-backdrop);
   backdrop-filter: var(--scrim-backdrop);
@@ -265,7 +265,7 @@
   height: 18px;
   border-radius: 999px;
   background: var(--selected);
-  color: #fff;
+  color: var(--bg);
 }
 
 .label {

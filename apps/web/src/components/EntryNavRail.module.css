@@ -252,8 +252,8 @@
 
 /* The supplied HTML restores neutral ink after leaving the open quota chip. */
 .sharedQuotaPill:global(.entry-top-right-account-pill):not(:global(.entry-top-right-account-pill--upgrade)):has(:global([aria-expanded='true'])):not(:hover) {
-  background: #fafafa;
-  color: #666;
+  background: var(--bg-panel);
+  color: var(--text-muted);
 }
 
 /* An unresolved workspace tier carries no plan identity. */

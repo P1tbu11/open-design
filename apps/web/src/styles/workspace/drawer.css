@@ -674,7 +674,7 @@
 .design-card-checkbox.checked {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast, #fff);
 }
 .design-card.is-selected {
   border-color: var(--accent);
@@ -1162,7 +1162,7 @@
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
   flex-shrink: 0;
 }
 

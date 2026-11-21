@@ -305,12 +305,12 @@
 .viewer-action.primary {
   background: var(--accent);
   border: 1px solid var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
 }
 .viewer-action.primary:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
-  color: white;
+  color: var(--accent-contrast, #fff);
 }
 /* Primary actions support a subtle in-flight affordance via data-running. Keeps
    layout stable (unlike :disabled-only) so locale text width doesn't jump. */
@@ -348,6 +348,28 @@
 .viewer-action.viewer-comment-count-trigger.active:hover:not(:disabled) {
   background: #E4E4E6;
   color: #333333;
+}
+[data-theme="dark"] .viewer-action.viewer-comment-count-trigger,
+[data-theme="dark"] .viewer-action.viewer-comment-count-trigger:hover:not(:disabled) {
+  background: var(--bg-panel);
+  color: var(--text);
+}
+[data-theme="dark"] .viewer-action.viewer-comment-count-trigger.active,
+[data-theme="dark"] .viewer-action.viewer-comment-count-trigger.active:hover:not(:disabled) {
+  background: var(--bg-subtle);
+  color: var(--text-strong);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .viewer-action.viewer-comment-count-trigger,
+  html:not([data-theme]) .viewer-action.viewer-comment-count-trigger:hover:not(:disabled) {
+    background: var(--bg-panel);
+    color: var(--text);
+  }
+  html:not([data-theme]) .viewer-action.viewer-comment-count-trigger.active,
+  html:not([data-theme]) .viewer-action.viewer-comment-count-trigger.active:hover:not(:disabled) {
+    background: var(--bg-subtle);
+    color: var(--text-strong);
+  }
 }
 .viewer-comment-count {
   min-width: 12px;
@@ -2518,6 +2540,92 @@
 .comment-side-selectbar .primary:hover:not(:disabled) {
   background: #202020;
   border-color: #202020;
+}
+[data-theme="dark"] .comment-side-panel {
+  background: var(--bg-panel);
+  border-color: var(--border);
+  color: var(--text);
+}
+[data-theme="dark"] .comment-side-header,
+[data-theme="dark"] .comment-side-selectbar {
+  background: var(--bg-panel);
+  border-color: var(--border-soft);
+}
+[data-theme="dark"] .comment-side-title,
+[data-theme="dark"] .comment-side-author strong,
+[data-theme="dark"] .comment-side-selectbar .ghost {
+  color: var(--text-strong);
+}
+[data-theme="dark"] .comment-side-toolbar,
+[data-theme="dark"] .comment-side-select-all,
+[data-theme="dark"] .comment-side-author small,
+[data-theme="dark"] .comment-side-time,
+[data-theme="dark"] .comment-side-selectcount {
+  color: var(--text-muted);
+}
+[data-theme="dark"] .comment-side-item,
+[data-theme="dark"] .comment-side-body {
+  color: var(--text);
+}
+[data-theme="dark"] .comment-side-item.selected,
+[data-theme="dark"] .comment-side-item.active {
+  background: var(--bg-subtle);
+}
+[data-theme="dark"] .comment-side-check {
+  background: var(--bg);
+  border-color: var(--border);
+  color: var(--accent-contrast);
+}
+[data-theme="dark"] .comment-side-check.checked,
+[data-theme="dark"] .comment-side-selectbar .primary,
+[data-theme="dark"] .comment-side-selectbar .primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .comment-side-panel {
+    background: var(--bg-panel);
+    border-color: var(--border);
+    color: var(--text);
+  }
+  html:not([data-theme]) .comment-side-header,
+  html:not([data-theme]) .comment-side-selectbar {
+    background: var(--bg-panel);
+    border-color: var(--border-soft);
+  }
+  html:not([data-theme]) .comment-side-title,
+  html:not([data-theme]) .comment-side-author strong,
+  html:not([data-theme]) .comment-side-selectbar .ghost {
+    color: var(--text-strong);
+  }
+  html:not([data-theme]) .comment-side-toolbar,
+  html:not([data-theme]) .comment-side-select-all,
+  html:not([data-theme]) .comment-side-author small,
+  html:not([data-theme]) .comment-side-time,
+  html:not([data-theme]) .comment-side-selectcount {
+    color: var(--text-muted);
+  }
+  html:not([data-theme]) .comment-side-item,
+  html:not([data-theme]) .comment-side-body {
+    color: var(--text);
+  }
+  html:not([data-theme]) .comment-side-item.selected,
+  html:not([data-theme]) .comment-side-item.active {
+    background: var(--bg-subtle);
+  }
+  html:not([data-theme]) .comment-side-check {
+    background: var(--bg);
+    border-color: var(--border);
+    color: var(--accent-contrast);
+  }
+  html:not([data-theme]) .comment-side-check.checked,
+  html:not([data-theme]) .comment-side-selectbar .primary,
+  html:not([data-theme]) .comment-side-selectbar .primary:hover:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
 }
 .comment-side-new-comment {
   flex: 0 0 auto;

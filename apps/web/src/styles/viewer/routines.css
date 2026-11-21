@@ -808,6 +808,18 @@
 .routines-status-succeeded { background: #e3efe6; color: #2e7d5b; }
 .routines-status-failed { background: #f6dfdc; color: #b3382b; }
 .routines-status-canceled { background: #ece9e2; color: var(--text-muted); }
+[data-theme="dark"] .routines-status-running { background: var(--amber-bg); color: var(--amber); }
+[data-theme="dark"] .routines-status-queued { background: var(--bg-subtle); color: var(--text-muted); }
+[data-theme="dark"] .routines-status-succeeded { background: var(--green-bg); color: var(--green); }
+[data-theme="dark"] .routines-status-failed { background: var(--red-bg); color: var(--red); }
+[data-theme="dark"] .routines-status-canceled { background: var(--bg-subtle); color: var(--text-muted); }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .routines-status-running { background: var(--amber-bg); color: var(--amber); }
+  html:not([data-theme]) .routines-status-queued { background: var(--bg-subtle); color: var(--text-muted); }
+  html:not([data-theme]) .routines-status-succeeded { background: var(--green-bg); color: var(--green); }
+  html:not([data-theme]) .routines-status-failed { background: var(--red-bg); color: var(--red); }
+  html:not([data-theme]) .routines-status-canceled { background: var(--bg-subtle); color: var(--text-muted); }
+}
 
 /* ============================================================
    New Project — Media tab additions (Media tab + segmented inner
@@ -1370,7 +1382,7 @@
 }
 .workspace-shell .workspace-tab.is-active {
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--bg-elevated);
   border-color: var(--workspace-active-tab-border);
   box-shadow:
     0 1px 2px color-mix(in srgb, var(--text) 6%, transparent),
@@ -3294,14 +3306,14 @@
 
 .app .df-panel,
 .app .df-main {
-  background: #fff;
+  background: var(--bg);
 }
 .app .df-main {
   border-right-color: var(--border);
 }
 .app .df-body {
   padding: 4px 20px 20px;
-  background: #fff;
+  background: var(--bg);
 }
 .app .df-controls-row {
   margin: 0 0 14px;

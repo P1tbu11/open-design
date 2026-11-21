@@ -225,3 +225,73 @@
  .onboarding .panel > header,.onboarding .panel > p,.onboarding form,.onboarding .skip { flex-shrink:0; }
  .onboarding .panel > .onboardingFooter { position:static;align-self:flex-start;flex-shrink:0;margin-top:auto;padding-top:32px; }
 }
+
+:global([data-theme="dark"]) .root,
+:global([data-theme="dark"]) .menu {
+  --invite-ink: var(--text-strong);
+  --invite-text: var(--text);
+  --invite-tooltip: #18181b;
+  --invite-surface: var(--bg-panel);
+  --invite-muted: var(--text-muted);
+  --invite-note: var(--text-muted);
+  --invite-faint: var(--text-soft);
+  --invite-secondary: var(--text-muted);
+  --invite-label: var(--text-muted);
+  --invite-option: var(--text);
+  --invite-border: var(--border);
+  --invite-menu-border: var(--border);
+  --invite-error-bg: var(--red-bg);
+  --invite-secondary-bg: var(--bg-subtle);
+  --invite-selected: var(--bg-subtle);
+}
+:global([data-theme="dark"]) .onboarding { background: var(--bg); }
+:global([data-theme="dark"]) .onboarding .input { background: var(--bg); color: var(--text); border-color: var(--border); }
+:global([data-theme="dark"]) .onboarding .role:not(:disabled),
+:global([data-theme="dark"]) .onboarding .role:is(:hover,:active):not(:disabled) { color: var(--text); border-color: var(--border); }
+:global([data-theme="dark"]) .onboarding .submit:disabled { background: var(--bg-subtle); color: var(--text-faint); }
+:global([data-theme="dark"]) .languagePicker { background: var(--bg-panel); border-color: var(--border); color: var(--text-muted); }
+:global([data-theme="dark"]) .root:not(.onboarding) .cancel,
+:global([data-theme="dark"]) .root:not(.onboarding) .close { color: var(--text); }
+:global([data-theme="dark"]) .root:not(.onboarding) .cancel:hover:not(:disabled),
+:global([data-theme="dark"]) .root:not(.onboarding) .close:hover:not(:disabled),
+:global([data-theme="dark"]) .root:not(.onboarding) .remove:hover:not(:disabled) { background: var(--bg-muted); color: var(--text-strong); }
+:global([data-theme="dark"]) .dialogMenu .option[data-highlighted=true] { background: var(--bg-subtle); }
+:global([data-theme="dark"]) .complete h2 { color: var(--text-strong); }
+:global([data-theme="dark"]) .complete p { color: var(--text-muted); }
+:global([data-theme="dark"]) .complete .completeEnter { background: var(--accent); color: var(--accent-contrast); }
+
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-theme])) .root,
+  :global(html:not([data-theme])) .menu {
+    --invite-ink: var(--text-strong);
+    --invite-text: var(--text);
+    --invite-tooltip: #18181b;
+    --invite-surface: var(--bg-panel);
+    --invite-muted: var(--text-muted);
+    --invite-note: var(--text-muted);
+    --invite-faint: var(--text-soft);
+    --invite-secondary: var(--text-muted);
+    --invite-label: var(--text-muted);
+    --invite-option: var(--text);
+    --invite-border: var(--border);
+    --invite-menu-border: var(--border);
+    --invite-error-bg: var(--red-bg);
+    --invite-secondary-bg: var(--bg-subtle);
+    --invite-selected: var(--bg-subtle);
+  }
+  :global(html:not([data-theme])) .onboarding { background: var(--bg); }
+  :global(html:not([data-theme])) .onboarding .input { background: var(--bg); color: var(--text); border-color: var(--border); }
+  :global(html:not([data-theme])) .onboarding .role:not(:disabled),
+  :global(html:not([data-theme])) .onboarding .role:is(:hover,:active):not(:disabled) { color: var(--text); border-color: var(--border); }
+  :global(html:not([data-theme])) .onboarding .submit:disabled { background: var(--bg-subtle); color: var(--text-faint); }
+  :global(html:not([data-theme])) .languagePicker { background: var(--bg-panel); border-color: var(--border); color: var(--text-muted); }
+  :global(html:not([data-theme])) .root:not(.onboarding) .cancel,
+  :global(html:not([data-theme])) .root:not(.onboarding) .close { color: var(--text); }
+  :global(html:not([data-theme])) .root:not(.onboarding) .cancel:hover:not(:disabled),
+  :global(html:not([data-theme])) .root:not(.onboarding) .close:hover:not(:disabled),
+  :global(html:not([data-theme])) .root:not(.onboarding) .remove:hover:not(:disabled) { background: var(--bg-muted); color: var(--text-strong); }
+  :global(html:not([data-theme])) .dialogMenu .option[data-highlighted=true] { background: var(--bg-subtle); }
+  :global(html:not([data-theme])) .complete h2 { color: var(--text-strong); }
+  :global(html:not([data-theme])) .complete p { color: var(--text-muted); }
+  :global(html:not([data-theme])) .complete .completeEnter { background: var(--accent); color: var(--accent-contrast); }
+}

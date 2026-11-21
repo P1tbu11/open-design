@@ -1095,13 +1095,13 @@
 .live .file code {
   background: linear-gradient(
     105deg,
-    var(--chat-text-strong) 0%,
-    var(--chat-text-strong) 34%,
-    color-mix(in srgb, var(--chat-bg) 74%, var(--chat-dia-2)) 46%,
-    color-mix(in srgb, var(--chat-bg) 84%, var(--chat-dia-4)) 50%,
-    color-mix(in srgb, var(--chat-bg) 74%, var(--chat-dia-5)) 54%,
-    var(--chat-text-strong) 66%,
-    var(--chat-text-strong) 100%
+    var(--chat-live-name-base) 0%,
+    var(--chat-live-name-base) 34%,
+    color-mix(in srgb, var(--chat-shimmer-gleam) 74%, var(--chat-dia-2)) 46%,
+    color-mix(in srgb, var(--chat-shimmer-gleam) 84%, var(--chat-dia-4)) 50%,
+    color-mix(in srgb, var(--chat-shimmer-gleam) 74%, var(--chat-dia-5)) 54%,
+    var(--chat-live-name-base) 66%,
+    var(--chat-live-name-base) 100%
   );
   background-size: 240% 100%;
   background-clip: text;
@@ -1288,13 +1288,13 @@
   100% { transform: translate(7%, 6%) scale(1.12); }
 }
 .mark.run {
-  --c1: #00ff08;
-  --c2: #00ffae;
-  --c3: #202020;
-  --c4: oklch(48% 0.13 152);
-  --c5: #eaffeb;
-  --orb-bg: #202020;
-  --orb-fill: oklch(48% 0.12 158);
+  --c1: var(--chat-orb-c1);
+  --c2: var(--chat-orb-c2);
+  --c3: var(--chat-orb-c3);
+  --c4: var(--chat-orb-c4);
+  --c5: var(--chat-orb-c5);
+  --orb-bg: var(--chat-orb-bg);
+  --orb-fill: var(--chat-orb-fill);
   --orb-blur: 1px;
   --orb-contrast: 1.1;
   --orb-sat: 1.12;
@@ -1537,9 +1537,9 @@
     105deg,
     var(--dia-base, var(--chat-text-muted)) 0%,
     var(--dia-base, var(--chat-text-muted)) 32%,
-    color-mix(in srgb, var(--chat-bg) 68%, var(--chat-dia-1)) 43%,
-    color-mix(in srgb, var(--chat-bg) 82%, var(--chat-dia-3)) 50%,
-    color-mix(in srgb, var(--chat-bg) 68%, var(--chat-dia-5)) 57%,
+    color-mix(in srgb, var(--chat-shimmer-gleam) 68%, var(--chat-dia-1)) 43%,
+    color-mix(in srgb, var(--chat-shimmer-gleam) 82%, var(--chat-dia-3)) 50%,
+    color-mix(in srgb, var(--chat-shimmer-gleam) 68%, var(--chat-dia-5)) 57%,
     var(--dia-base, var(--chat-text-muted)) 68%,
     var(--dia-base, var(--chat-text-muted)) 100%
   );

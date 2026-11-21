@@ -3038,7 +3038,7 @@ legend.qf-color-legend {
   justify-content: center;
   gap: 8px;
   border: 1px solid transparent;
-  color: #fff;
+  color: var(--accent-contrast, #fff);
   background: var(--accent);
   box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 34%, transparent);
 }
@@ -3046,8 +3046,8 @@ legend.qf-color-legend {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid color-mix(in srgb, #fff 45%, transparent);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, var(--accent-contrast, #fff) 45%, transparent);
+  border-top-color: var(--accent-contrast, #fff);
   animation: icon-spin 0.7s linear infinite;
 }
 .questions-continue[aria-busy='true'] {
@@ -3594,7 +3594,7 @@ legend.qf-color-legend {
   border-radius: var(--radius-pill);
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
@@ -4132,7 +4132,7 @@ body.entry-resizing { cursor: col-resize; user-select: none; }
   font-weight: 600;
   letter-spacing: 0;
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
   border-radius: var(--radius-pill);
   display: inline-flex;
   align-items: center;

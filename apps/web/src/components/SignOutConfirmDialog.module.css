@@ -17,3 +17,25 @@
 .actions .confirm { background: #202020; }
 .actions .confirm:hover:not(:disabled) { background: #353535; }
 .actions .confirm:active:not(:disabled) { background: #000; }
+:global([data-theme="dark"]) .dialog { background: var(--bg-panel); color: var(--text); }
+:global([data-theme="dark"]) .account { border-color: var(--border); color: var(--text-strong); }
+:global([data-theme="dark"]) .actions .cancel,
+:global([data-theme="dark"]) .actions .cancel:hover:not(:disabled),
+:global([data-theme="dark"]) .actions .cancel:active:not(:disabled) { border-color: var(--border); color: var(--text-strong); }
+:global([data-theme="dark"]) .actions .cancel { background: var(--bg-subtle); }
+:global([data-theme="dark"]) .actions .cancel:hover:not(:disabled) { background: var(--bg-muted); }
+:global([data-theme="dark"]) .actions .confirm,
+:global([data-theme="dark"]) .actions .confirm:hover:not(:disabled),
+:global([data-theme="dark"]) .actions .confirm:active:not(:disabled) { background: var(--accent); color: var(--accent-contrast); }
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-theme])) .dialog { background: var(--bg-panel); color: var(--text); }
+  :global(html:not([data-theme])) .account { border-color: var(--border); color: var(--text-strong); }
+  :global(html:not([data-theme])) .actions .cancel,
+  :global(html:not([data-theme])) .actions .cancel:hover:not(:disabled),
+  :global(html:not([data-theme])) .actions .cancel:active:not(:disabled) { border-color: var(--border); color: var(--text-strong); }
+  :global(html:not([data-theme])) .actions .cancel { background: var(--bg-subtle); }
+  :global(html:not([data-theme])) .actions .cancel:hover:not(:disabled) { background: var(--bg-muted); }
+  :global(html:not([data-theme])) .actions .confirm,
+  :global(html:not([data-theme])) .actions .confirm:hover:not(:disabled),
+  :global(html:not([data-theme])) .actions .confirm:active:not(:disabled) { background: var(--accent); color: var(--accent-contrast); }
+}
