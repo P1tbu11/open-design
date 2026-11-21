@@ -602,4 +602,37 @@ describe('5. Unified global scrollbar contract (WebKit primary + @supports stand
     expect(speakerNotesSource).toContain('::-webkit-scrollbar { width: 8px; height: 8px; }');
     expect(speakerNotesSource).toContain('@supports not selector(::-webkit-scrollbar)');
   });
+
+  it('keeps EntryNavRail divider removed without hover rules and bleeds the recent-list accordion clip box so its edge scrollbar is never clipped', () => {
+    const entryLayout = postcss.parse(readWebFile('src/styles/home/entry-layout.css'));
+    const teamSectionDecls = ruleDecls(entryLayout, '.entry-nav-rail__team-section');
+    expect(teamSectionDecls['border-top']).toBeUndefined();
+    expect(teamSectionDecls['border']).toBeUndefined();
+
+    let hasTeamSectionHoverRule = false;
+    entryLayout.walkRules((rule) => {
+      if (
+        rule.selector.includes('.entry-nav-rail__team-section') &&
+        rule.selector.includes(':hover')
+      ) {
+        hasTeamSectionHoverRule = true;
+      }
+    });
+    expect(hasTeamSectionHoverRule).toBe(false);
+
+    // `.accordion-collapsible-inner` carries `overflow: hidden`, so the -6px
+    // right bleed MUST live on `.entry-nav-rail__recent > .accordion-collapsible`
+    // rather than `.entry-nav-rail__recent-list` (otherwise `overflow: hidden`
+    // slices off the entire 4px scrollbar thumb in the 6px right gutter).
+    expect(
+      ruleDecls(entryLayout, '.entry-nav-rail__recent > .accordion-collapsible')['margin-right'],
+    ).toBe('-6px');
+    expect(ruleDecls(entryLayout, '.entry-nav-rail__recent-list')['margin']).toBe('0');
+    expect(ruleDecls(entryLayout, '.entry-nav-rail__recent-list')['padding']).toBe('2px 6px 0 0');
+    expect(
+      ruleDecls(entryLayout, '.entry-nav-rail:hover .entry-nav-rail__recent-list')[
+        '--scrollbar-thumb-bg'
+      ],
+    ).toBe('var(--scrollbar-thumb)');
+  });
 });

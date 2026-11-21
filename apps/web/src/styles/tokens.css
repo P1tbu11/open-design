@@ -226,9 +226,9 @@
   --scrollbar-size: 8px;
   --scrollbar-thumb-inset: 2px;
   --scrollbar-track: transparent;
-  --scrollbar-thumb: rgba(0, 0, 0, 0.16);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.28);
-  --scrollbar-thumb-active: rgba(0, 0, 0, 0.38);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.30);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.45);
+  --scrollbar-thumb-active: rgba(0, 0, 0, 0.58);
 }
 
 /* Dark theme variables — shared between explicit [data-theme="dark"] and the
@@ -307,9 +307,9 @@
   --code-body-bg: #18181b;
 
   --scrollbar-track: transparent;
-  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.30);
-  --scrollbar-thumb-active: rgba(255, 255, 255, 0.42);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.36);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.50);
+  --scrollbar-thumb-active: rgba(255, 255, 255, 0.62);
 }
 
 /* System mode: follow OS preference when no explicit data-theme is set. */
@@ -388,8 +388,8 @@
     --code-body-bg: #18181b;
 
     --scrollbar-track: transparent;
-    --scrollbar-thumb: rgba(255, 255, 255, 0.18);
-    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.30);
-    --scrollbar-thumb-active: rgba(255, 255, 255, 0.42);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.36);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.50);
+    --scrollbar-thumb-active: rgba(255, 255, 255, 0.62);
   }
 }

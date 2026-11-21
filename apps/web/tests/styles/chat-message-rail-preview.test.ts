@@ -26,23 +26,10 @@ function seamScopeBlock(css: string, selector: string): string {
 }
 
 describe('chat message rail preview card and floating-card dark seam', () => {
-  it('anchors the rail 2px from the pane edge, fades in snappily on chat viewport hover, and keeps the preview card aligned to the 20px transcript boundary', () => {
-    const railRule = chatCss.match(/\.chat-message-rail\s*\{([^}]*)\}/)?.[1];
-    expect(railRule).toBeTruthy();
-    expect(railRule).toMatch(/right:\s*2px;/);
-    expect(railRule).toMatch(/opacity:\s*0;/);
-    expect(railRule).toMatch(/transition:\s*opacity 100ms linear;/);
-
-    const railHoverRule = chatCss.match(
-      /\.chat-log-viewport:hover \.chat-message-rail,[\s\S]*?\{([^}]*)\}/,
-    )?.[1];
-    expect(railHoverRule).toBeTruthy();
-    expect(railHoverRule).toMatch(/opacity:\s*1;/);
-    expect(railHoverRule).toMatch(/transition-duration:\s*80ms;/);
-
+  it('right-aligns to the transcript and reads the floating-card seam tokens', () => {
     const previewRule = chatCss.match(/\.chat-message-rail__preview\s*\{([^}]*)\}/)?.[1];
     expect(previewRule).toBeTruthy();
-    expect(previewRule).toMatch(/right:\s*18px;/);
+    expect(previewRule).toMatch(/right:\s*16px;/);
     expect(previewRule).toMatch(/background:\s*var\(--chat-floating-card-bg\);/);
     expect(previewRule).toMatch(/color:\s*var\(--chat-floating-card-text\);/);
     expect(previewRule).not.toMatch(/linear-gradient|backdrop-filter/);

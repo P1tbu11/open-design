@@ -832,9 +832,9 @@
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0) 120px),
     #0b0b0d;
-  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.30);
-  --scrollbar-thumb-active: rgba(255, 255, 255, 0.42);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.36);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.50);
+  --scrollbar-thumb-active: rgba(255, 255, 255, 0.62);
   overflow: hidden;
 }
 .preview-viewport:not(.preview-viewport-desktop).comment-preview-layer-with-deck-rail {

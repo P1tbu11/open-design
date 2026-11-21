@@ -294,7 +294,7 @@
 }
 .chat-message-rail {
   position: absolute;
-  right: 2px;
+  right: 4px;
   /* The nav is the hover hit zone: it spans the whole log viewport — from
      just under the project header (history icons) down to the composer top —
      while the visible wheel stays centered inside it. */
@@ -307,21 +307,11 @@
   justify-content: center;
   opacity: 0;
   pointer-events: auto;
-  transition: opacity 100ms linear;
+  transition: opacity 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
-.chat-log-viewport:hover .chat-message-rail,
 .chat-message-rail:hover,
 .chat-message-rail:focus-within {
   opacity: 1;
-  transition-duration: 80ms;
-}
-@media (prefers-reduced-motion: reduce) {
-  .chat-message-rail,
-  .chat-log-viewport:hover .chat-message-rail,
-  .chat-message-rail:hover,
-  .chat-message-rail:focus-within {
-    transition: none;
-  }
 }
 .chat-message-rail__track {
   position: relative;
@@ -398,9 +388,9 @@
 }
 .chat-message-rail__preview {
   position: absolute;
-  /* The rail's right edge is 2px inside the pane. An 18px inset puts this
+  /* The rail's right edge is 4px inside the pane. A 16px inset puts this
      card's right edge on the transcript's 20px content boundary. */
-  right: 18px;
+  right: 16px;
   top: var(--chat-message-rail-y);
   width: min(280px, calc(100vw - 88px));
   max-width: 280px;
