@@ -108,15 +108,20 @@ describe('project chat pane material (styles/viewer/routines.css)', () => {
     ).toMatch(/background:\s*var\(--bg-elevated\);/);
   });
 
-  it('does not paint a dark-only material or panel backing slab on .pane, .chat-log, or .composer', () => {
+  it('does not paint a dark-only material or panel backing slab on .pane, .chat-log, or .composer in explicit or system dark mode', () => {
     const clean = routinesCss.replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(clean).not.toMatch(
-      /\[data-theme=['"]dark['"]\]\s+\.app\s+\.split-chat-slot\s*>\s*\.pane(?![\w-])/,
-    );
-    expect(clean).not.toMatch(/\[data-theme=['"]dark['"]\]\s+\.app\s+\.chat-log(?![\w-])/);
-    expect(clean).not.toMatch(
-      /\[data-theme=['"]dark['"]\]\s+\.chat-composer-fixed-layer\s+\.composer(?![\w-])/,
-    );
+    for (const prefix of [String.raw`\[data-theme=['"]dark['"]\]`, String.raw`html:not\(\[data-theme\]\)`]) {
+      expect(clean).not.toMatch(
+        new RegExp(String.raw`${prefix}\s+\.app\s+\.split-chat-slot\s*>\s*\.pane(?![\w-])`),
+      );
+      expect(clean).not.toMatch(new RegExp(String.raw`${prefix}\s+\.app\s+\.chat-log(?![\w-])`));
+      expect(clean).not.toMatch(
+        new RegExp(String.raw`${prefix}\s+\.chat-skin\s+\.chat-log(?![\w-])`),
+      );
+      expect(clean).not.toMatch(
+        new RegExp(String.raw`${prefix}\s+\.chat-composer-fixed-layer\s+\.composer(?![\w-])`),
+      );
+    }
   });
 });
 

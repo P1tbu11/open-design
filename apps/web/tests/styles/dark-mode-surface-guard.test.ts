@@ -299,10 +299,11 @@ describe('4. Core workspace, chat user bubble, viewer, library & share dark surf
     expect(ruleDecls(chat, '.msg.user .user-text').color).toBe('var(--chat-user-bubble-ink)');
   });
 
-  it('keeps a unified transparent ground across the left chat pane in dark mode without extra backing slabs', () => {
+  it('keeps a unified transparent ground across the left chat pane and Electron vibrancy stack in dark mode without extra backing slabs', () => {
     const routines = postcss.parse(readWebFile('src/styles/viewer/routines.css'));
     expect(ruleDecls(routines, '.app .split-chat-slot > .pane').background).toBe('transparent');
     expect(ruleDecls(routines, '.app .chat-log').background).toBe('transparent');
+    expect(ruleDecls(routines, '.chat-skin .chat-log').background).toBe('transparent');
     expect(ruleDecls(routines, '.chat-composer-fixed-layer .composer').background).toBe(
       'transparent',
     );
@@ -313,31 +314,91 @@ describe('4. Core workspace, chat user bubble, viewer, library & share dark surf
       ruleDecls(routines, '.chat-composer-fixed-layer .composer-shell')['border-color'],
     ).toBe('var(--chat-border-soft)');
 
+    // Verify Electron macOS vibrancy & veil pass-through parity in app-wash.css and material.css.
+    const appWash = postcss.parse(readWebFile('src/styles/app-wash.css'));
+    const washRoot = customPropsInSelector(appWash, ':root');
+    const washDark = customPropsInSelector(appWash, "[data-theme='dark']");
+    const washSystemDark = customPropsInSelector(
+      appWash,
+      'html:not([data-theme])',
+      'prefers-color-scheme: dark',
+    );
+    expect(washRoot.get('--veil-shell')).toBe('transparent');
+    expect(washRoot.get('--veil-page')).toBe('transparent');
+    expect(washRoot.get('--veil-canvas')).toBe('transparent');
+    expect(washRoot.get('--veil-panel')).toBe('transparent');
+    expect(washDark.get('--wash-base')).toBe('#202020');
+    expect(washSystemDark.get('--wash-base')).toBe('#202020');
+    expect(
+      ruleDecls(appWash, "html:has(.workspace-shell--desktop[data-host-platform='darwin'])")
+        .background,
+    ).toBe('transparent');
+    expect(
+      ruleDecls(appWash, "html:has(.workspace-shell--desktop[data-host-platform='darwin']) body")
+        .background,
+    ).toBe('transparent');
+
+    const material = postcss.parse(readWebFile('src/styles/material.css'));
+    const materialDark = customPropsInSelector(material, "[data-theme='dark']");
+    const materialSystemDark = customPropsInSelector(
+      material,
+      'html:not([data-theme])',
+      'prefers-color-scheme: dark',
+    );
+    expect([...materialDark.keys()].sort()).toEqual([...materialSystemDark.keys()].sort());
+    for (const [prop, val] of materialDark.entries()) {
+      expect(materialSystemDark.get(prop), `material.css dark parity drift on ${prop}`).toBe(val);
+    }
+
+    // Scan ALL stylesheets in src/ so no dark-mode rule anywhere can reintroduce a solid/tinted
+    // backing plate on any container in the ChatPane / tool-info pass-through hierarchy.
     const slabViolations: string[] = [];
     const forbiddenDarkSlabTargets = [
-      '.app .split-chat-slot > .pane',
-      '.app .chat-log',
-      '.chat-skin .chat-log',
+      '.workspace-shell',
+      '.workspace-shell__body',
+      '.app',
+      '.split',
+      '.split-chat-slot',
+      '.split-chat-tabs-dock',
+      '.split-chat-slot > .pane',
+      '.chat-log-wrap',
+      '.chat-log-viewport',
+      '.chat-log',
+      '.chat-composer-slot',
       '.chat-composer-fixed-layer',
       '.chat-composer-fixed-layer .composer',
     ];
-    routines.walkRules((rule) => {
-      const inSystemDark =
-        rule.parent?.type === 'atrule' &&
-        (rule.parent as AtRule).name === 'media' &&
-        (rule.parent as AtRule).params.includes('prefers-color-scheme: dark');
-      for (const sel of rule.selectors) {
-        const trimmed = sel.trim();
-        const isDarkSelector =
-          trimmed.includes('[data-theme="dark"]') ||
-          trimmed.includes("[data-theme='dark']") ||
-          (inSystemDark && trimmed.includes('html:not([data-theme])'));
-        if (!isDarkSelector) continue;
-        if (forbiddenDarkSlabTargets.some((target) => trimmed.endsWith(target))) {
-          slabViolations.push(`${trimmed} { ${rule.toString()} }`);
+    for (const file of collectCssFiles(SRC_ROOT)) {
+      const root = postcss.parse(readFileSync(file, 'utf8'));
+      root.walkRules((rule) => {
+        const inSystemDark =
+          rule.parent?.type === 'atrule' &&
+          (rule.parent as AtRule).name === 'media' &&
+          (rule.parent as AtRule).params.includes('prefers-color-scheme: dark');
+        let paintsBackground = false;
+        rule.walkDecls((decl) => {
+          if (
+            (decl.prop === 'background' || decl.prop === 'background-color') &&
+            decl.value.trim() !== 'transparent' &&
+            decl.value.trim() !== 'none'
+          ) {
+            paintsBackground = true;
+          }
+        });
+        if (!paintsBackground) return;
+        for (const sel of rule.selectors) {
+          const trimmed = sel.trim();
+          const isDarkSelector =
+            trimmed.includes('[data-theme="dark"]') ||
+            trimmed.includes("[data-theme='dark']") ||
+            (inSystemDark && trimmed.includes('html:not([data-theme])'));
+          if (!isDarkSelector) continue;
+          if (forbiddenDarkSlabTargets.some((target) => trimmed.endsWith(target))) {
+            slabViolations.push(`${relative(WEB_ROOT, file)} :: ${trimmed}`);
+          }
         }
-      }
-    });
+      });
+    }
     expect(slabViolations).toEqual([]);
   });
 
