@@ -2597,7 +2597,7 @@ export function EntryNavRail({
           </div>
         ) : (
           /* Same section wrapper as the signed-in branch (OPEND-3140): it
-             draws the divider under 社区 and carries the collapse stagger, so
+             carries the vertical spacing under 社区 and the collapse stagger, so
              the two destination lists read the same. The name is historical —
              nothing in it is team-specific. */
           <div className="entry-nav-rail__team-section">
