@@ -225,7 +225,7 @@
  * `cubic-bezier(0.23, 1, 0.32, 1)` 这一个值(`AGENTS.md`),写死它换来的确定性强过
  * 一层间接。
  *
- * 同一族的 `.entrance` / `.live::after` 也因此不把 var 放进简写里。
+ * 同一族的 `.entrance` 也因此不把 var 放进简写里。
  */
 .fold[open] > .body {
   animation: fold-body-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
@@ -1085,14 +1085,14 @@
   .settled { transition: none; }
 }
 
-/* ── 执行中的那一行:金属文字扫光 + 柔和行底流光(@beui AgentShimmer 层次)──── */
-.live {
-  position: relative;
-  isolation: isolate;
-}
+/* ── 执行中的工具行与步骤抽屉头:扫光严格裁切在文字字形上(background-clip: text),
+   绝不在整行容器背景上铺横条渐变 ── */
 .live > .name,
 .live > summary .name,
-.live .file code {
+.live > .name code,
+.live > summary .name code,
+.live .file code,
+.stepRow[aria-busy='true'] > summary > .summaryContent > span:last-child:not(.struck) {
   background: linear-gradient(
     105deg,
     var(--chat-live-name-base) 0%,
@@ -1110,67 +1110,18 @@
   -webkit-text-fill-color: transparent;
   animation: chat-record-sweep 1.8s linear infinite;
 }
-.live::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    transparent 36%,
-    color-mix(in srgb, var(--chat-text-strong) 9%, transparent) 50%,
-    transparent 64%,
-    transparent 100%
-  );
-  background-size: 260% 100%;
-  background-repeat: no-repeat;
-  animation: tool-row-stream 1.8s linear infinite;
-}
-@keyframes tool-row-stream {
-  from { background-position: 100% 0; }
-  to   { background-position: -40% 0; }
-}
 @media (prefers-reduced-motion: reduce) {
   .live > .name,
   .live > summary .name,
-  .live .file code {
+  .live > .name code,
+  .live > summary .name code,
+  .live .file code,
+  .stepRow[aria-busy='true'] > summary > .summaryContent > span:last-child:not(.struck) {
     animation: none;
     background: none;
     color: var(--chat-text-strong);
     -webkit-text-fill-color: currentColor;
   }
-  .live::after { display: none; }
-}
-
-/* 进行中的 TodoWrite 步骤抽屉头扫光:只铺在 summary 上,不染展开后的子列表 */
-.stepRow[aria-busy='true'] > summary {
-  position: relative;
-  isolation: isolate;
-}
-.stepRow[aria-busy='true'] > summary::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    transparent 42%,
-    color-mix(in srgb, var(--chat-text-strong) 5%, transparent) 50%,
-    transparent 58%,
-    transparent 100%
-  );
-  background-size: 300% 100%;
-  background-repeat: no-repeat;
-  animation: tool-row-stream 2.4s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .stepRow[aria-busy='true'] > summary::after { display: none; }
 }
 
 /* ── 折叠态那一句摘要预览 ──────────────────────────────────

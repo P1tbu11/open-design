@@ -1641,23 +1641,14 @@
   border-radius: 0;
   box-shadow: none;
   /* Product decision (OPEND-3090, per the #8113 Demo): the card paints
-     nothing of its own, so the app wash / window vibrancy shows through the
-     chat column exactly as it does through the gutter around it. The earlier
-     85% white frost over the Regular blur is gone on purpose; do not bring it
-     back. Dark theme still falls back to the standard Regular material, and
-     the degraded blocks below flatten the card to a solid surface. */
+     nothing of its own in either light or dark mode, so the shared page ground
+     shows uniformly across .split-chat-tabs-dock, .pane/.chat-log, and the
+     composer frame without an extra backing slab. Degraded blocks below still
+     flatten the card to a solid surface when transparency is reduced. */
   background: transparent;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   overflow: hidden;
-}
-[data-theme='dark'] .app .split-chat-slot > .pane {
-  background: var(--material-regular);
-}
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme]) .app .split-chat-slot > .pane {
-    background: var(--material-regular);
-  }
 }
 @media (prefers-reduced-transparency: reduce) {
   .app .split-chat-slot > .pane {
@@ -2505,9 +2496,8 @@
 .chat-composer-fixed-layer .composer {
   gap: 5px;
   padding: 8px;
-  /* Bottommost gray card removed — the white shell sits directly on the chat
-     card. (Dark keeps --bg-panel below, which matches the dark shell, so no
-     separate card shows there either.) */
+  /* Bottommost outer card stays transparent in both light and dark so the
+     floating .composer-shell card sits directly on the unified chat ground. */
   background: transparent;
   border-radius: var(--radius-lg);
 }
@@ -2545,20 +2535,6 @@
   backdrop-filter: none;
   box-shadow: none;
 }
-
-[data-theme="dark"] .app .chat-log,
-[data-theme="dark"] .chat-skin .chat-log,
-[data-theme="dark"] .chat-composer-fixed-layer .composer {
-  background: var(--bg-panel);
-}
-
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme]) .app .chat-log,
-  html:not([data-theme]) .chat-skin .chat-log,
-  html:not([data-theme]) .chat-composer-fixed-layer .composer {
-    background: var(--bg-panel);
-  }
-}
 .chat-composer-fixed-layer .composer-shell > * {
   margin-left: 0;
   margin-right: 0;
@@ -2573,6 +2549,14 @@
 .chat-composer-fixed-layer .composer-shell:focus-within {
   border-color: var(--border-soft);
   box-shadow: none;
+}
+[data-theme="dark"] .chat-composer-fixed-layer .composer-shell:focus-within {
+  border-color: var(--border);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .chat-composer-fixed-layer .composer-shell:focus-within {
+    border-color: var(--border);
+  }
 }
 .app .composer.drag-active .composer-shell,
 .chat-skin .composer.drag-active .composer-shell {

@@ -171,6 +171,61 @@ describe('2. Chat seam parity & shimmer highlight safety (ChatRoot.module.css + 
     }
     expect(darkSweepViolations).toEqual([]);
   });
+
+  it('restricts chat shimmer gradients strictly to text glyphs (background-clip: text) and never paints full-row box sweeps', () => {
+    const chatCssFiles = collectCssFiles(resolve(SRC_ROOT, 'components/chat'));
+    const boxSweepViolations: string[] = [];
+
+    for (const file of chatCssFiles) {
+      const raw = readFileSync(file, 'utf8');
+      expect(raw, `${relative(WEB_ROOT, file)} must not define tool-row-stream box sweep`).not.toContain(
+        'tool-row-stream',
+      );
+
+      const root = postcss.parse(raw);
+      root.walkRules((rule) => {
+        // Skip prefers-reduced-motion reset blocks where animation: none is set.
+        if (
+          rule.parent?.type === 'atrule' &&
+          (rule.parent as AtRule).name === 'media' &&
+          (rule.parent as AtRule).params.includes('prefers-reduced-motion')
+        ) {
+          return;
+        }
+
+        let hasLinearGradientBg = false;
+        let hasSweepAnimation = false;
+        let clipsText = false;
+
+        rule.walkDecls((decl) => {
+          if (
+            (decl.prop === 'background' || decl.prop === 'background-image') &&
+            decl.value.includes('linear-gradient')
+          ) {
+            hasLinearGradientBg = true;
+          }
+          if (
+            (decl.prop === 'animation' || decl.prop === 'animation-name') &&
+            decl.value !== 'none'
+          ) {
+            hasSweepAnimation = true;
+          }
+          if (
+            (decl.prop === 'background-clip' || decl.prop === '-webkit-background-clip') &&
+            decl.value.includes('text')
+          ) {
+            clipsText = true;
+          }
+        });
+
+        if (hasLinearGradientBg && hasSweepAnimation && !clipsText) {
+          boxSweepViolations.push(`${relative(WEB_ROOT, file)} :: ${rule.selector}`);
+        }
+      });
+    }
+
+    expect(boxSweepViolations).toEqual([]);
+  });
 });
 
 describe('3. Accent surface foreground contrast across all web stylesheets', () => {
@@ -242,6 +297,48 @@ describe('4. Core workspace, chat user bubble, viewer, library & share dark surf
     expect(systemDarkUser.get('--chat-user-bubble-ground')).toBe('var(--bg-subtle)');
     expect(systemDarkUser.get('--chat-user-bubble-ink')).toBe('var(--text-strong)');
     expect(ruleDecls(chat, '.msg.user .user-text').color).toBe('var(--chat-user-bubble-ink)');
+  });
+
+  it('keeps a unified transparent ground across the left chat pane in dark mode without extra backing slabs', () => {
+    const routines = postcss.parse(readWebFile('src/styles/viewer/routines.css'));
+    expect(ruleDecls(routines, '.app .split-chat-slot > .pane').background).toBe('transparent');
+    expect(ruleDecls(routines, '.app .chat-log').background).toBe('transparent');
+    expect(ruleDecls(routines, '.chat-composer-fixed-layer .composer').background).toBe(
+      'transparent',
+    );
+    expect(ruleDecls(routines, '.chat-composer-fixed-layer .composer-shell').background).toBe(
+      'var(--chat-floating-card-bg)',
+    );
+    expect(
+      ruleDecls(routines, '.chat-composer-fixed-layer .composer-shell')['border-color'],
+    ).toBe('var(--chat-border-soft)');
+
+    const slabViolations: string[] = [];
+    const forbiddenDarkSlabTargets = [
+      '.app .split-chat-slot > .pane',
+      '.app .chat-log',
+      '.chat-skin .chat-log',
+      '.chat-composer-fixed-layer',
+      '.chat-composer-fixed-layer .composer',
+    ];
+    routines.walkRules((rule) => {
+      const inSystemDark =
+        rule.parent?.type === 'atrule' &&
+        (rule.parent as AtRule).name === 'media' &&
+        (rule.parent as AtRule).params.includes('prefers-color-scheme: dark');
+      for (const sel of rule.selectors) {
+        const trimmed = sel.trim();
+        const isDarkSelector =
+          trimmed.includes('[data-theme="dark"]') ||
+          trimmed.includes("[data-theme='dark']") ||
+          (inSystemDark && trimmed.includes('html:not([data-theme])'));
+        if (!isDarkSelector) continue;
+        if (forbiddenDarkSlabTargets.some((target) => trimmed.endsWith(target))) {
+          slabViolations.push(`${trimmed} { ${rule.toString()} }`);
+        }
+      }
+    });
+    expect(slabViolations).toEqual([]);
   });
 
   it('keeps dark-mode overrides on toolbar pills, viewer comments, library preview, and design-system rows', () => {
