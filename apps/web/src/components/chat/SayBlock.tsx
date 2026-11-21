@@ -9,6 +9,8 @@ export interface SayBlockProps {
   text: string;
   /** 这一段是**这一刻还在往里写的那一段**吗 —— 语义与 `SayText.live` 相同。 */
   live?: boolean;
+  /** 所属回合是否仍在运行(允许单包叙述紧跟 tool_use 落地时保留首帧化开)。 */
+  turnRunning?: boolean;
   /** Compatibility scope forwarded from existing shell callers; retired rules no longer use it. */
   instanceScope?: string;
   onBrandBrowserAssistConfirm?: BrandBrowserAssistConfirm;
@@ -17,12 +19,20 @@ export interface SayBlockProps {
 export function SayBlock({
   text,
   live,
+  turnRunning,
   instanceScope,
   onBrandBrowserAssistConfirm,
 }: SayBlockProps): ReactElement | null {
-  const segments = splitShellCards(text, Boolean(live));
+  const active = Boolean(live);
+  const segments = splitShellCards(text, active);
   if (!segments.some((seg) => seg.kind === 'card')) {
-    return <SayText text={segments.map((seg) => seg.kind === 'text' ? seg.text : '').join('')} live={live} />;
+    return (
+      <SayText
+        text={segments.map((seg) => seg.kind === 'text' ? seg.text : '').join('')}
+        live={active}
+        turnRunning={turnRunning}
+      />
+    );
   }
 
   /* 逐字化开只发给**最后**那一段散文 —— 前面几段被卡片隔开,早就写完了 */
@@ -45,9 +55,10 @@ export function SayBlock({
           );
         }
         if (!seg.text.trim()) return null;
+        const tailLive = active && i === lastTextIndex;
         return (
           <Fragment key={`text-${i}`}>
-            <SayText text={seg.text} live={live && i === lastTextIndex} />
+            <SayText text={seg.text} live={tailLive} turnRunning={turnRunning} />
           </Fragment>
         );
       })}

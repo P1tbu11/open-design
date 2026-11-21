@@ -529,15 +529,56 @@ export function toolTitle(toolName: string, input: unknown): string {
  *   `cat > page.html <<'EOF'`   → `cat > page.html`(真正在做的事留住了)
  * 去完之后什么都不剩(比如整行就是 `<<'X'`)就退回原样,宁可难看也不空着。
  */
-export function commandHeadline(command: string): string {
-  const first = String(command ?? '').split('\n')[0] ?? '';
-  const stripped = first
-    // heredoc 开启标记:<<EOF / <<'EOF' / <<"EOF" / <<-EOF
-    .replace(/\s*<<-?\s*(['"]?)[A-Za-z_][A-Za-z0-9_]*\1\s*$/, '')
-    // 紧跟其后的那个「从标准输入读」的孤立 `-`
-    .replace(/\s+-\s*$/, '')
+function hasUnclosedInlineQuote(line: string): boolean {
+  let quote: '"' | "'" | '`' | null = null;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '\\' && quote !== "'") {
+      i += 1;
+      continue;
+    }
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch;
+    }
+  }
+  return quote !== null;
+}
+
+function collapseMultilineCommand(raw: string): string {
+  const unwrappedContinuations = raw.replace(/\\\r?\n\s*/g, ' ');
+  const withoutCommentLines = unwrappedContinuations
+    .split(/\r?\n/)
+    .filter((line, idx) => idx === 0 || !/^\s*#/.test(line))
+    .join(' ');
+  return withoutCommentLines
+    .replace(/\s+/g, ' ')
+    .replace(/((?:^|\s)(?:-[A-Za-z]*[ce]|--eval|--command)\s+['"`])\s+/g, '$1')
+    .replace(/\s+(['"`])$/g, '$1')
     .trim();
-  return stripped || first.trim();
+}
+
+export function commandHeadline(command: string): string {
+  const raw = String(command ?? '');
+  const first = raw.split('\n')[0] ?? '';
+  const heredocRe = /\s*<<-?\s*(['"]?)[A-Za-z_][A-Za-z0-9_]*\1\s*$/;
+  if (heredocRe.test(first)) {
+    const stripped = first
+      .replace(heredocRe, '')
+      .replace(/\s+-\s*$/, '')
+      .trim();
+    return stripped || first.trim();
+  }
+  const trimmedFirst = first.trimEnd();
+  if (
+    raw.includes('\n')
+    && (hasUnclosedInlineQuote(trimmedFirst) || trimmedFirst.endsWith('\\'))
+  ) {
+    const collapsed = collapseMultilineCommand(raw);
+    if (collapsed) return collapsed;
+  }
+  return first.trim();
 }
 
 /** 标题是原始命令(而不是人话)时,界面要用等宽字体显示 */

@@ -1,0 +1,101 @@
+/*
+ * 运行态 ExecutionShell 外层活动视口(@beui/agent-activity 风格):
+ *   · 仅在轮次进行中(`running && !concluded`)挂载在壳的 `.body.stack` 上;
+ *   · 限高 176px(~5 行活动条目) + 贴底自动跟随(用户上滚立即让位);
+ *   · 吸收壳内行 `margin-inline: -7px` 外扩并强制隐藏横纵向滚动条(`overflow-x: hidden` +
+ *     `scrollbar-width: none` + `::-webkit-scrollbar { display: none }`);
+ *   · 按实时滚动位置(`data-mask-top` / `data-mask-bottom`)施加多段平滑半透遮罩裁切;
+ *   · 轮次结束脱下此类名,手动展开历史记录时完整铺开不受限高。
+ */
+/*
+ * 统一使用 5 重 `.liveViewport` 前缀:基类特异性 (0,5,0)、三态遮罩规则同为 (0,7,0),
+ * 对称且稳定压过 `record.module.css` 中 `.fold .body.stack` (0,3,0) 与
+ * `.fold.flat > .body.stack` (0,4,0) 的 padding,不依赖 CSS chunk 注入先后顺序。
+ */
+.liveViewport.liveViewport.liveViewport.liveViewport.liveViewport {
+  max-height: 176px;
+  margin-inline: -7px;
+  padding-inline: 7px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-behavior: auto;
+}
+
+.liveViewport::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* 贴底自动跟随态(上方有溢出):顶部 44px 多段柔雾渐隐 + 底部 12px 轻羽化 */
+.liveViewport.liveViewport.liveViewport.liveViewport.liveViewport[data-mask-top='true']:not([data-mask-bottom='true']) {
+  padding-bottom: 8px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    color-mix(in srgb, var(--chat-text-strong) 16%, transparent) 12px,
+    color-mix(in srgb, var(--chat-text-strong) 52%, transparent) 26px,
+    var(--chat-text-strong) 44px,
+    var(--chat-text-strong) calc(100% - 12px),
+    color-mix(in srgb, var(--chat-text-strong) 45%, transparent) calc(100% - 4px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    color-mix(in srgb, var(--chat-text-strong) 16%, transparent) 12px,
+    color-mix(in srgb, var(--chat-text-strong) 52%, transparent) 26px,
+    var(--chat-text-strong) 44px,
+    var(--chat-text-strong) calc(100% - 12px),
+    color-mix(in srgb, var(--chat-text-strong) 45%, transparent) calc(100% - 4px),
+    transparent 100%
+  );
+}
+
+/* 用户上滚翻阅中间段(上下均有溢出):上下各 42px 多段平滑半透遮罩 */
+.liveViewport.liveViewport.liveViewport.liveViewport.liveViewport[data-mask-top='true'][data-mask-bottom='true'] {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    color-mix(in srgb, var(--chat-text-strong) 16%, transparent) 11px,
+    color-mix(in srgb, var(--chat-text-strong) 52%, transparent) 25px,
+    var(--chat-text-strong) 42px,
+    var(--chat-text-strong) calc(100% - 42px),
+    color-mix(in srgb, var(--chat-text-strong) 52%, transparent) calc(100% - 25px),
+    color-mix(in srgb, var(--chat-text-strong) 16%, transparent) calc(100% - 11px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    color-mix(in srgb, var(--chat-text-strong) 16%, transparent) 11px,
+    color-mix(in srgb, var(--chat-text-strong) 52%, transparent) 25px,
+    var(--chat-text-strong) 42px,
+    var(--chat-text-strong) calc(100% - 42px),
+    color-mix(in srgb, var(--chat-text-strong) 52%, transparent) calc(100% - 25px),
+    color-mix(in srgb, var(--chat-text-strong) 16%, transparent) calc(100% - 11px),
+    transparent 100%
+  );
+}
+
+/* 用户滚回最顶部(仅下方有溢出):顶部清晰直出 + 底部 42px 多段平滑半透遮罩 */
+.liveViewport.liveViewport.liveViewport.liveViewport.liveViewport[data-mask-bottom='true']:not([data-mask-top='true']) {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    var(--chat-text-strong) 0px,
+    var(--chat-text-strong) calc(100% - 42px),
+    color-mix(in srgb, var(--chat-text-strong) 52%, transparent) calc(100% - 25px),
+    color-mix(in srgb, var(--chat-text-strong) 16%, transparent) calc(100% - 11px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    var(--chat-text-strong) 0px,
+    var(--chat-text-strong) calc(100% - 42px),
+    color-mix(in srgb, var(--chat-text-strong) 52%, transparent) calc(100% - 25px),
+    color-mix(in srgb, var(--chat-text-strong) 16%, transparent) calc(100% - 11px),
+    transparent 100%
+  );
+}

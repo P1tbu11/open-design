@@ -24,6 +24,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
+  min-width: 0;
   padding: 8px 11px;
   cursor: pointer;
   list-style: none;
@@ -51,6 +52,7 @@
   gap: 7px;
   flex: 0 1 auto;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   white-space: nowrap;
 }
@@ -71,9 +73,17 @@
   flex: none;
   margin-left: auto;
   display: inline-flex;
-  transition: transform var(--chat-dur-quick) var(--chat-ease-out);
+  transform: rotate(0deg);
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
 }
-.fold[open] > summary .chev { transform: rotate(180deg); }
+.chev > svg { transform: rotate(-90deg); }
+.fold[open]:not([data-closing='true']) > summary .chev {
+  transform: rotate(90deg);
+  transition-duration: 200ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chev { transition: none; }
+}
 .meta + .chev { margin-left: 0; }
 
 /* 稿子把「推到最右」只写在**折叠头**上(`.fold > summary .ms`),
@@ -134,6 +144,7 @@
   background: none;
   border-radius: 0;
   width: auto;
+  min-width: 0;
   margin: 0;
   padding: 5px 11px;
 }
@@ -218,6 +229,10 @@
  */
 .fold[open] > .body {
   animation: fold-body-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.fold[data-closing='true'] > .body {
+  animation: none;
+  pointer-events: none;
 }
 @keyframes fold-body-in {
   from { opacity: 0; transform: translateY(-4px); }
@@ -331,11 +346,11 @@
  *   · 步骤**里面**的子行落 **22**(稿子:「缩进一格(状态点 15 + 间距 7 = 22)」)
  */
 .fold.flat > .body.stack {
-  padding: 0 0 2px;
+  padding-bottom: 2px;
 }
 .fold.flat[open] > summary + .body.stack {
-  border-top: var(--chat-stroke) solid var(--chat-border);
-  padding-top: 6px;
+  border-top: 0;
+  padding-top: 4px;
 }
 /* 开场白是**正文**:13px,不是壳里那些 12px 的注脚(稿子:「开头说明保留 13px」) */
 .fold.flat > .body.stack > .think { padding: 6px 0; font-size: var(--chat-t-body); }
@@ -590,6 +605,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
+  min-width: 0;
   padding: 7px 11px;
   border: var(--chat-stroke) solid var(--chat-border);
   border-radius: var(--chat-radius);
@@ -624,6 +640,7 @@
 .name {
   flex: 1;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -779,6 +796,14 @@
   padding: 0;
   cursor: pointer;
   border-radius: var(--chat-radius-sm);
+  max-width: 100%;
+  min-width: 0;
+}
+.file:not(.fileStatic) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 .file code {
   /* 全局 `code` 是行内代码芯片(底色 + 1px 5px 内距 + 圆角);稿子这里的 code
@@ -943,6 +968,53 @@
   color: var(--chat-text-muted);
 }
 
+/* 详情面板里的来源链接行(纯文本 + 域名芯片,零第三方 favicon 请求) */
+.detailLinks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.detailLink {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: var(--chat-radius-sm);
+  border: var(--chat-stroke) solid var(--chat-border);
+  background: var(--chat-bg-subtle);
+  color: var(--chat-text);
+  font-size: var(--chat-t-mini);
+  text-decoration: none;
+  transition:
+    background-color 140ms cubic-bezier(0.23, 1, 0.32, 1),
+    border-color 140ms cubic-bezier(0.23, 1, 0.32, 1),
+    color 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.detailLink:hover {
+  background: var(--chat-bg-fill-tertiary);
+  color: var(--chat-text-strong);
+}
+.detailLinkIcon {
+  flex: none;
+  display: inline-flex;
+  color: var(--chat-text-soft);
+}
+.detailLinkTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detailDomain {
+  flex: none;
+  font-family: var(--chat-font-mono);
+  font-size: var(--chat-t-cap);
+  color: var(--chat-text-soft);
+}
+
 /* ── 入场:刚开出来的那一行工具调用 ────────────────────────────
  *
  * 执行记录里其它东西都有自己的入场 —— 文字逐字化开(`useCharReveal`)、思考有球、
@@ -974,43 +1046,69 @@
  * 是否重渲染,比读 JS 的 `matchMedia` 更可靠。
  */
 .entrance {
-  animation: tool-row-entrance 240ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation: tool-row-entrance 320ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 @keyframes tool-row-entrance {
-  from { opacity: 0; transform: translateY(-4px); filter: blur(4px); }
+  from { opacity: 0; transform: translateY(10px); filter: blur(4px); }
   to   { opacity: 1; transform: translateY(0);    filter: blur(0px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .entrance { animation: none; }
 }
 
-/* ── 执行中的那一行:流光 ──────────────────────────────────────
- *
- * 技法沿用壳头的 `.shimmer`(`background-size: 300%` + 位移 `background-position`),
- * 但有三处刻意的不同 —— 它扫的是**整行的一条光带**,不是文字本身:
- *
- *  1. 壳头那句是**棱镜五色**(`--chat-dia-1..5`),因为它是「进行中」这个状态本身,
- *     该抢眼。工具行的流光只是「还在动」的旁白,五色会把一屏十几行炸开花。
- *     这里只用**同一种墨**的低透明度起一条窄光带。
- *  2. 不给文字上 `background-clip: text`:工具行里是文件名、命令、秒表混排,
- *     逐字染色会让它们深浅不一,读起来像加载失败。
- *  3. 用 `::after` 铺一层,`pointer-events: none`,所以它不参与命中、不改布局,
- *     也不会盖住行尾那枚箭头。
- *
- * ## 为什么是 2.4s 而不是 `.shimmer` 的 2.5s
- *
- * 那条是**文字**扫光,和读字速度绑定;这条是背景,**慢一点才像「在流动」而不是
- * 「在闪」**。2.4s 与壳头那 2.5s 几乎同相,一屏里两处同时出现时不会互相打拍子。
- *
- * ## 关掉动效的人
- *
- * 光带整个不出现(`display: none`)—— 静止的一条亮带读起来像「这块被选中了」,
- * 比没有更误导。执行中的提示由行首那颗球和走动的秒表承担,它们本来就不动效。
- */
+/* 刚出现的活跃推理格与进行中步骤抽屉:轻量模糊上浮(靠 `aria-busy` 命中,不改两态结构 className) */
+.thoughts[aria-busy='true'],
+.stepRow[aria-busy='true'] {
+  animation: chat-row-in 280ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes chat-row-in {
+  from { opacity: 0; transform: translateY(8px); filter: blur(3.5px); }
+  to   { opacity: 1; transform: translateY(0);   filter: blur(0px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thoughts[aria-busy='true'],
+  .stepRow[aria-busy='true'] { animation: none; }
+}
+
+/* 已完成的工具行:平滑退回次级视觉权重,把焦点让给正在扫光的进行中行;
+   鼠标移入、聚焦或展开详情时 220ms 恢复完整对比度。 */
+.settled {
+  opacity: 0.66;
+  transition: opacity 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.settled:hover,
+.settled:focus-within,
+.settled[open] {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settled { transition: none; }
+}
+
+/* ── 执行中的那一行:金属文字扫光 + 柔和行底流光(@beui AgentShimmer 层次)──── */
 .live {
   position: relative;
-  /* 光带压在内容下面:它是一层背景,不是覆盖层 */
   isolation: isolate;
+}
+.live > .name,
+.live > summary .name,
+.live .file code {
+  background: linear-gradient(
+    105deg,
+    var(--chat-text-strong) 0%,
+    var(--chat-text-strong) 34%,
+    color-mix(in srgb, var(--chat-bg) 74%, var(--chat-dia-2)) 46%,
+    color-mix(in srgb, var(--chat-bg) 84%, var(--chat-dia-4)) 50%,
+    color-mix(in srgb, var(--chat-bg) 74%, var(--chat-dia-5)) 54%,
+    var(--chat-text-strong) 66%,
+    var(--chat-text-strong) 100%
+  );
+  background-size: 240% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: chat-record-sweep 1.8s linear infinite;
 }
 .live::after {
   content: '';
@@ -1019,15 +1117,51 @@
   z-index: -1;
   border-radius: inherit;
   pointer-events: none;
-  /*
-   * 一条窄的亮带在中间、两侧透明。`--chat-text-strong` 取 6% —— 再高一行里就
-   * 只剩那道光了,文件名的墨色被吃掉。
-   */
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 36%,
+    color-mix(in srgb, var(--chat-text-strong) 9%, transparent) 50%,
+    transparent 64%,
+    transparent 100%
+  );
+  background-size: 260% 100%;
+  background-repeat: no-repeat;
+  animation: tool-row-stream 1.8s linear infinite;
+}
+@keyframes tool-row-stream {
+  from { background-position: 100% 0; }
+  to   { background-position: -40% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live > .name,
+  .live > summary .name,
+  .live .file code {
+    animation: none;
+    background: none;
+    color: var(--chat-text-strong);
+    -webkit-text-fill-color: currentColor;
+  }
+  .live::after { display: none; }
+}
+
+/* 进行中的 TodoWrite 步骤抽屉头扫光:只铺在 summary 上,不染展开后的子列表 */
+.stepRow[aria-busy='true'] > summary {
+  position: relative;
+  isolation: isolate;
+}
+.stepRow[aria-busy='true'] > summary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
   background: linear-gradient(
     90deg,
     transparent 0%,
     transparent 42%,
-    color-mix(in srgb, var(--chat-text-strong) 6%, transparent) 50%,
+    color-mix(in srgb, var(--chat-text-strong) 5%, transparent) 50%,
     transparent 58%,
     transparent 100%
   );
@@ -1035,12 +1169,8 @@
   background-repeat: no-repeat;
   animation: tool-row-stream 2.4s linear infinite;
 }
-@keyframes tool-row-stream {
-  from { background-position: 100% 0; }
-  to   { background-position: 0% 0; }
-}
 @media (prefers-reduced-motion: reduce) {
-  .live::after { display: none; }
+  .stepRow[aria-busy='true'] > summary::after { display: none; }
 }
 
 /* ── 折叠态那一句摘要预览 ──────────────────────────────────
@@ -1121,6 +1251,14 @@
 .mark.ok {
   background: var(--chat-tick-img) center / contain no-repeat;
   color: var(--chat-brand-weak);
+  animation: chat-mark-settle 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes chat-mark-settle {
+  from { opacity: 0.65; transform: scale(0.9); }
+  to   { opacity: 1;    transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mark.ok { animation: none; }
 }
 .mark.fail { color: var(--chat-red); }
 .mark.fail svg { width: 15px; height: 15px; }
@@ -1396,25 +1534,23 @@
  */
 .shimmer {
   background: linear-gradient(
-    90deg,
+    105deg,
     var(--dia-base, var(--chat-text-muted)) 0%,
-    var(--dia-base, var(--chat-text-muted)) 33.33%,
-    var(--chat-dia-1) 40%,
-    var(--chat-dia-2) 45%,
-    var(--chat-dia-3) 50%,
-    var(--chat-dia-4) 55%,
-    var(--chat-dia-5) 60%,
-    var(--dia-base, var(--chat-text-muted)) 66.67%,
+    var(--dia-base, var(--chat-text-muted)) 32%,
+    color-mix(in srgb, var(--chat-bg) 68%, var(--chat-dia-1)) 43%,
+    color-mix(in srgb, var(--chat-bg) 82%, var(--chat-dia-3)) 50%,
+    color-mix(in srgb, var(--chat-bg) 68%, var(--chat-dia-5)) 57%,
+    var(--dia-base, var(--chat-text-muted)) 68%,
     var(--dia-base, var(--chat-text-muted)) 100%
   );
-  background-size: 300% 100%;
+  background-size: 240% 100%;
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
   font-weight: 500;
   font-size: var(--chat-t-body);
-  animation: chat-record-sweep 2.5s infinite;
+  animation: chat-record-sweep 1.8s linear infinite;
 }
 /* 分段头那句(「进行中」)跟「已完成」「运行失败」是同一列标题,要跟着那一档走 */
 .shimmer.head {
@@ -1423,9 +1559,8 @@
 }
 
 @keyframes chat-record-sweep {
-  0% { background-position: 100% 0; animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1); }
-  60% { background-position: 0% 0; }
-  100% { background-position: 0% 0; }
+  0%   { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
 }
 
 .dots {

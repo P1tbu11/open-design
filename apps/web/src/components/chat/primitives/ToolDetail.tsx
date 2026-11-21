@@ -20,7 +20,13 @@
  */
 import type { ReactElement } from 'react';
 import { useT } from '../../../i18n';
-import { formatToolInput, formatToolValue, truncateToolText } from '../../../runtime/chat/tool-detail';
+import {
+  extractToolOutputLinks,
+  formatToolInput,
+  formatToolValue,
+  truncateToolText,
+} from '../../../runtime/chat/tool-detail';
+import { STROKE_ICON } from './icons';
 import styles from './record.module.css';
 
 export interface ToolDetailProps {
@@ -30,10 +36,19 @@ export interface ToolDetailProps {
   output?: string | null;
 }
 
+const LinkGlobeIcon = (): ReactElement => (
+  <svg {...STROKE_ICON} width="12" height="12">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3.6 9h16.8M3.6 15h16.8" />
+    <path d="M12 3a14.2 14.2 0 013.8 9 14.2 14.2 0 01-3.8 9 14.2 14.2 0 01-3.8-9A14.2 14.2 0 0112 3z" />
+  </svg>
+);
+
 export function ToolDetail({ input, output }: ToolDetailProps): ReactElement | null {
   const t = useT();
   const inputText = formatToolInput(input);
   const outputText = output ? truncateToolText(output) : null;
+  const links = output ? extractToolOutputLinks(output) : [];
   if (!inputText && !outputText) return null;
 
   return (
@@ -46,6 +61,23 @@ export function ToolDetail({ input, output }: ToolDetailProps): ReactElement | n
             ? <span className={styles.detailMore}>{t('chat.record.truncated')}</span>
             : null}
         </section>
+      ) : null}
+      {links.length > 0 ? (
+        <div className={styles.detailLinks} data-testid="chat-tool-detail-links">
+          {links.map((link) => (
+            <a
+              key={link.url}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.detailLink}
+            >
+              <span className={styles.detailLinkIcon}><LinkGlobeIcon /></span>
+              <span className={styles.detailLinkTitle}>{link.title}</span>
+              <span className={styles.detailDomain}>{link.domain}</span>
+            </a>
+          ))}
+        </div>
       ) : null}
       {outputText ? (
         <section className={styles.detailSection} data-testid="chat-tool-detail-output">

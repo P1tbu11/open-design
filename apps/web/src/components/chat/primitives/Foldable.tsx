@@ -18,17 +18,43 @@
  *     —— 详见 `handleToggle` 上方那段(OPEND-2557)。
  */
 import {
+  type MouseEvent,
   type ReactElement,
   type Ref,
   type SyntheticEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
 import type { FoldableProps } from './contract';
 import { ChevronIcon } from './icons';
 import styles from './record.module.css';
+
+export const FOLD_CLOSE_MS = 140;
+export const FOLD_EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+
+function prefersReducedMotion(): boolean {
+  return Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+}
+
+function canAnimateCloseEnv(): boolean {
+  if (prefersReducedMotion()) return false;
+  return (
+    (typeof HTMLElement !== 'undefined' && typeof HTMLElement.prototype.animate === 'function')
+    || (typeof Element !== 'undefined' && typeof Element.prototype.animate === 'function')
+  );
+}
+
+function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
+  if (!ref) return;
+  if (typeof ref === 'function') {
+    ref(value);
+  } else {
+    (ref as { current: T | null }).current = value;
+  }
+}
 
 export function Foldable({
   summary,
@@ -42,7 +68,9 @@ export function Foldable({
   scroll,
   stream,
   deferBody = false,
+  busy,
   bodyRef,
+  bodyClassName,
   className,
   children,
 }: FoldableProps & { stream?: boolean; bodyRef?: Ref<HTMLDivElement>; className?: string }): ReactElement {
@@ -57,11 +85,90 @@ export function Foldable({
   const controlled = open != null;
   const hasBody = children != null && children !== false;
   const isOpen = expandable && hasBody && (controlled ? Boolean(open) : selfOpen);
-  const shouldMountBody = !deferBody || isOpen || bodyActivated;
+
+  /**
+   * 收起时的 140ms WAAPI 退场闩:逻辑 `isOpen` 先翻为 false,DOM `[open]` 暂留到
+   * `body.animate(...)` 结束再撤下,避免 `<details>` 首帧直接把正文裁掉。
+   * jsdom(无 `Element.prototype.animate`)与 `prefers-reduced-motion: reduce`
+   * 下 `canAnimateCloseEnv()` 为假,退回同步撤 `[open]`。
+   */
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  const [closing, setClosing] = useState(false);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    if (!isOpen && prevIsOpen && expandable && hasBody && canAnimateCloseEnv()) {
+      setClosing(true);
+    } else if (isOpen && closing) {
+      setClosing(false);
+    }
+  }
+
+  const domOpen = isOpen || closing;
+  const shouldMountBody = !deferBody || domOpen || bodyActivated;
+
+  const internalBodyRef = useRef<HTMLDivElement | null>(null);
+  const closeAnimRef = useRef<Animation | null>(null);
+  const suppressCloseEchoRef = useRef(false);
+
+  const setMergedBodyRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      internalBodyRef.current = node;
+      assignRef(bodyRef, node);
+    },
+    [bodyRef],
+  );
 
   useEffect(() => {
     if (isOpen && !bodyActivated) setBodyActivated(true);
   }, [bodyActivated, isOpen]);
+
+  useLayoutEffect(() => {
+    if (isOpen && closeAnimRef.current) {
+      try { closeAnimRef.current.cancel(); } catch { /* noop */ }
+      closeAnimRef.current = null;
+    }
+  }, [isOpen]);
+
+  useLayoutEffect(() => {
+    if (!closing) return;
+    const bodyEl = internalBodyRef.current;
+    if (!bodyEl || typeof bodyEl.animate !== 'function' || prefersReducedMotion()) {
+      setClosing(false);
+      return;
+    }
+    if (closeAnimRef.current) {
+      try { closeAnimRef.current.cancel(); } catch { /* noop */ }
+      closeAnimRef.current = null;
+    }
+    const anim = bodyEl.animate(
+      [
+        { opacity: 1, transform: 'translateY(0px)' },
+        { opacity: 0, transform: 'translateY(-4px)' },
+      ],
+      {
+        duration: FOLD_CLOSE_MS,
+        easing: FOLD_EASE_OUT,
+        fill: 'forwards',
+      },
+    );
+    closeAnimRef.current = anim;
+    let settled = false;
+    const finish = () => {
+      if (settled || closeAnimRef.current !== anim) return;
+      settled = true;
+      closeAnimRef.current = null;
+      try { anim.cancel(); } catch { /* noop */ }
+      suppressCloseEchoRef.current = true;
+      setClosing(false);
+    };
+    anim.onfinish = finish;
+    return () => {
+      if (closeAnimRef.current === anim) {
+        closeAnimRef.current = null;
+        try { anim.cancel(); } catch { /* noop */ }
+      }
+    };
+  }, [closing]);
 
   /**
    * 折叠态跟着**外面那件事的生命周期**走(可选接入):跑着的时候摊开,跑完收起来。
@@ -93,12 +200,61 @@ export function Foldable({
    */
   const selfOpenRef = useRef(selfOpen);
   selfOpenRef.current = selfOpen;
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
+  const closingRef = useRef(closing);
+  closingRef.current = closing;
+
+  const handleSummaryClick = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      if (deferBody && expandable && hasBody) setBodyActivated(true);
+      if (!expandable || !hasBody || event.defaultPrevented) return;
+      if (
+        event.target instanceof Element
+        && event.target.closest('button, a, input, select, textarea')
+      ) {
+        return;
+      }
+      if (!canAnimateCloseEnv()) return;
+
+      if (closingRef.current) {
+        event.preventDefault();
+        if (closeAnimRef.current) {
+          try { closeAnimRef.current.cancel(); } catch { /* noop */ }
+          closeAnimRef.current = null;
+        }
+        suppressCloseEchoRef.current = false;
+        setClosing(false);
+        if (!controlled) {
+          setUserToggled(true);
+          setSelfOpen(true);
+        }
+        onToggle?.(true);
+        return;
+      }
+
+      if (isOpenRef.current) {
+        event.preventDefault();
+        if (!controlled) {
+          setUserToggled(true);
+          setSelfOpen(false);
+        }
+        onToggle?.(false);
+      }
+    },
+    [controlled, deferBody, expandable, hasBody, onToggle],
+  );
 
   const handleToggle = useCallback(
     (event: SyntheticEvent<HTMLDetailsElement>) => {
       const next = event.currentTarget.open;
       if (!expandable || !hasBody) {
         if (next) event.currentTarget.open = false;
+        return;
+      }
+      if (closingRef.current && next) return;
+      if (!next && suppressCloseEchoRef.current) {
+        suppressCloseEchoRef.current = false;
         return;
       }
       if (next) setBodyActivated(true);
@@ -119,10 +275,14 @@ export function Foldable({
   ].filter(Boolean).join(' ');
 
   return (
-    <details className={classes} open={isOpen} onToggle={handleToggle}>
-      <summary onClick={() => {
-        if (deferBody && expandable && hasBody) setBodyActivated(true);
-      }}>
+    <details
+      className={classes}
+      open={domOpen}
+      data-closing={closing ? 'true' : undefined}
+      aria-busy={busy || undefined}
+      onToggle={handleToggle}
+    >
+      <summary onClick={handleSummaryClick}>
         <span className={styles.summaryContent} data-testid="chat-foldable-summary-content">
           {summary}
         </span>
@@ -142,8 +302,13 @@ export function Foldable({
       </summary>
       {expandable && hasBody && shouldMountBody ? (
         <div
-          ref={bodyRef}
-          className={[styles.body, stream ? styles.stream : styles.stack, scroll ? styles.scroll : null]
+          ref={setMergedBodyRef}
+          className={[
+            styles.body,
+            stream ? styles.stream : styles.stack,
+            scroll ? styles.scroll : null,
+            bodyClassName ?? null,
+          ]
             .filter(Boolean).join(' ')}
         >
           {children}

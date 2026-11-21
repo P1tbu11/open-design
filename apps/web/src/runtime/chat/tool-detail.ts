@@ -148,3 +148,77 @@ export function formatToolInput(input: unknown): FormattedToolText | null {
   const raw = isRecord(input) ? input.od_tool_args : undefined;
   return truncateToolText(formatToolValue(hasToolInput(raw) ? raw : input));
 }
+
+export interface ToolOutputLink {
+  title: string;
+  url: string;
+  domain: string;
+}
+
+const TOOL_OUTPUT_LINK_LIMIT = 8;
+
+function normalizeHttpUrl(rawUrl: string): { url: string; domain: string } | null {
+  const cleaned = rawUrl.trim().replace(/[),.;:!?]+$/, '');
+  if (!cleaned) return null;
+  try {
+    const parsed = new URL(cleaned);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    if (!parsed.hostname) return null;
+    const domain = parsed.hostname.replace(/^www\./i, '');
+    return { url: parsed.toString(), domain };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 从工具输出里提取紧凑的来源链接(`[title](https://...)` 优先,裸 URL 兜底)。
+ * 只解析纯文本与域名徽标,绝不向第三方 favicon 服务发网络请求。
+ */
+export function extractToolOutputLinks(
+  output: string | null | undefined,
+  max = TOOL_OUTPUT_LINK_LIMIT,
+): ToolOutputLink[] {
+  if (!output || max <= 0) return [];
+  const out: ToolOutputLink[] = [];
+  const seen = new Set<string>();
+  const sample = output.length > 8_000 ? output.slice(0, 8_000) : output;
+
+  const mdRe = /\[([^\][\r\n]{1,200})\]\((https?:\/\/[^\s<>)]+)\)/g;
+  for (const match of sample.matchAll(mdRe)) {
+    const normalized = normalizeHttpUrl(match[2] ?? '');
+    if (!normalized || seen.has(normalized.url)) continue;
+    const rawTitle = (match[1] ?? '').replace(/\s+/g, ' ').trim();
+    seen.add(normalized.url);
+    out.push({
+      title: rawTitle || normalized.domain,
+      url: normalized.url,
+      domain: normalized.domain,
+    });
+    if (out.length >= max) return out;
+  }
+
+  const stripped = sample.replace(mdRe, ' ');
+  const bareRe = /https?:\/\/[^\s<>)"'`]+/g;
+  for (const match of stripped.matchAll(bareRe)) {
+    const normalized = normalizeHttpUrl(match[0] ?? '');
+    if (!normalized || seen.has(normalized.url)) continue;
+    seen.add(normalized.url);
+    let fallbackTitle = normalized.domain;
+    try {
+      const parsed = new URL(normalized.url);
+      const pathPart = decodeURIComponent(parsed.pathname).replace(/^\/+|\/+$/g, '');
+      if (pathPart) fallbackTitle = `${normalized.domain}/${pathPart}`;
+    } catch {
+      /* keep domain */
+    }
+    out.push({
+      title: oneLinePreview(fallbackTitle, 72) ?? normalized.domain,
+      url: normalized.url,
+      domain: normalized.domain,
+    });
+    if (out.length >= max) return out;
+  }
+
+  return out;
+}

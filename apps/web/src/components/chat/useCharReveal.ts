@@ -104,7 +104,7 @@
  * 是随着 host 一起进场的)。要两条都要,得由数据侧告诉渲染层「这一段是刚到的」——
  * 那是 `ProjectView` 的活,不在这只 hook 里。
  */
-import { useLayoutEffect, type RefObject } from 'react';
+import { useLayoutEffect, useRef, type RefObject } from 'react';
 
 /** 字间错开 10ms(稿子的 `--i * 0.01s`) */
 export const STAGGER_MS = 10;
@@ -129,7 +129,7 @@ const OWNED = 'data-char-reveal';
  * `updateMessage`,渲染层分不出来。所以由攒住这段历史的那一侧(`ProjectView` 的
  * `createBufferedTextUpdates` 重放窗口)在提交前打一个标记,下一次化开计算认领掉它。
  */
-let historyReplayLandedAt = 0;
+let historyReplayLandedAt: number | null = null;
 /**
  * 标记的有效期。正常路径上「打标记 → 提交 → React 渲染 → layout effect」就在同一
  * 拍里走完,这个窗口只是兜底:万一那条消息此刻根本没在渲染(切走了、被卸载了),
@@ -138,20 +138,53 @@ let historyReplayLandedAt = 0;
 const HISTORY_REPLAY_CLAIM_WINDOW_MS = 1_000;
 
 /**
+ * 直播流刚刚把一段非重放 delta 提交给 React 的时间戳(`performance.now()` 同一时钟)。
+ *
+ * 解决 `agy`(`antigravity`)等单包返回 agent 以及新挂载 `ProseBlock`/`SayText` 首包
+ * 与「历史挂载即落定」之间的区分:`createBufferedTextUpdates` 只在 `!replayOpen` 且有
+ * 新可见文本落地时打这个标记,并在当前宏任务末尾自动归零 —— 历史加载、刷新页面、
+ * 从设置页返回都不会经过它,首帧照旧 `0` 个 `.rv` span。
+ */
+let liveStreamDeltaLandedAt: number | null = null;
+let liveStreamDeltaClearTimer: ReturnType<typeof setTimeout> | null = null;
+const LIVE_STREAM_DELTA_WINDOW_MS = 100;
+
+export function markLiveStreamDeltaLanded(): void {
+  liveStreamDeltaLandedAt = performance.now();
+  if (liveStreamDeltaClearTimer !== null) clearTimeout(liveStreamDeltaClearTimer);
+  liveStreamDeltaClearTimer = setTimeout(() => {
+    liveStreamDeltaClearTimer = null;
+    liveStreamDeltaLandedAt = null;
+  }, 0);
+}
+
+function isLiveStreamDeltaFresh(now: number): boolean {
+  if (liveStreamDeltaLandedAt === null) return false;
+  if (now - liveStreamDeltaLandedAt < LIVE_STREAM_DELTA_WINDOW_MS) return true;
+  liveStreamDeltaLandedAt = null;
+  return false;
+}
+
+/**
  * 「接下来这一次落地是重放的历史,不是模型此刻在吐字」。
  *
  * 必须在那一次 `updateMessage` **之前**同步调用:中间不能插进别的渲染,
  * 标记才认得准那一次提交。
  */
 export function markHistoryReplayLanded(): void {
+  if (liveStreamDeltaClearTimer !== null) {
+    clearTimeout(liveStreamDeltaClearTimer);
+    liveStreamDeltaClearTimer = null;
+  }
+  liveStreamDeltaLandedAt = null;
   historyReplayLandedAt = performance.now();
 }
 
 /** 认领标记:属于这一次化开计算就返回 true,并把标记消掉(只认一次)。 */
 function claimHistoryReplayLanded(now: number): boolean {
-  if (historyReplayLandedAt === 0) return false;
+  if (historyReplayLandedAt === null) return false;
   const fresh = now - historyReplayLandedAt < HISTORY_REPLAY_CLAIM_WINDOW_MS;
-  historyReplayLandedAt = 0;
+  historyReplayLandedAt = null;
   return fresh;
 }
 
@@ -203,6 +236,17 @@ interface RevealState {
   touched: Touched[];
   /** 到点自己把 span 收回去的定时器 —— 理由见下面那段注释 */
   timer: ReturnType<typeof setTimeout> | 0;
+  /** 单包直播首次挂载时允许在流立刻关闭后继续把本轮波次走完 */
+  finishingLiveMount?: boolean;
+}
+
+export interface UseCharRevealOptions {
+  /**
+   * 仅由 `ProseBlock`(壳外结论段)在 `isLastAssistant` 为真时开启:
+   * 单包 agent(`agy`)常在同一批 `onDone` 里同时提交全文并把 `streaming` 置为 false,
+   * 此时凭 `markLiveStreamDeltaLanded()` 认出这是刚到的直播正文,走完一次 `planReveal`。
+   */
+  allowMountOnLiveFlush?: boolean;
 }
 
 const states = new WeakMap<HTMLElement, RevealState>();
@@ -243,14 +287,78 @@ function foreignWrites(host: HTMLElement): Set<Node> {
   return out;
 }
 
-export function useCharReveal(ref: RefObject<HTMLElement | null>, streaming: boolean): void {
+export function useCharReveal(
+  ref: RefObject<HTMLElement | null>,
+  streaming: boolean,
+  options?: UseCharRevealOptions,
+): void {
+  const streamingRef = useRef(streaming);
+  streamingRef.current = streaming;
+  const allowMountOnLiveFlush = Boolean(options?.allowMountOnLiveFlush);
+
+  useLayoutEffect(() => {
+    const mountedHost = ref.current;
+    return () => {
+      if (!mountedHost) return;
+      const stale = states.get(mountedHost);
+      if (stale?.timer) clearTimeout(stale.timer);
+      restore(mountedHost);
+      states.delete(mountedHost);
+      watchers.get(mountedHost)?.disconnect();
+      watchers.delete(mountedHost);
+    };
+  }, [ref]);
+
   // 用 layout effect:DOM 改完到浏览器画之前做掉,不会闪
   useLayoutEffect(() => {
     const host = ref.current;
     if (!host) return;
+    const reducedMotion = Boolean(
+      globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+    );
+    const now = performance.now();
+    const prev = states.get(host);
+    let mountedFromLive = false;
 
-    if (!streaming) {
+    /*
+     * ⑥ **挂载即落定**(用户 2026-09-04,详见文件头)—— 除非数据侧刚刚标记了
+     *    「这一拍落地的是非重放直播 delta」(`markLiveStreamDeltaLanded`)。
+     *
+     * 没有上一帧状态且没有新鲜直播标记 = 历史重挂(刷新页面、从设置页返回、切会话),
+     * 首帧直接记成「已经显示过」,0 个 `.rv` span、0 只定时器。
+     * 若带有新鲜直播标记(如 `agy` 单包正文随 `ProseBlock` 一起进场,或壳内 `SayText`
+     * 首包进场),则按 `shown = 0` 走一次 `planReveal`。
+     */
+    if (!prev && (streaming || allowMountOnLiveFlush)) {
+      const replay = claimHistoryReplayLanded(now);
+      const liveFresh = !replay && !reducedMotion && isLiveStreamDeltaFresh(now);
+      if (!liveFresh) {
+        if (!streaming) return;
+        if (reducedMotion) return;
+        watcher(host);
+        const landed = measure(host);
+        host.removeAttribute('data-reveal');
+        states.set(host, { shown: landed, len: landed, until: 0, touched: [], timer: 0 });
+        forgetOwnWrites(host);
+        return;
+      }
+      mountedFromLive = true;
+    }
+
+    if (!streaming && !mountedFromLive) {
       const stale = states.get(host);
+      if (
+        allowMountOnLiveFlush
+        && !reducedMotion
+        && stale?.finishingLiveMount
+        && stale.until > now
+        && stale.touched.length > 0
+        && stale.touched.every((t) => t.node.isConnected)
+        && foreignWrites(host).size === 0
+        && measure(host) === stale.len
+      ) {
+        return;
+      }
       if (stale?.timer) clearTimeout(stale.timer);
       restore(host);
       states.delete(host);
@@ -258,36 +366,14 @@ export function useCharReveal(ref: RefObject<HTMLElement | null>, streaming: boo
       watchers.delete(host);
       return;
     }
-    if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    if (reducedMotion) return;
     // 观察器要在**第一次截短之前**就挂上,否则第一帧的写入没人记录
     watcher(host);
 
-    const now = performance.now();
-    const prev = states.get(host);
-
-    /*
-     * ⑥ **挂载即落定**(用户 2026-09-04,详见文件头)。
-     *
-     * 没有上一帧的状态 = 这只 host 是刚进 DOM 的。它此刻装着的字**不是新到的字**,
-     * 是历史 —— 刷新页面、从设置页返回、切会话,都会带着完整正文重挂一次。
-     * 直接记成「已经显示过」,`return` 得比 `restore()` / `collect()` 还早:
-     * 挂载那一帧连一次 DOM 改写都没有,更不会排收尾定时器。
-     *
-     * 重放标记顺手认领掉:这一次落地本来就是历史,别把它留给后面某一段真正的直播。
-     */
-    if (!prev) {
-      claimHistoryReplayLanded(now);
-      const landed = measure(host);
-      host.removeAttribute('data-reveal');
-      states.set(host, { shown: landed, len: landed, until: 0, touched: [], timer: 0 });
-      forgetOwnWrites(host);
-      return;
-    }
-
     // ④ 没有新字 + 上一批还没开完 ⇒ 原地不动,让正在开的那几个字自己开完
-    if (prev.until > now && measure(host) === prev.len) return;
+    if (prev && prev.until > now && measure(host) === prev.len) return;
 
-    if (prev.timer) clearTimeout(prev.timer);
+    if (prev?.timer) clearTimeout(prev.timer);
 
     restore(host);                                    // ② 先把上一帧加的 span 收走
     const nodes = collect(host);
@@ -310,7 +396,7 @@ export function useCharReveal(ref: RefObject<HTMLElement | null>, streaming: boo
     }
 
     // ③ 只认长度增量。markdown 闭合会让可见文字变短,那时把「已显示」压到新长度即可
-    const shown = Math.min(prev.shown, len);
+    const shown = prev ? Math.min(prev.shown, len) : 0;
     const grew = len - shown;
     if (grew <= 0) {
       host.removeAttribute('data-reveal');
@@ -396,11 +482,24 @@ export function useCharReveal(ref: RefObject<HTMLElement | null>, streaming: boo
      */
     const timer = setTimeout(() => {
       restore(host);
-      states.set(host, { shown: len, len, until: 0, touched: [], timer: 0 });
+      if (!streamingRef.current) {
+        states.delete(host);
+        watchers.get(host)?.disconnect();
+        watchers.delete(host);
+      } else {
+        states.set(host, { shown: len, len, until: 0, touched: [], timer: 0 });
+      }
     }, plan.totalMs + 16);
 
     forgetOwnWrites(host);   // 这一批的截短是我们写的,不算 React 的写入
-    states.set(host, { shown: len, len, until: now + plan.totalMs, touched, timer });
+    states.set(host, {
+      shown: len,
+      len,
+      until: now + plan.totalMs,
+      touched,
+      timer,
+      finishingLiveMount: allowMountOnLiveFlush && (mountedFromLive || isLiveStreamDeltaFresh(now)),
+    });
   });
 }
 

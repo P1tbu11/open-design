@@ -30,6 +30,8 @@ export interface SayTextProps {
    * 两处都挂就成了同一段字被拆两遍。
    */
   live?: boolean;
+  /** 所属回合仍在运行时允许单包叙述紧跟 tool_use 落地时保留首帧化开。 */
+  turnRunning?: boolean;
 }
 
 /**
@@ -54,13 +56,14 @@ export interface SayTextProps {
  * 代码块的语法高亮流的时候不开(`syntaxHighlight: !live`),和 `ThinkingMarkdown`
  * 同一条:围栏还在长,没必要为每一帧启一次 Shiki。
  */
-export function SayText({ text, live }: SayTextProps): ReactElement | null {
+export function SayText({ text, live, turnRunning }: SayTextProps): ReactElement | null {
   // hook 必须无条件调用 —— 空文本的提前返回放在它们后面
   const hostRef = useRef<HTMLDivElement>(null);
-  useCharReveal(hostRef, Boolean(live));
+  const isLive = Boolean(live);
+  useCharReveal(hostRef, isLive, { allowMountOnLiveFlush: Boolean(turnRunning) });
   const body = useMemo(
-    () => renderMarkdown(text.trim(), { syntaxHighlight: !live }),
-    [live, text],
+    () => renderMarkdown(text.trim(), { syntaxHighlight: !isLive }),
+    [isLive, text],
   );
 
   if (!text.trim()) return null;

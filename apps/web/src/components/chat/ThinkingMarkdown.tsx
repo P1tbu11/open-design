@@ -49,7 +49,7 @@ const RenderedThinkingMarkdown = memo(function RenderedThinkingMarkdown({
   live: boolean;
 }): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
-  useCharReveal(rootRef, live);
+  useCharReveal(rootRef, live, { allowMountOnLiveFlush: live });
   const content = useMemo(() => decodedProse(text, live), [live, text]);
 
   return (

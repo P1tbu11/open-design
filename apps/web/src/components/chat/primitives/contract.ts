@@ -68,6 +68,10 @@ export interface FoldableProps {
    * 子组件状态都不会因再次折叠而丢失；defaultOpen / 受控 open 首帧仍立即挂载。
    */
   deferBody?: boolean;
+  /** 这一块此刻是否仍在实时更新 —— 映射到 `<details aria-busy>` */
+  busy?: boolean;
+  /** 内容容器的附加类名(如运行态壳层的自动跟随视口)。 */
+  bodyClassName?: string;
   children?: ReactNode;
 }
 
@@ -110,6 +114,8 @@ export interface ToolRowProps {
  */
 export interface SayTextProps {
   text: string;
+  live?: boolean;
+  streaming?: boolean;
 }
 /* `streaming` 已删(W2):8/20 21:02 版设计稿把光标 `.caret` 整个去掉了,
    流式期间没有任何视觉标记;逐字化开在消息层做(W9)。 */

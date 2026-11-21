@@ -42,7 +42,7 @@ import type { ToolRow as ToolRowData } from '../../../runtime/chat/contract';
 import { rowInputIsInspectable } from '../../../runtime/chat/contract';
 import { formatElapsed } from '../../../runtime/chat/format';
 import { openableRecordFilePath, type RecordFileScope } from '../../../runtime/chat/record-file-open';
-import { toolInputPreview } from '../../../runtime/chat/tool-detail';
+import { extractToolOutputLinks, toolInputPreview } from '../../../runtime/chat/tool-detail';
 import { FileButton } from './FileButton';
 import { Foldable } from './Foldable';
 import { StatusMark } from './StatusMark';
@@ -191,18 +191,22 @@ export function ToolRow({
    * 和上面 `icon` 那一格(`running ? 'running' : 'pending'`)用的是同一对量。
    */
   const live = row.pending && running;
+  const settled = !row.pending && !row.failed;
 
   /**
    * 行根元素的类。
    *
    * `entrance` 是刚开出来的那一下入场(`.entrance`),`live` 是**执行中**那层流光
-   * (`.live`)。两者覆盖同一条时间线的两段:入场 240ms 之后,流光接着在跑,
-   * 直到结果回来。
+   * (`.live`),`settled` 是已完成行退到平静次级对比度的收敛态(`.settled`)。
    *
-   * ⚠️ 这两个类都挂在**行自己的根**上,不包 wrapper —— 理由见 `entrance` 的注释
+   * ⚠️ 这几个类都挂在**行自己的根**上,不包 wrapper —— 理由见 `entrance` 的注释
    * (`.fold .body.stack > *` 的 reset 与 `.tool + .tool` 的 6px 行距都按相邻关系命中)。
    */
-  const rowFlags = [entrance ? styles.entrance : null, live ? styles.live : null]
+  const rowFlags = [
+    entrance ? styles.entrance : null,
+    live ? styles.live : null,
+    settled ? styles.settled : null,
+  ]
     .filter(Boolean).join(' ');
   const rowClass = `${styles.tool}${row.failed ? ` ${styles.fail}` : ''}${rowFlags ? ` ${rowFlags}` : ''}`;
   /**
@@ -269,10 +273,11 @@ export function ToolRow({
     </div>
   );
 
-  /* 搜索:显示搜了什么、命中几处。命中数取代耗时 —— 用户关心的是找到没有,不是快不快 */
+  /* 搜索:显示搜了什么、命中几处。命中数取代耗时 —— 用户关心的是找到没有,不是快不快。
+     若搜索输出中含来源 URL(如 WebSearch),提供可展开详情与域名芯片;普通代码 Grep 保持单行。 */
   if (row.tool === 'search' && row.pattern && !row.failed) {
-    return (
-      <div className={rowClass}>
+    const searchSummary = (
+      <>
         {icon}
         <span className={styles.name}>
           {t('chat.record.verb.search')}{' '}
@@ -281,6 +286,24 @@ export function ToolRow({
         {row.hits != null
           ? <span className={`${styles.meta} ${styles.num}`}>{t('chat.record.hits', { count: row.hits })}</span>
           : metaSlot}
+      </>
+    );
+    if (collapsible && extractToolOutputLinks(detailOutput).length > 0) {
+      return (
+        <Foldable
+          summary={searchSummary}
+          className={foldClass}
+          busy={live}
+          lifecycleOpen={lifecycleOpen}
+          deferBody={deferBody}
+        >
+          {detailBody()}
+        </Foldable>
+      );
+    }
+    return (
+      <div className={rowClass} aria-busy={live || undefined}>
+        {searchSummary}
       </div>
     );
   }
@@ -337,6 +360,7 @@ export function ToolRow({
         <Foldable
           summary={summary}
           className={foldClass}
+          busy={live}
           /*
            * **不再传 `elapsed`** —— 摘要里已经有那一格(`metaSlot`)。
            * `Foldable` 的 `elapsed` 是它**自己**那一格,两处都给就是行尾出现两个
@@ -349,7 +373,7 @@ export function ToolRow({
         </Foldable>
       );
     }
-    return <div className={rowClass}>{summary}</div>;
+    return <div className={rowClass} aria-busy={live || undefined}>{summary}</div>;
   }
 
   /*
@@ -359,7 +383,7 @@ export function ToolRow({
   const semanticVerb = row.tool === 'search' ? t('chat.record.verb.search') : verb;
   if (semanticVerb && row.command && row.rawTitle && !row.failed) {
     return (
-      <div className={rowClass}>
+      <div className={rowClass} aria-busy={live || undefined}>
         {icon}
         <span className={styles.name}>
           {semanticVerb} <FileButton path={row.command} label={row.title} />
@@ -468,6 +492,7 @@ export function ToolRow({
       <Foldable
         summary={<>{icon}<span className={styles.name}>{row.title}</span>{failButton}</>}
         elapsed={elapsed ?? (row.pending ? '' : undefined)}
+        busy={live}
         lifecycleOpen={lifecycleOpen}
         deferBody={deferBody}
         /*
@@ -561,6 +586,7 @@ export function ToolRow({
           </>
         )}
         elapsed={elapsed ?? (row.pending ? '' : undefined)}
+        busy={live}
         lifecycleOpen={lifecycleOpen}
         deferBody={deferBody}
         className={foldClass}
@@ -606,6 +632,7 @@ export function ToolRow({
       <Foldable
         summary={fallbackSummary}
         className={foldClass}
+        busy={live}
         /* 摘要里已经有 `metaSlot` 那一格 —— 同上面文件行那支,不再传 `elapsed` */
         lifecycleOpen={lifecycleOpen}
         deferBody={deferBody}
@@ -614,7 +641,7 @@ export function ToolRow({
       </Foldable>
     );
   }
-  return <div className={rowClass}>{fallbackSummary}</div>;
+  return <div className={rowClass} aria-busy={live || undefined}>{fallbackSummary}</div>;
 }
 
 type Translate = ReturnType<typeof useT>;

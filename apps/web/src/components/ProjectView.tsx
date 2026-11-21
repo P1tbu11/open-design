@@ -209,7 +209,7 @@ import { AmrBalanceDialog } from './AmrBalanceDialog';
 import { AmrConcurrencyDialog } from './AmrConcurrencyDialog';
 import { isMembershipConcurrencyLimitFailure } from '@open-design/contracts';
 import { AmrOwnerTopUpDialog } from './chat/AmrOwnerTopUpDialog';
-import { markHistoryReplayLanded } from './chat/useCharReveal';
+import { markHistoryReplayLanded, markLiveStreamDeltaLanded } from './chat/useCharReveal';
 import { workspaceAutoRechargeUrl, workspaceUpgradeUrl } from './EntryNavRail';
 import {
   amrHandoffDeviceId,
@@ -16796,6 +16796,9 @@ export function createBufferedTextUpdates({
     pendingThinkingEventDelta = '';
     pendingThinkingEventFrames = 0;
     try {
+      if (!replayOpen && (contentDelta || textEventDelta || thinkingEventDelta)) {
+        markLiveStreamDeltaLanded();
+      }
       commit((prev) => {
         const previousEvents = prev.events ?? [];
         const nextEvents = appendBufferedAgentDeltas(

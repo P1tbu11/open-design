@@ -3016,7 +3016,9 @@ function ProseBlock({
    * 判据挂在「这是最后一条且还在流」上 —— 历史消息重渲染时不能再化开一遍。
    */
   const proseRef = useRef<HTMLDivElement>(null);
-  useCharReveal(proseRef, Boolean(isLastAssistant && streaming));
+  useCharReveal(proseRef, Boolean(isLastAssistant && streaming), {
+    allowMountOnLiveFlush: Boolean(isLastAssistant),
+  });
   // Route file-link clicks away from the default target="_blank" behavior.
   // Without this, Electron's window-open handler creates a new app window
   // whose href can't resolve, and the user lands on the home screen — the

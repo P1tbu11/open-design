@@ -33,6 +33,7 @@ import { SayBlock } from './SayBlock';
 import type { BrandBrowserAssistConfirm } from '../OdCard';
 import { StatusMark } from './primitives/StatusMark';
 import { ToolRow } from './primitives/ToolRow';
+import shellStyles from './ExecutionShell.module.css';
 import styles from './primitives/record.module.css';
 
 /**
@@ -183,6 +184,9 @@ export function ExecutionShell({
    * 「停在哪一步」也藏了。
    */
   const lifecycleOpen = (running && !concluded) || shell.stopped;
+  const liveViewportActive = running && !concluded && !bodyOnly;
+  const shellBodyRef = useRef<HTMLDivElement>(null);
+  useThinkingFollow(shellBodyRef, liveViewportActive, { maskOverflow: true });
   const [open, setOpen] = useState(foldPreference?.current ?? lifecycleOpen);
   const [userToggled, setUserToggled] = useState(foldPreference?.current !== undefined);
   useEffect(() => {
@@ -389,7 +393,9 @@ export function ExecutionShell({
   if (bodyOnly) return <>{body}</>;
   return <Foldable summary={head} variant="flat" elapsed={elapsed ?? undefined}
     open={open} onToggle={onToggle} expandable={items.length > 0 || children != null}
-    deferBody={deferCollapsedBodies}
+    deferBody={deferCollapsedBodies} busy={running}
+    bodyRef={shellBodyRef}
+    bodyClassName={liveViewportActive ? shellStyles.liveViewport : undefined}
     className={hasTodo ? `${styles.turnHead} ${styles.hasTodo}` : styles.turnHead}>{body}</Foldable>;
 }
 
@@ -578,11 +584,13 @@ function renderItem(item: GroupedShellItem, index: number, ctx: RenderCtx): Reac
      * `SayBlock.tsx` / `tests/components/chat/od-card-inside-execution-shell.test.tsx`)。
      * 一张卡都没有时 `SayBlock` 把原来那只 `SayText` 原样交出去。
      */
+    const isLiveSay = index === ctx.liveTextIndex;
     return (
       <SayBlock
         key={`text-${index}`}
         text={item.text}
-        live={index === ctx.liveTextIndex}
+        live={isLiveSay}
+        turnRunning={ctx.running}
         instanceScope={ctx.odCardScope ? `${ctx.odCardScope}:${index}` : undefined}
         onBrandBrowserAssistConfirm={ctx.onBrandBrowserAssistConfirm}
       />
@@ -856,6 +864,7 @@ function ThoughtsRow({ texts, elapsedMs, tokens, muted, live, t, deferBody }: {
       className={styles.thoughts}
       defaultOpen={live}
       stream={live}
+      busy={live}
       /* **两态共用同一套限高**:`max-height` + 普通滚动条,用户自己滚。
          用户 2026-08-27:「thought 展开应该有个最高高度, 可以滚动」;
          2026-09-02 又确认进行中那一档同样要:「但我记得 thinking 下面文本不是有最大
@@ -946,6 +955,8 @@ function TodoRow({ segment, ctx }: { segment: TodoSegment; ctx: RenderCtx }): Re
     ctx.thinkingTokens,
   );
 
+  const stepLive = ctx.running && segment.status === 'in_progress';
+
   return (
     <Foldable
       summary={
@@ -956,6 +967,7 @@ function TodoRow({ segment, ctx }: { segment: TodoSegment; ctx: RenderCtx }): Re
       }
       elapsed={elapsed ?? undefined}
       expandable={expandable}
+      busy={stepLive}
       /*
        * **相位,不是初始值**(W24 的 `lifecycleOpen`)。这里原来是 `defaultOpen`,
        * 而 `defaultOpen` 只在挂载那一帧被看一眼 —— 这一行的 key 是

@@ -3680,11 +3680,19 @@ body.od-quick-switcher-open .chat-composer-fixed-layer .composer-att .msg-att-de
    起跑延迟由 JS 逐字算(见 useCharReveal),这里只管一个字怎么显出来。 */
 [data-reveal] .rv {
   display: inline-block;
-  animation: text-reveal 0.4s var(--ease-out) both;
+  animation: text-reveal 0.4s cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 @keyframes text-reveal {
-  from { opacity: 0; filter: blur(10px) brightness(0%); }
-  to { opacity: 1; filter: blur(0px) brightness(100%); }
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(2.5px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   [data-reveal] .rv { animation: none; }

@@ -31,4 +31,17 @@ describe('命令标题', () => {
   it('agent 自己给了 description 就用它,不去猜命令', () => {
     expect(toolTitle('Bash', { command: "node - <<'X'", description: '生成封面图' })).toBe('生成封面图');
   });
+
+  it('多行内联脚本(python3 -c "\\n..." / node -e):折叠空白保留脚本正文,不截成孤立引号', () => {
+    expect(bash('python3 -c "\nimport os\nfrom PIL import Image\nprint(1)\n"'))
+      .toBe('python3 -c "import os from PIL import Image print(1)"');
+    expect(bash("python3 -c '\n# Scheme 16\nimport sys\nprint(sys.version)\n'"))
+      .toBe("python3 -c 'import sys print(sys.version)'");
+    expect(bash('node -e "\nconst x = 1;\nconsole.log(x);\n"'))
+      .toBe('node -e "const x = 1; console.log(x);"');
+  });
+
+  it('反斜杠续行命令拼成单行摘要', () => {
+    expect(bash('curl -fsSL \\\n  https://example.com/health')).toBe('curl -fsSL https://example.com/health');
+  });
 });
