@@ -246,6 +246,10 @@
   --chat-dia-3: #ea580c;
   --chat-dia-4: #0ea5e9;
   --chat-dia-5: #2563eb;
+  /* 扫光高光锚点:亮暗两套主题的流光都向高光点亮,绝不能混入 `--chat-bg`
+     (暗色 `--chat-bg` 是 `#121212`,混入后会变成一道黑带把文字擦掉)。 */
+  --chat-shimmer-gleam: #ffffff;
+  --chat-live-name-base: var(--chat-text-strong);
 }
 
 /* 暗色作用域。全局 token 会自己翻,映射到 token 的条目写法不变;
@@ -372,6 +376,8 @@
   --chat-dia-3: #fb923c;
   --chat-dia-4: #f1f5f9;
   --chat-dia-5: #60a5fa;
+  --chat-shimmer-gleam: #ffffff;
+  --chat-live-name-base: var(--chat-text-muted);
 }
 
 /* 「包一层」那种用法专有:不引入布局盒。抹在已有元素上时不能有这一条。 */

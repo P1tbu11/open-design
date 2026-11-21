@@ -87,9 +87,7 @@
   max-height: 205px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: none;
 }
-.menuList::-webkit-scrollbar { display: none; }
 .row .menuItem { height: 42px; min-height: 42px; border: 0; border-radius: 8px; justify-content: flex-start; padding: 7px 12px; }
 @media (max-width: 480px) {
   .row { gap: 6px; }

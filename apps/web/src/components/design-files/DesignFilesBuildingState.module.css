@@ -2,7 +2,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: #fff;
+  background: var(--bg);
 }
 
 /* A display, not an editor. `pointer-events: none` is load-bearing twice over:

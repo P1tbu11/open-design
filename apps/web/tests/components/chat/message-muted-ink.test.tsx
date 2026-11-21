@@ -66,13 +66,15 @@ describe('用户气泡', () => {
       .toBe('var(--chat-user-bubble-ground)');
   });
 
-  it('暗色下不能是那枚近黑 —— 白字压在近黑底上会看不见', () => {
+  it('暗色下既不能是近黑糊底,也不能是刺眼全白板 —— 走抬高深灰底配高对比亮字', () => {
     document.documentElement.setAttribute('data-theme', 'dark');
     mount();
     const bubble = document.getElementById('bubble')!;
     const ground = getComputedStyle(bubble).getPropertyValue('--chat-user-bubble-ground').trim();
+    const ink = getComputedStyle(bubble).getPropertyValue('--chat-user-bubble-ink').trim();
     expect(ground).not.toBe('#121212');
-    expect(ground).toBe('var(--text-strong)');
+    expect(ground).toBe('var(--bg-subtle)');
+    expect(ink).toBe('var(--text-strong)');
   });
 
   it('正文是 medium', () => {

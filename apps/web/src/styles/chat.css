@@ -605,27 +605,43 @@
   /* 气泡底色只能有一个出处:hover 变色、以及折行时盖住半个字的那道渐变,
      必须和它同色 —— 写死两处早晚会分叉。接入 chat 接缝后这条搬去 --chat-bub-bg(W1)。
      ------------------------------------------------------------
-     稿子(PR #7170)把这枚底从 `--text-strong`(#202020)再压深一档到 #121212。
-     不直接写在 `--bub-bg` 上,是因为**暗色下不能跟着压**:那边气泡是「浅底深字」
-     (`color: var(--bg)`),再压成近黑就是黑底黑字。所以中间隔一枚
-     `--chat-user-bubble-ground`,明暗各给各的。 */
+     亮色是深底白字(#121212 底 + --bg 白字);暗色不能用刺眼的全白板(--text-strong),
+     改成比暗色会话底抬高一档的深灰面(--bg-subtle)配高对比白字(--text-strong)。 */
   --chat-user-bubble-ground: #121212;
+  --chat-user-bubble-ink: var(--bg);
   --bub-bg: var(--chat-user-bubble-ground);
 }
-/* 暗色回到主题自己的最强墨色 —— 那边气泡是浅底,近黑会把白字吃掉。
+/* 暗色气泡走抬高一档的深灰底 + 高对比亮字:既不和暗色底糊成一片,也不会刺成一块纯白板。
    两条选择器对齐 `styles/tokens.css` 的写法:显式 [data-theme] 与系统跟随各一条。 */
 [data-theme="dark"] .msg.user {
-  --chat-user-bubble-ground: var(--text-strong);
+  --chat-user-bubble-ground: var(--bg-subtle);
+  --chat-user-bubble-ink: var(--text-strong);
 }
 @media (prefers-color-scheme: dark) {
+  html:not([data-theme]) [data-chat-root] {
+    --chat-confirm-surface: var(--brand-soft);
+    --chat-floating-card-bg: var(--bg);
+    --chat-floating-card-text: var(--text-strong);
+    --chat-brand-weak: #2f781d;
+    --chat-anim-ink: #dbdbdb;
+    --chat-plan-current-text: var(--text);
+    --chat-dia-1: #a78bfa;
+    --chat-dia-2: #fb7185;
+    --chat-dia-3: #fb923c;
+    --chat-dia-4: #f1f5f9;
+    --chat-dia-5: #60a5fa;
+    --chat-live-name-base: var(--chat-text-muted);
+  }
+
   html:not([data-theme]) .msg.user {
-    --chat-user-bubble-ground: var(--text-strong);
+    --chat-user-bubble-ground: var(--bg-subtle);
+    --chat-user-bubble-ink: var(--text-strong);
   }
 }
 .msg.user .user-text {
   /* 稿子是深底白字,缺口在**右下**(原来是浅底深字、缺口在右上) */
   white-space: pre-wrap;
-  color: var(--bg);
+  color: var(--chat-user-bubble-ink);
   background: var(--bub-bg);
   border: none;
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
@@ -688,7 +704,7 @@
   padding: 0 0 0 26px;
   border: none;
   background: linear-gradient(to right, transparent 0, var(--bub-bg) 26px);
-  color: var(--bg);
+  color: var(--chat-user-bubble-ink);
   font: inherit;
   font-weight: 600;
   line-height: 1.7;
@@ -715,12 +731,12 @@
   font-weight: 600;
   /* 装在气泡【里面】,跟着气泡的前景色走(反色底上是白),压一档透明度让它
      退在正文后面 —— 它是出口,不是话。 */
-  color: color-mix(in srgb, var(--bg) 68%, transparent);
+  color: color-mix(in srgb, var(--chat-user-bubble-ink) 68%, transparent);
   cursor: pointer;
   transition: color 100ms var(--ease-out);
 }
 .msg.user .msg-more button:hover {
-  color: var(--bg);
+  color: var(--chat-user-bubble-ink);
 }
 .msg.user .msg-more button .od-icon {
   width: 12px;
@@ -857,7 +873,7 @@
 }
 .msg-mode-chip--chat {
   border-color: color-mix(in srgb, var(--text-soft) 22%, var(--border));
-  background: color-mix(in srgb, var(--bg-subtle) 78%, #fff);
+  background: color-mix(in srgb, var(--bg-subtle) 78%, var(--bg));
   color: var(--text-muted);
 }
 .msg-plugin-context {
@@ -1162,7 +1178,7 @@
   padding: 2px 8px;
   font-size: 12px;
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
   border-radius: var(--radius-xs);
 }
 /* Legacy run-recovery card styling. The card itself moved to a CSS Module in
@@ -1193,7 +1209,7 @@
   cursor: pointer;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -1241,7 +1257,7 @@
   cursor: pointer;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
   font: inherit;
   font-weight: 600;
   padding: 6px 14px;
@@ -1837,7 +1853,6 @@ body:has(.manual-edit-workspace) .chat-composer-fixed-layer {
   padding: 8px;
   max-height: min(60vh, 440px);
   overflow-y: auto;
-  scrollbar-width: thin;
   animation: composer-toolbox-pop-in 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 /* Plugins variant of the standalone popover: wide enough that the
@@ -3380,6 +3395,12 @@ body:has(.manual-edit-workspace) .chat-composer-fixed-layer {
 [data-theme='dark'] .composer-att {
   --composer-att-ink: #dbdbdb;
   --att-fade: color-mix(in srgb, #fff 6%, var(--bg));
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .composer-att {
+    --composer-att-ink: #dbdbdb;
+    --att-fade: color-mix(in srgb, #fff 6%, var(--bg));
+  }
 }
 .composer-att::-webkit-scrollbar {
   display: none;

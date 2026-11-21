@@ -173,7 +173,7 @@ html.od-radial-open .workspace-shell {
 .workspace-radial-sector-path:hover,
 .workspace-radial-sector-path.is-hover {
   /* Whisper brand tint — same as the composer picker's hovered wedge. */
-  fill: #f9fff4;
+  fill: var(--brand-surface);
 }
 /* Template icons ride each wedge's mid-radius/mid-angle as HTML spans (the Icon
    component renders a Remix font glyph, which SVG <text> can't host). Inert, so
@@ -191,7 +191,7 @@ html.od-radial-open .workspace-shell {
 }
 .workspace-radial-icon-btn.is-hover {
   /* Deep brand green — mirrors the composer picker's hovered icon. */
-  color: #2f781d;
+  color: var(--brand-ink);
 }
 /* The "+" re-appears over the fan's anchor rotated 45° (reads as ×);
    clicking it closes the menu. */
@@ -421,7 +421,7 @@ html.od-radial-open .workspace-shell {
   border-color: color-mix(in srgb, var(--border) 72%, transparent);
   border-bottom-color: var(--bg-panel);
   color: var(--text-strong);
-  box-shadow: 0 -1px 0 color-mix(in srgb, #ffffff 68%, transparent) inset;
+  box-shadow: 0 -1px 0 color-mix(in srgb, var(--bg) 68%, transparent) inset;
 }
 .workspace-tab:hover::before,
 .workspace-tab:hover + .workspace-tab::before,
@@ -646,7 +646,6 @@ html.od-radial-open .workspace-shell {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  scrollbar-width: thin;
   contain: layout style paint;
 }
 .workspace-tabs-list__item {
@@ -929,13 +928,13 @@ html.od-radial-open .workspace-shell {
 .chrome-action-export {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
   box-shadow: 0 6px 14px color-mix(in srgb, var(--accent) 24%, transparent);
 }
 .chrome-action-export:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
-  color: white;
+  color: var(--accent-contrast, #fff);
 }
 .chrome-action-export:focus-visible {
   outline-color: var(--accent);
@@ -1200,7 +1199,7 @@ body[data-artifact-share-access='private'] .ws-tabs-file-actions-before {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--bg-panel) 96%, white 4%);
+  background: color-mix(in srgb, var(--bg-panel) 96%, var(--bg) 4%);
   box-shadow: var(--shadow-lg);
 }
 .artifact-version-panel__head {
@@ -2086,7 +2085,7 @@ body:has(.artifact-version-panel) .ws-tabs-file-actions-before {
   border: 0;
   border-radius: 999px;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast, #fff);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -2189,7 +2188,7 @@ a.avatar-item:visited {
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--bg);
   color: var(--text);
   font-size: 12px;
   line-height: 1.4;
@@ -2478,6 +2477,16 @@ a.avatar-item:visited {
   border-radius: 10px;
   background: #FAFAFA;
   box-shadow: none;
+}
+[data-theme="dark"] .comment-float-host {
+  border-color: var(--border);
+  background: var(--bg-panel);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .comment-float-host {
+    border-color: var(--border);
+    background: var(--bg-panel);
+  }
 }
 /* The floating comments card lives outside the workspace grid, so it does not
    naturally reduce the preview's layout width. Reserve the card's 320px width,

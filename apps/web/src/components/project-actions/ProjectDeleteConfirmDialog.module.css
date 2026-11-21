@@ -49,3 +49,17 @@
 }
 
 .activeShareDialog .activeShareFooter button:disabled { cursor: not-allowed; opacity: 0.55; }
+
+:global([data-theme="dark"]) .activeShareDialog:global(.modal-confirm) .activeShareFooter:global(.row) :global(button).activeShareCancel {
+  background: var(--bg-subtle);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-theme])) .activeShareDialog:global(.modal-confirm) .activeShareFooter:global(.row) :global(button).activeShareCancel {
+    background: var(--bg-subtle);
+    border-color: var(--border);
+    color: var(--text);
+  }
+}

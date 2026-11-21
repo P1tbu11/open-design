@@ -20,3 +20,19 @@
 }
 
 .card :global(.entry-local-mode-tip__title-icon) { width:20px;height:20px;min-width:20px;color:#205b16; }
+:global([data-theme="dark"]) .card:global(.entry-local-mode-tip) { border-color: var(--border-soft); background: var(--bg-panel); }
+:global([data-theme="dark"]) .card:hover,
+:global([data-theme="dark"]) .card:focus-visible { background: var(--bg-panel); }
+:global([data-theme="dark"]) .card :global(.entry-local-mode-tip__title) { color: var(--text-strong); }
+:global([data-theme="dark"]) .card :global(.entry-local-mode-tip__pitch) p { color: var(--text-muted); }
+:global([data-theme="dark"]) .card :global(.entry-local-mode-tip__title-icon) { color: var(--brand); }
+:global([data-theme="dark"]) .card :global(.entry-local-mode-tip__login-badge) { background: var(--bg); color: #00ff08; }
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-theme])) .card:global(.entry-local-mode-tip) { border-color: var(--border-soft); background: var(--bg-panel); }
+  :global(html:not([data-theme])) .card:hover,
+  :global(html:not([data-theme])) .card:focus-visible { background: var(--bg-panel); }
+  :global(html:not([data-theme])) .card :global(.entry-local-mode-tip__title) { color: var(--text-strong); }
+  :global(html:not([data-theme])) .card :global(.entry-local-mode-tip__pitch) p { color: var(--text-muted); }
+  :global(html:not([data-theme])) .card :global(.entry-local-mode-tip__title-icon) { color: var(--brand); }
+  :global(html:not([data-theme])) .card :global(.entry-local-mode-tip__login-badge) { background: var(--bg); color: #00ff08; }
+}

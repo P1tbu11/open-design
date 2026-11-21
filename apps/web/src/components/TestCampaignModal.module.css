@@ -1,7 +1,7 @@
-.control { position: fixed; right: 16px; bottom: 16px; z-index: 90; max-width: min(760px, calc(100vw - 32px)); color: var(--foreground, #111); }
-.control > label { display: inline-flex; align-items: center; gap: 8px; margin-left: 8px; padding: 8px 10px; border: 1px solid var(--border, #d4d4d8); border-radius: 8px; background: var(--surface, #fff); font-size: 12px; }
+.control { position: fixed; right: 16px; bottom: 16px; z-index: 90; max-width: min(760px, calc(100vw - 32px)); color: var(--text, #111); }
+.control > label { display: inline-flex; align-items: center; gap: 8px; margin-left: 8px; padding: 8px 10px; border: 1px solid var(--border, #d4d4d8); border-radius: 8px; background: var(--bg-panel, #fff); font-size: 12px; }
 .control select { min-width: 148px; }
-.control output { display: block; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--surface, #fff); font: 500 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.control output { display: block; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--bg-panel, #fff); font: 500 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .backdrop { position: fixed; inset: 0; padding-right: var(--web-modal-scrollbar-width, 0px); padding-bottom: var(--web-modal-scrollbar-height, 0px); display: grid; place-items: center; background: rgb(0 0 0 / 45%); z-index: 1000; }
 /* Content owns its card gutter (registered templates use a viewport-sized
    transparent canvas). Bound that canvas once at the viewport, without taking
@@ -29,5 +29,5 @@
 /* Focused only as the trap's fallback when content has no control; it is not itself a control, so it paints no platform focus ring. */
 .modal:focus { outline: none; }
 
-.replay { position: fixed; right: 16px; bottom: 16px; z-index: 90; padding: 8px 12px; border: 1px solid var(--border, #d4d4d8); border-radius: 8px; background: var(--surface, #fff); color: var(--foreground, #111); font: inherit; font-size: 12px; cursor: pointer; }
+.replay { position: fixed; right: 16px; bottom: 16px; z-index: 90; padding: 8px 12px; border: 1px solid var(--border, #d4d4d8); border-radius: 8px; background: var(--bg-panel, #fff); color: var(--text, #111); font: inherit; font-size: 12px; cursor: pointer; }
 .replay:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

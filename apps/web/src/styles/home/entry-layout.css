@@ -681,6 +681,19 @@
     ) 0 0 / 200% 100%,
     color-mix(in srgb, var(--bg-elevated) 68%, var(--bg-muted));
 }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .entry-rail-account-skeleton__avatar,
+  html:not([data-theme]) .entry-rail-account-skeleton__name {
+    background:
+      linear-gradient(
+        110deg,
+        transparent 28%,
+        color-mix(in srgb, #fff 13%, transparent) 50%,
+        transparent 72%
+      ) 0 0 / 200% 100%,
+      color-mix(in srgb, var(--bg-elevated) 68%, var(--bg-muted));
+  }
+}
 .entry-rail-account-skeleton__avatar {
   /* Mirrors `.entry-nav-rail__account-avatar`'s 24×25 box. That box's own
      `clip-path: url(#od-avatar-squircle)` currently has no matching SVG
@@ -963,7 +976,6 @@
   max-height: calc(11 * 38px + 10 * 2px + 2px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
 }
 /* The flex chain that lets the list above shrink with the window: each box
    between the group and the list opts out of the `min-height: auto` floor and
@@ -1712,7 +1724,6 @@
   padding: 3px;
   background: var(--bg-subtle);
   border-radius: var(--radius-sm);
-  scrollbar-width: thin;
 }
 .avatar-item--lang {
   padding-left: 14px;
@@ -2118,7 +2129,6 @@ body[data-web-modal-scroll-lock] .entry-main--scroll {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -2212,7 +2222,6 @@ body[data-web-modal-scroll-lock] .entry-main--scroll {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   background: var(--bg-subtle);
-  scrollbar-width: thin;
 }
 .entry-settings-menu__option {
   appearance: none;
@@ -5271,8 +5280,6 @@ body[data-web-modal-scroll-lock] .entry-main--scroll {
   background: color-mix(in srgb, var(--bg-panel) 98%, var(--bg-subtle) 2%);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--shadow-color, #000) 10%, transparent);
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-muted) 34%, transparent) transparent;
 }
 
 .onboarding-view__select-menu[data-searchable='true'] {
@@ -5315,8 +5322,6 @@ body[data-web-modal-scroll-lock] .entry-main--scroll {
   overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-muted) 34%, transparent) transparent;
 }
 
 .onboarding-view__select-empty {
@@ -5326,21 +5331,6 @@ body[data-web-modal-scroll-lock] .entry-main--scroll {
   padding: 7px 10px;
   color: var(--text-muted);
   font-size: 13px;
-}
-
-.onboarding-view__select-options::-webkit-scrollbar {
-  width: 8px;
-}
-
-.onboarding-view__select-options::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.onboarding-view__select-options::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-muted) 28%, transparent);
-  border: 2px solid transparent;
-  border-radius: var(--radius-pill);
-  background-clip: padding-box;
 }
 
 .onboarding-view__select-field[data-placement='top'] .onboarding-view__select-menu {
@@ -6180,6 +6170,20 @@ body[data-web-modal-scroll-lock] .entry-main--scroll {
       transparent 72%
     ) 0 0 / 200% 100%,
     color-mix(in srgb, var(--bg-elevated) 70%, var(--bg-muted));
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .onboarding-view__skeleton-line,
+  html:not([data-theme]) .onboarding-view__skeleton-model-label,
+  html:not([data-theme]) .onboarding-view__skeleton-model-bar {
+    background:
+      linear-gradient(
+        110deg,
+        transparent 28%,
+        color-mix(in srgb, #fff 12%, transparent) 50%,
+        transparent 72%
+      ) 0 0 / 200% 100%,
+      color-mix(in srgb, var(--bg-elevated) 70%, var(--bg-muted));
+  }
 }
 
 /* Version meta placeholder (sits where "AMR v0.1.0" renders). */
@@ -8256,15 +8260,15 @@ button.entry-nav-rail__menu-credits-row:active:not(:disabled) {
 .entry-invite__btn.is-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast, #fff);
 }
-/* Re-assert the accent fill + white label on hover — the global
+/* Re-assert the accent fill + contrast label on hover — the global
    `button:hover` rule in primitives.css otherwise repaints the background to
-   --bg-subtle, washing the white text away. */
+   --bg-subtle, washing the label away. */
 .entry-invite__btn.is-primary:hover:not(:disabled) {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast, #fff);
   filter: brightness(1.05);
 }
 
@@ -9067,7 +9071,7 @@ button.entry-nav-rail__menu-credits-row:active:not(:disabled) {
   border: 0;
   border-radius: 999px;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast, #fff);
   font-size: 11px;
   font-weight: 650;
   letter-spacing: 0.02em;
@@ -9231,8 +9235,8 @@ button.entry-nav-rail__menu-credits-row:active:not(:disabled) {
   height: 72px;
   margin-left: -20px;
   border-radius: 50%;
-  border: 3px solid #fff;
-  background: #fff;
+  border: 3px solid var(--bg);
+  background: var(--bg-panel);
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -9252,8 +9256,8 @@ button.entry-nav-rail__menu-credits-row:active:not(:disabled) {
 }
 
 .entry-invite__art-avatar--invite {
-  border: 2px dashed color-mix(in srgb, var(--accent) 60%, #fff);
-  background: color-mix(in srgb, var(--accent) 12%, #fff);
+  border: 2px dashed color-mix(in srgb, var(--accent) 60%, var(--bg));
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
   color: var(--accent);
   box-shadow: none;
 }
@@ -9323,9 +9327,7 @@ button.entry-nav-rail__menu-credits-row:active:not(:disabled) {
   min-height: 0;
   overflow-y: auto;
   padding: 6px;
-  scrollbar-width: none;
 }
-.project-search-results::-webkit-scrollbar { display: none; }
 .project-search-empty {
   padding: 28px 12px;
   text-align: center;

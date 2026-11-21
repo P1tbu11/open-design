@@ -30,7 +30,7 @@ import type { PersistedAgentEvent } from '@open-design/contracts';
 import { I18nProvider } from '../../../src/i18n';
 import { ToolRow } from '../../../src/components/chat/primitives/ToolRow';
 import { buildTurnBlocks } from '../../../src/runtime/chat/build-turn-blocks';
-import { TOOL_DETAIL_MAX_CHARS } from '../../../src/runtime/chat/tool-detail';
+import { TOOL_DETAIL_MAX_CHARS, otherToolNamePrefix } from '../../../src/runtime/chat/tool-detail';
 import type { ToolRow as ToolRowData, TurnBlock } from '../../../src/runtime/chat/contract';
 
 afterEach(cleanup);
@@ -106,6 +106,76 @@ describe('折叠态 —— 裸工具名那一档现在带一句参数摘要', ()
   it('命令类不出摘要 —— 命令原文就在 `.name` 里', () => {
     render(<ToolRow row={row({ tool: 'exec', name: 'run_command', title: 'ls -la', rawTitle: true, command: 'ls -la', input: { command: 'ls -la' } })} />);
     expect(screen.queryByTestId('chat-tool-preview')).toBeNull();
+  });
+
+  it('MCP / 元工具标题退回工具名本身时不重复拼两遍(防 call_mcp_tool call_mcp_tool)', () => {
+    expect(otherToolNamePrefix('call_mcp_tool', 'call_mcp_tool')).toBeNull();
+    expect(otherToolNamePrefix('call_mcp_tool', 'call_mcp_tool: render')).toBeNull();
+    expect(otherToolNamePrefix('Task', 'Audit dark mode')).toBe('Task ');
+
+    const { container } = render(
+      <ToolRow
+        running
+        row={row({
+          tool: 'other',
+          name: 'call_mcp_tool',
+          title: 'call_mcp_tool',
+          pending: true,
+          elapsedMs: 16_300,
+          input: { server: 'openmotion', arguments: { fps: 60 } },
+        })}
+      />,
+    );
+    const summaryText = (container.querySelector('summary')?.textContent ?? '').replace(/\s+/g, ' ').trim();
+    expect(summaryText).toBe('call_mcp_tool16.3s');
+    expect(summaryText.match(/call_mcp_tool/g)).toHaveLength(1);
+  });
+
+  it('call_mcp_tool 带子工具名时在右侧展示子工具摘要,且子工具名等于外层工具名时自动去重', () => {
+    const { rerender, container } = render(
+      <ToolRow
+        running
+        row={row({
+          tool: 'other',
+          name: 'call_mcp_tool',
+          title: 'call_mcp_tool',
+          pending: true,
+          elapsedMs: 4_200,
+          input: { server: 'openmotion', toolName: 'create_scene' },
+        })}
+      />,
+    );
+    expect(screen.getByTestId('chat-tool-preview').textContent).toBe('create_scene');
+    expect((container.querySelector('summary')?.textContent ?? '').match(/call_mcp_tool/g)).toHaveLength(1);
+
+    rerender(
+      <ToolRow
+        running
+        row={row({
+          tool: 'other',
+          name: 'call_mcp_tool',
+          title: 'call_mcp_tool',
+          pending: true,
+          elapsedMs: 4_200,
+          input: { server: 'openmotion', toolName: 'call_mcp_tool' },
+        })}
+      />,
+    );
+    expect(screen.queryByTestId('chat-tool-preview')).toBeNull();
+  });
+
+  it('有独立描述标题的 other 工具(如 Task + description)仍然保留工具名前缀', () => {
+    const { container } = render(
+      <ToolRow
+        row={row({
+          tool: 'other',
+          name: 'Task',
+          title: 'Audit dark surfaces',
+          elapsedMs: 3_000,
+        })}
+      />,
+    );
+    expect(container.textContent).toContain('Task Audit dark surfaces');
   });
 });
 

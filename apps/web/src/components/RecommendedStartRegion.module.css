@@ -190,11 +190,11 @@
 
 .change:hover:not(:disabled) {
   /* Specificity-matches the global button:hover rule (see .primary above);
-     a soft white wash instead of its gray --bg-subtle fill. Same hover
+     a soft surface wash instead of its gray --bg-subtle fill. Same hover
      treatment as .tertiary — the two text actions are peers, only their
      resting text color separates them. */
   color: var(--text);
-  background: color-mix(in srgb, #fff 55%, transparent);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
   border-radius: 999px;
 }
 
@@ -213,6 +213,6 @@
 
 .tertiary:hover:not(:disabled) {
   color: var(--text);
-  background: color-mix(in srgb, #fff 55%, transparent);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
   border-radius: 999px;
 }

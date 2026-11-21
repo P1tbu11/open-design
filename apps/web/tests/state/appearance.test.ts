@@ -3,10 +3,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_ACCENT_COLOR,
+  DEFAULT_DARK_ACCENT_COLOR,
   applyAppearanceToDocument,
   normalizeAccentColor,
   normalizeAppTheme,
   resolveAccentColor,
+  resolveAccentContrastColor,
 } from '../../src/state/appearance';
 
 function stubSystemPrefersDark(prefersDark: boolean): void {
@@ -61,6 +63,7 @@ describe('applyAppearanceToDocument', () => {
   afterEach(() => {
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.style.removeProperty('--accent');
+    document.documentElement.style.removeProperty('--accent-contrast');
     document.documentElement.style.removeProperty('--accent-strong');
     document.documentElement.style.removeProperty('--accent-soft');
     document.documentElement.style.removeProperty('--accent-tint');
@@ -135,12 +138,26 @@ describe('applyAppearanceToDocument', () => {
     expect(document.documentElement.style.getPropertyValue('--accent-hover')).toContain('#ef4444');
   });
 
-  it('falls back to the default accent when no valid accent is configured', () => {
+  it('falls back to the theme-matched default accent when no valid accent is configured', () => {
     document.documentElement.style.setProperty('--accent', '#4f46e5');
 
     applyAppearanceToDocument({ theme: 'dark', accentColor: 'not-a-color' });
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(DEFAULT_DARK_ACCENT_COLOR);
+    expect(document.documentElement.style.getPropertyValue('--accent-contrast')).toBe('#202020');
+
+    applyAppearanceToDocument({ theme: 'light', accentColor: 'not-a-color' });
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
     expect(document.documentElement.style.getPropertyValue('--accent')).toBe(DEFAULT_ACCENT_COLOR);
+    expect(document.documentElement.style.getPropertyValue('--accent-contrast')).toBe('#fafafa');
+  });
+
+  it('picks readable contrast ink for bright and dark custom accents', () => {
+    expect(resolveAccentContrastColor('#ededed')).toBe('#202020');
+    expect(resolveAccentContrastColor('#87ea5c')).toBe('#202020');
+    expect(resolveAccentContrastColor('#353535')).toBe('#fafafa');
+    expect(resolveAccentContrastColor('#1a74ff')).toBe('#fafafa');
   });
 });

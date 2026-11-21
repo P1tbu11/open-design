@@ -75,7 +75,6 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
 }
 
 .stack[data-expanded='true'] .column { height: var(--chat-queue-column-height); }

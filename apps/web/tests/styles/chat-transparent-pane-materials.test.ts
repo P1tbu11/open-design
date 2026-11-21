@@ -216,16 +216,18 @@ describe('the floating card stays with the composer and the queue', () => {
 });
 
 describe('user bubble matches the recording: dark ground, white ink (styles/chat.css)', () => {
-  it('keeps the dark ground token on the light appearance and the theme ink in dark', () => {
+  it('keeps the dark ground token on the light appearance and an elevated dark surface in dark', () => {
     expect(value(declarations(chatCss, '.msg.user'), '--chat-user-bubble-ground')).toBe('#121212');
+    expect(value(declarations(chatCss, '.msg.user'), '--chat-user-bubble-ink')).toBe('var(--bg)');
     expect(value(declarations(chatCss, '.msg.user'), '--bub-bg')).toBe('var(--chat-user-bubble-ground)');
-    expect(value(declarations(chatCss, '[data-theme="dark"] .msg.user'), '--chat-user-bubble-ground')).toBe('var(--text-strong)');
+    expect(value(declarations(chatCss, '[data-theme="dark"] .msg.user'), '--chat-user-bubble-ground')).toBe('var(--bg-subtle)');
+    expect(value(declarations(chatCss, '[data-theme="dark"] .msg.user'), '--chat-user-bubble-ink')).toBe('var(--text-strong)');
   });
 
-  it('paints the bubble from that ground with the page ink for the text', () => {
+  it('paints the bubble from that ground with the paired bubble ink for the text', () => {
     const bubble = declarations(chatCss, '.msg.user .user-text');
     expect(background(bubble)).toBe('var(--bub-bg)');
-    expect(value(bubble, 'color')).toBe('var(--bg)');
+    expect(value(bubble, 'color')).toBe('var(--chat-user-bubble-ink)');
   });
 });
 

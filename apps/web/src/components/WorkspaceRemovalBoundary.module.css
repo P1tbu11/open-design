@@ -10,3 +10,17 @@
 .actions .confirm:active:not(:disabled) { background: #333; color: #fff; transform: none; }
 .actions .confirm:disabled { opacity: .55; cursor: wait; }
 .actions .confirm:focus-visible { outline: 1px solid #c7c7c7; outline-offset: 1px; }
+:global([data-theme="dark"]) .dialog { background: var(--bg-panel); color: var(--text-strong); }
+:global([data-theme="dark"]) .dialog p { color: var(--text-muted); }
+:global([data-theme="dark"]) .dialog .error { color: var(--red); }
+:global([data-theme="dark"]) .actions .confirm,
+:global([data-theme="dark"]) .actions .confirm:hover:not(:disabled),
+:global([data-theme="dark"]) .actions .confirm:active:not(:disabled) { background: var(--accent); color: var(--accent-contrast); }
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-theme])) .dialog { background: var(--bg-panel); color: var(--text-strong); }
+  :global(html:not([data-theme])) .dialog p { color: var(--text-muted); }
+  :global(html:not([data-theme])) .dialog .error { color: var(--red); }
+  :global(html:not([data-theme])) .actions .confirm,
+  :global(html:not([data-theme])) .actions .confirm:hover:not(:disabled),
+  :global(html:not([data-theme])) .actions .confirm:active:not(:disabled) { background: var(--accent); color: var(--accent-contrast); }
+}

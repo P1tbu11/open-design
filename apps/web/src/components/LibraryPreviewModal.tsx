@@ -213,10 +213,10 @@ function ElementPanel({ asset }: { asset: LibraryAsset }) {
     <div style={{ borderTop: '1px solid var(--border, #e5e7eb)', padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <KindIcon kind="html" size={13} />
-        <code style={{ fontSize: 12, color: 'var(--text-strong, #111827)', background: 'var(--subtle, #f3f4f6)', padding: '2px 6px', borderRadius: 6 }}>
+        <code style={{ fontSize: 12, color: 'var(--text-strong)', background: 'var(--bg-subtle)', padding: '2px 6px', borderRadius: 6 }}>
           {element.selector || element.tag}
         </code>
-        {dims ? <span style={{ fontSize: 12, color: 'var(--text-muted, #6b7280)' }}>{dims}</span> : null}
+        {dims ? <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{dims}</span> : null}
         {element.hasHtml ? (
           <button type="button" style={{ ...chipBtn, marginLeft: 'auto' }} onClick={() => setOpen((o) => !o)}>
             {open ? 'Hide HTML' : 'Show HTML'}
@@ -230,7 +230,7 @@ function ElementPanel({ asset }: { asset: LibraryAsset }) {
           <div className={styles.stageNote}>Could not load element HTML.</div>
         ) : (
           <div style={{ position: 'relative' }}>
-            <button type="button" style={{ ...chipBtn, position: 'absolute', top: 6, right: 6, background: 'var(--panel, #fff)' }} onClick={copy}>
+            <button type="button" style={{ ...chipBtn, position: 'absolute', top: 6, right: 6, background: 'var(--bg-panel)' }} onClick={copy}>
               {copied ? 'Copied' : 'Copy'}
             </button>
             <pre
@@ -239,7 +239,8 @@ function ElementPanel({ asset }: { asset: LibraryAsset }) {
                 overflow: 'auto',
                 margin: 0,
                 padding: '10px 12px',
-                background: 'var(--subtle, #f6f7f9)',
+                background: 'var(--bg-subtle)',
+                color: 'var(--text)',
                 borderRadius: 8,
                 fontSize: 12,
                 lineHeight: 1.5,

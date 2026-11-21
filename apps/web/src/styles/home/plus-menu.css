@@ -175,7 +175,6 @@
 }
 .plus-menu__popup--flyout-contained {
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 .plus-menu__item {
   appearance: none;
@@ -316,7 +315,6 @@
   min-height: 0;
   max-height: 240px;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 .plus-menu__divider {
   height: 1px;
@@ -483,7 +481,6 @@
     0 1px 2px rgba(0, 0, 0, 0.04),
     0 10px 28px -10px rgba(0, 0, 0, 0.18);
   overflow: hidden auto;
-  scrollbar-width: thin;
 }
 .plus-menu__detail-title {
   font-size: 13px;

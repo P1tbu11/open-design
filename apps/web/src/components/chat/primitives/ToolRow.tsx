@@ -42,7 +42,7 @@ import type { ToolRow as ToolRowData } from '../../../runtime/chat/contract';
 import { rowInputIsInspectable } from '../../../runtime/chat/contract';
 import { formatElapsed } from '../../../runtime/chat/format';
 import { openableRecordFilePath, type RecordFileScope } from '../../../runtime/chat/record-file-open';
-import { extractToolOutputLinks, toolInputPreview } from '../../../runtime/chat/tool-detail';
+import { extractToolOutputLinks, otherToolNamePrefix, toolInputPreview } from '../../../runtime/chat/tool-detail';
 import { FileButton } from './FileButton';
 import { Foldable } from './Foldable';
 import { StatusMark } from './StatusMark';
@@ -264,7 +264,7 @@ export function ToolRow({
    * 命令类也不出:命令原文就在 `.name` 里,摘要只会是它的截断版。
    */
   const preview = row.tool === 'other' && !row.failed ? toolInputPreview(row.input) : null;
-  const showPreview = preview && preview !== row.title ? preview : null;
+  const showPreview = preview && preview !== row.title && preview !== row.name ? preview : null;
 
   /** 展开后那两段等宽文字。命令类不走这里(它有自己的终端块)。 */
   const detailBody = () => (
@@ -619,7 +619,7 @@ export function ToolRow({
     <>
       {icon}
       <span className={styles.name}>
-        {row.tool === 'other' ? `${row.name} ` : null}
+        {row.tool === 'other' ? otherToolNamePrefix(row.name, row.title) : null}
         {row.rawTitle ? <code>{row.title}</code> : row.title}
       </span>
       {showPreview ? <span className={styles.preview} data-testid="chat-tool-preview">{showPreview}</span> : null}
