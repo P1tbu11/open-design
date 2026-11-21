@@ -242,6 +242,7 @@
 
   --text: #ededed;
   --text-strong: #fafafa;
+  --select-ink: var(--text-strong);
   --text-muted: #bdbdbd;
   --text-soft: #848484;
   --text-faint: #5c5c5c;
@@ -305,6 +306,7 @@
 
     --text: #ededed;
     --text-strong: #fafafa;
+    --select-ink: var(--text-strong);
     --text-muted: #bdbdbd;
     --text-soft: #848484;
     --text-faint: #5c5c5c;

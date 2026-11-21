@@ -469,12 +469,13 @@ describe('② 当前这一步 / 收起药丸的墨色 —— 稿子 `--plan-curr
     );
   });
 
-  it('② 那枚别名在亮暗两个作用域里都是稿子的字面 #353535', () => {
+  it('② 那枚别名在亮色作用域为稿子字面 #353535,暗色作用域映射为可读前景 var(--text)', () => {
     const decls = [...SEAM.matchAll(new RegExp(`${PLAN_CURRENT_ALIAS}:\\s*([^;]+);`, 'g'))].map(
       (m) => m[1]!.trim().toLowerCase(),
     );
     expect(decls.length, '接缝里没有两处声明(亮 + 暗各一次)').toBe(2);
-    for (const value of decls) expect(value).toBe(DRAFT.planCurrent);
+    expect(decls[0]).toBe(DRAFT.planCurrent);
+    expect(decls[1]).toBe('var(--text)');
   });
 
   it('反向对照:非当前的那几步一格没动,仍是 --chat-text-soft,且它就是稿子的 #848484', () => {
