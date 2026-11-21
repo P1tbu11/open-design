@@ -231,8 +231,8 @@ export function ImageRow({ row, onRetry, onOpenImage, imageSrc, running = false 
               </span>
             );
           }
-          /* 还没出来的格子:设计稿的「像素液体」。这一格什么都还没有,底下没有图
-             可以糊,所以液体不指向任何一张具体的图 —— 它只说「这里在动、东西还在长」。
+          /* 还没出来的格子:黑白 Bayer 抖动。这一格什么都还没有,底下没有图
+             可以糊,所以它不指向任何一张具体的图 —— 它只说「这里在动、东西还在长」。
              静止的灰块说不出这句话,产品 2026-08-26 明令不许再用。 */
           return (
             <span key={i} className={`${styles.shot} ${styles.load}`} data-image-cell="loading">

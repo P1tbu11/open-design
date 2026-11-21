@@ -1,5 +1,5 @@
-/* 像素液体的画布。宿主必须是 `position: relative` 并且自己裁圆角 —— 生图格
-   (`.shot`)和产物卡缩略图(`.artifact-card-thumb`)本来就都是。 */
+/* 待生成占位的 Bayer 抖动画布。宿主必须是 `position: relative` 并且自己裁圆角
+   —— 生图格(`.shot`)和产物卡缩略图(`.artifact-card-thumb`)本来就都是。 */
 .liquid {
   position: absolute;
   inset: 0;

@@ -1,18 +1,22 @@
 /**
- * 像素液体 —— 着色器移植 + 共享调度器。
+ * 待生成占位的 Bayer 抖动 + 共享调度器。
  *
  * 这一层跑在 node 里,**不碰 canvas**:jsdom 既没有 2D 上下文也没有布局,
- * 「画得对不对」在这里根本量不到。所以这个文件只钉两件事:
- *   ① `shade()` 是一个确定性的抖动场 —— 同一个 t 出同一帧、不同 t 出不同帧,
- *      而且一帧里 alpha 是有层次的(是抖动,不是铺一块实心)。
+ * 「画得漂不漂亮」在这里量不到。所以这个文件只钉两件事:
+ *   ① `shade()` 是确定性的黑白有序抖动 —— 同一个 t 出同一帧、不同 t 出不同帧,
+ *      像素只有「近黑墨点」和「全透明」两态,而且两种都有(不是铺一块实心,
+ *      也不是绿色液体)。84×112 上标题栏比四角密、内页是空的,
+ *      右侧上沿比左侧更高 —— 软颗粒里的斜窗,不是正对的矩形。
  *   ② 调度器:一条共享 rAF、看不见就停、同时跑的实例有上限、释放后不空转。
- * 画面正确性只能靠真浏览器,那部分在 PR 里以人工验证交付。
+ * 颗粒好不好看只能靠真浏览器。起本地 web 后,触发生图未完成的 ImageRow,
+ * 或产物卡还在写的 FileOpsSummary,看格子里是不是黑白抖动而不是霓虹绿。
  */
 import { describe, expect, it, vi } from 'vitest';
 import {
   DESIGN_CELL_PX,
   DESIGN_PIXEL,
   TARGET_COLS,
+  browserChromeLayout,
   pixelSizeFor,
   shade,
 } from '../../src/runtime/pixel-liquid';
@@ -48,7 +52,7 @@ function fakeHost() {
   };
 }
 
-describe('shade() —— 上游 color_frag 的移植', () => {
+describe('shade() —— 黑白 4×4 Bayer 抖动', () => {
   it('同一个 t 出同一帧,不同 t 出不同帧', () => {
     const a = surface(24, 32);
     const b = surface(24, 32);
@@ -61,26 +65,91 @@ describe('shade() —— 上游 color_frag 的移植', () => {
     expect(Array.from(a.data)).not.toEqual(Array.from(c.data));
   });
 
-  it('一帧里 alpha 是有层次的 —— 抖动,不是一块实心', () => {
-    const img = surface(48, 64);
-    shade(img, 48, 64, 3.2, 6);
+  it('只有近黑墨点和全透明两态,两种都有,而且不是绿色', () => {
+    const img = surface(84, 112);
+    shade(img, 84, 112, 3.2, 6);
 
-    const alphas = new Set<number>();
-    for (let p = 3; p < img.data.length; p += 4) alphas.add(img.data[p] as number);
+    let on = 0;
+    for (let p = 0; p < img.data.length; p += 4) {
+      const r = img.data[p] as number;
+      const g = img.data[p + 1] as number;
+      const b = img.data[p + 2] as number;
+      const a = img.data[p + 3] as number;
+      expect(r).toBe(g);
+      expect(g).toBe(b);
+      expect(a === 0 || a === 255).toBe(true);
+      if (a === 255) {
+        on += 1;
+        expect(r).toBeLessThan(40);
+        expect(g).toBeLessThan(40);
+      } else {
+        expect(r).toBe(0);
+        expect(g).toBe(0);
+        expect(b).toBe(0);
+      }
+    }
 
-    // 一块静止的灰只有一个 alpha;4×4 Bayer + 噪声 + 颗粒会摊出一大片层级
-    expect(alphas.size).toBeGreaterThan(16);
+    const coverage = on / (84 * 112);
+    expect(coverage).toBeGreaterThan(0.02);
+    expect(coverage).toBeLessThan(0.45);
   });
 
-  it('方格是实的:同一个 4×4 抖动格里,同一行相邻像素不会全都相等', () => {
-    const img = surface(48, 64);
-    shade(img, 48, 64, 3.2, 6);
+  it('一行里有亮有灭 —— 抖动颗粒,不是一条实心', () => {
+    const img = surface(84, 112);
+    shade(img, 84, 112, 3.2, 6);
     let varied = 0;
-    for (let x = 0; x + 1 < 48; x++) {
-      const p = (10 * 48 + x) * 4 + 3;
-      if (img.data[p] !== img.data[p + 4]) varied++;
+    for (let x = 0; x + 1 < 84; x++) {
+      const p = (56 * 84 + x) * 4 + 3;
+      if (img.data[p] !== img.data[p + 4]) varied += 1;
     }
-    expect(varied).toBeGreaterThan(0);
+    expect(varied).toBeGreaterThan(4);
+  });
+
+  it('84×112 上是软颗粒的斜窗:框比角密,内页更空,上沿是斜的', () => {
+    const w = 84;
+    const h = 112;
+    const img = surface(w, h);
+    shade(img, w, h, 1.2, 6);
+    const layout = browserChromeLayout(w, h);
+
+    const disk = (cx: number, cy: number, r: number): number => {
+      let n = 0;
+      let on = 0;
+      for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
+        for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const dx = x + 0.5 - cx;
+          const dy = y + 0.5 - cy;
+          if (dx * dx + dy * dy > r * r) continue;
+          n += 1;
+          if (img.data[(y * w + x) * 4 + 3]) on += 1;
+        }
+      }
+      return n === 0 ? 0 : on / n;
+    };
+
+    const corner = disk(4, 4, 3);
+    const bar = disk(layout.bar.x, layout.bar.y, 2.4);
+    const page = disk(layout.page.x, layout.page.y, 4);
+    expect(corner).toBeLessThan(0.2);
+    expect(bar).toBeGreaterThan(0.35);
+    expect(bar).toBeGreaterThan(corner + 0.25);
+    expect(page).toBeLessThan(bar - 0.25);
+
+    const holes = layout.holes.map((hole) => disk(hole.x, hole.y, 2));
+    expect(Math.min(...holes)).toBeLessThan(bar - 0.1);
+
+    /* 透视:窗的右侧上沿比左侧更高。正对的矩形做不到这个差。 */
+    const ink = (x: number, y: number) => img.data[(y * w + x) * 4 + 3] > 0;
+    const firstSolid = (x0: number, x1: number): number => {
+      for (let y = 0; y < h - 1; y++) {
+        for (let x = x0; x < x1; x++) {
+          if (ink(x, y) && ink(x, y + 1)) return y;
+        }
+      }
+      return h;
+    };
+    expect(firstSolid(8, 26) - firstSolid(58, 78)).toBeGreaterThan(6);
   });
 });
 
