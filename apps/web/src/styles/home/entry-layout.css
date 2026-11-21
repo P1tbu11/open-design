@@ -1877,7 +1877,12 @@ body[data-web-modal-scroll-lock] .entry-main--scroll {
      instead. Right and bottom keep 6, where the window frame provides a
      contrast the top edge has no equivalent for. */
   margin: 0 6px 6px 0;
-  --entry-content-surface: rgba(255, 255, 255, 0.85);
+  /* 85% of the base ground, not a literal white: `--bg` is #fff in light and
+     the N0 neutral (#121212) in dark, so this resolves to the same
+     rgba(255, 255, 255, 0.85) milky frost in light and to the token-ramp dark
+     ground (Leon 10-16 token review) instead of staying a white wash over the
+     dark theme. One rule serves both appearances — no dark-only override. */
+  --entry-content-surface: color-mix(in srgb, var(--bg) 85%, transparent);
   --entry-content-ring: var(--glass-refract-ring-edge);
   background: var(--entry-content-surface);
   -webkit-backdrop-filter: var(--material-thin-backdrop);
@@ -6870,10 +6875,10 @@ body[data-web-modal-scroll-lock] .entry-main--scroll {
   min-width: 62px;
   min-height: 30px;
   padding: 5px 13px;
-  border: 1px solid #d9d9d6;
+  border: 1px solid var(--border);
   border-radius: 30px;
-  background: #fafafa;
-  color: #666;
+  background: var(--bg-panel);
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 600;
   transition: background-color 160ms cubic-bezier(0.23, 1, 0.32, 1),
@@ -6888,8 +6893,8 @@ body[data-web-modal-scroll-lock] .entry-main--scroll {
 .entry-top-right-account-pill:not(.entry-top-right-account-pill--upgrade):has(
     .entry-top-right-credits[aria-expanded='true']
   ) {
-  background: #fff;
-  color: #202020;
+  background: var(--bg);
+  color: var(--text-strong);
 }
 /* Avatar-only trigger at the capsule's right end: a circle sized to the
    capsule's inner height — the name/email/plan all live in the hover menu. */
@@ -7652,8 +7657,8 @@ button.entry-nav-rail__menu-credits-row:active:not(:disabled) {
 }
 
 [data-testid="design-systems-tab"] > aside div:has(> [data-testid^="design-system-card-"][aria-pressed="true"]) {
-  border-color: #dbdbdb;
-  background: #ffffff;
+  border-color: var(--border);
+  background: var(--bg-panel);
 }
 
 [data-testid="design-systems-tab"] > aside div:has(> [data-testid^="design-system-card-"]):hover > [data-testid^="design-system-card-"],
