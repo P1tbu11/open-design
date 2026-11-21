@@ -65,7 +65,7 @@ describe('计划卡:非当前的几步同一档灰', () => {
    *   `components.css:2070`      `.steps li.is-now { color: var(--plan-current-text) }`
    * `#353535` 比 `--chat-text-strong`(#202020)浅一档。原来那枚是把「深」
    * 就近映射到了现成的接缝 token,不是稿子写的东西。
-   * 现在收敛到 `--chat-plan-current-text`(接缝里亮暗两个作用域各一处,均 #353535)。
+   * 现在收敛到 `--chat-plan-current-text`(亮色 #353535,暗色映射 var(--text))。
    * 这一条要说的话没变:**当前这一步仍然是唯一深的一行**。
    * 逐值对稿在 `w73-composer-and-plan-ink.test.tsx`。
    */

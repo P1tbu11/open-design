@@ -11,7 +11,8 @@
  * 覆盖值是产品单独指定的色号,与全局 token 无关,所以这里写字面量;
  * 其余一律映射到全局 token,零漂移。
  *
- * 产品当前强制亮色(appearance.ts: FORCED_APP_THEME = 'light')。
+ * 主题是用户偏好(light / dark / system,见 src/state/appearance.ts),
+ * 但 chat 内部仍然只认 --chat-*:暗色作用域随 data-theme="dark" 自动生效。
  * 暗色作用域里设计稿没给值的,按「同值」处理,不自行发明。
  */
 
@@ -264,8 +265,8 @@
   --chat-bg-fill-secondary: var(--bg-fill-secondary);
   --chat-bg-fill-tertiary: var(--bg-fill-tertiary);
   --chat-confirm-surface: var(--brand-soft);
-  --chat-floating-card-bg: #fff;
-  --chat-floating-card-text: #202020;
+  --chat-floating-card-bg: var(--bg);
+  --chat-floating-card-text: var(--text-strong);
 
   --chat-border: var(--border);
   --chat-border-strong: var(--border-strong);
@@ -295,10 +296,9 @@
   --chat-pick: #00ff04;
   /* 设计稿按明度镜像补的值,不是产品给的 */
   --chat-anim-ink: #dbdbdb;
-  /* 稿子的 `--plan-current-text: #353535` 没有暗色覆盖,按接缝约定同值。
-     ⚠️ 暗色方案真要落地时这一枚得单独看:#353535 在暗底上几乎不可读,
-     但那是「补一版暗色稿」的活,不是这里凭空发明一个值。 */
-  --chat-plan-current-text: #353535;
+  /* 亮色 `#353535` 比 `--text-strong`(#202020)柔和一档;暗色底(`#121212`)上映射为
+     `var(--text)`(#ededed),同样比 `--text-strong`(#fafafa)退一档且保持可读对比度。 */
+  --chat-plan-current-text: var(--text);
   /* 状态卡这四枚稿子没给暗色覆盖,按接缝约定同值(原委见亮色作用域那段注释)。
      ⚠️ 暗色方案真要落地时这一族得整张卡一起看,而不是在这儿凭空反色。 */
   --chat-status-card-surface: #121212;
