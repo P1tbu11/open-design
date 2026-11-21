@@ -436,15 +436,15 @@ describe('5. Unified global scrollbar contract (WebKit primary + @supports stand
     expect(rootVars.get('--scrollbar-size')).toBe('8px');
     expect(rootVars.get('--scrollbar-thumb-inset')).toBe('2px');
     expect(rootVars.get('--scrollbar-track')).toBe('transparent');
-    expect(rootVars.get('--scrollbar-thumb')).toMatch(/^rgba\(\s*0,\s*0,\s*0,/);
-    expect(rootVars.get('--scrollbar-thumb-hover')).toMatch(/^rgba\(\s*0,\s*0,\s*0,/);
-    expect(rootVars.get('--scrollbar-thumb-active')).toMatch(/^rgba\(\s*0,\s*0,\s*0,/);
+    expect(rootVars.get('--scrollbar-thumb')).toBe('rgba(0, 0, 0, 0.14)');
+    expect(rootVars.get('--scrollbar-thumb-hover')).toBe('rgba(0, 0, 0, 0.24)');
+    expect(rootVars.get('--scrollbar-thumb-active')).toBe('rgba(0, 0, 0, 0.36)');
 
     for (const vars of [darkVars, systemDarkVars]) {
       expect(vars.get('--scrollbar-track')).toBe('transparent');
-      expect(vars.get('--scrollbar-thumb')).toMatch(/^rgba\(\s*255,\s*255,\s*255,/);
-      expect(vars.get('--scrollbar-thumb-hover')).toMatch(/^rgba\(\s*255,\s*255,\s*255,/);
-      expect(vars.get('--scrollbar-thumb-active')).toMatch(/^rgba\(\s*255,\s*255,\s*255,/);
+      expect(vars.get('--scrollbar-thumb')).toBe('rgba(255, 255, 255, 0.16)');
+      expect(vars.get('--scrollbar-thumb-hover')).toBe('rgba(255, 255, 255, 0.26)');
+      expect(vars.get('--scrollbar-thumb-active')).toBe('rgba(255, 255, 255, 0.38)');
     }
   });
 

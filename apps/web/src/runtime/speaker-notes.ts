@@ -190,7 +190,7 @@ export function buildSpeakerNotesPresenterHtml(options: {
       initial-value: rgba(0, 0, 0, 0);
     }
     :where(*) { --scrollbar-thumb-bg: rgba(0, 0, 0, 0); transition: --scrollbar-thumb-bg 100ms linear; }
-    :where(*:hover, *:focus-visible) { --scrollbar-thumb-bg: rgba(255, 255, 255, 0.36); transition-duration: 80ms; }
+    :where(*:hover, *:focus-visible) { --scrollbar-thumb-bg: rgba(255, 255, 255, 0.16); transition-duration: 80ms; }
     @media (prefers-reduced-motion: reduce) { :where(*, *:hover, *:focus-visible) { transition: none; } }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -201,11 +201,11 @@ export function buildSpeakerNotesPresenterHtml(options: {
       background-color: var(--scrollbar-thumb-bg, transparent);
       background-clip: padding-box;
     }
-    ::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.50); }
-    ::-webkit-scrollbar-thumb:active { background-color: rgba(255, 255, 255, 0.62); }
+    ::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.26); }
+    ::-webkit-scrollbar-thumb:active { background-color: rgba(255, 255, 255, 0.38); }
     @supports not selector(::-webkit-scrollbar) {
       * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
-      *:hover, *:focus-visible { scrollbar-color: rgba(255, 255, 255, 0.36) transparent; }
+      *:hover, *:focus-visible { scrollbar-color: rgba(255, 255, 255, 0.16) transparent; }
     }
     body {
       margin: 0;
