@@ -623,9 +623,13 @@
   overflow-wrap: anywhere;
   max-height: 220px;
   overflow: auto;
-  scrollbar-width: thin;
 }
-.op-bash .op-output { background: #2a2926; }
+.op-bash .op-output {
+  background: #2a2926;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
+  --scrollbar-thumb-active: rgba(255, 255, 255, 0.38);
+}
 
 .op-todo .todo-list {
   list-style: none;
@@ -807,13 +811,13 @@
   gap: 6px;
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
   box-shadow: 0 6px 14px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 .viewer-action-export:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
-  color: white;
+  color: var(--accent-contrast, #fff);
 }
 @keyframes export-ready-nudge {
   0% {
@@ -1093,7 +1097,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 20px 22px 18px;
-  scrollbar-width: thin;
 }
 .image-export-modal.modal {
   width: min(430px, calc(100vw - 32px));

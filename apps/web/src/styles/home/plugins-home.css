@@ -193,10 +193,10 @@
 .plugins-home__chip--saved.is-active {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
 }
 .plugins-home__chip--saved.is-active .plugins-home__chip-count {
-  color: white;
+  color: var(--accent-contrast, #fff);
   opacity: 0.85;
 }
 
@@ -306,10 +306,10 @@
 .plugins-home__pill.is-active {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
 }
 .plugins-home__pill.is-active .plugins-home__pill-count {
-  color: white;
+  color: var(--accent-contrast, #fff);
   opacity: 0.85;
 }
 .plugins-home__pill-count {
@@ -325,10 +325,10 @@
 .plugins-home__pill--all.is-active {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
 }
 .plugins-home__pill--all.is-active .plugins-home__pill-count {
-  color: white;
+  color: var(--accent-contrast, #fff);
   opacity: 0.85;
 }
 .plugins-home__pill--sub-all {

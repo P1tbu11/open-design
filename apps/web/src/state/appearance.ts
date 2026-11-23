@@ -3,6 +3,7 @@ import type { AppTheme } from '../types';
 
 const ACCENT_VARS = [
   '--accent',
+  '--accent-contrast',
   '--accent-strong',
   '--accent-soft',
   '--accent-tint',
@@ -10,6 +11,7 @@ const ACCENT_VARS = [
 ] as const;
 
 export const DEFAULT_ACCENT_COLOR = '#353535';
+export const DEFAULT_DARK_ACCENT_COLOR = '#ededed';
 export const ACCENT_SWATCHES = [
   DEFAULT_ACCENT_COLOR,
   '#202020',
@@ -32,9 +34,26 @@ export function resolveAccentColor(value: unknown): string {
   return normalizeAccentColor(value) ?? DEFAULT_ACCENT_COLOR;
 }
 
+function srgbChannelLuminance(channelByte: number): number {
+  const s = channelByte / 255;
+  return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+}
+
+export function resolveAccentContrastColor(accentHex: string): '#202020' | '#fafafa' {
+  const r = Number.parseInt(accentHex.slice(1, 3), 16);
+  const g = Number.parseInt(accentHex.slice(3, 5), 16);
+  const b = Number.parseInt(accentHex.slice(5, 7), 16);
+  const luminance =
+    0.2126 * srgbChannelLuminance(r) +
+    0.7152 * srgbChannelLuminance(g) +
+    0.0722 * srgbChannelLuminance(b);
+  return luminance >= 0.42 ? '#202020' : '#fafafa';
+}
+
 function accentVars(accentColor: string): Record<(typeof ACCENT_VARS)[number], string> {
   return {
     '--accent': accentColor,
+    '--accent-contrast': resolveAccentContrastColor(accentColor),
     // Keep these mix ratios in sync with the pre-hydration script in app/layout.tsx.
     '--accent-strong': `color-mix(in srgb, ${accentColor} 82%, var(--text-strong))`,
     '--accent-soft': `color-mix(in srgb, ${accentColor} 12%, var(--bg-subtle))`,
@@ -107,7 +126,11 @@ export function applyAppearanceToDocument({
   getOpenDesignHost()?.appearance?.setTheme(normalizeAppTheme(theme));
 
   const normalized = resolveAccentColor(accentColor);
-  const vars = accentVars(normalized);
+  const effectiveAccent =
+    resolved === 'dark' && normalized === DEFAULT_ACCENT_COLOR
+      ? DEFAULT_DARK_ACCENT_COLOR
+      : normalized;
+  const vars = accentVars(effectiveAccent);
   for (const name of ACCENT_VARS) {
     root.style.setProperty(name, vars[name]);
   }

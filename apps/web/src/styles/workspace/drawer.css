@@ -674,7 +674,7 @@
 .design-card-checkbox.checked {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast, #fff);
 }
 .design-card.is-selected {
   border-color: var(--accent);
@@ -1162,7 +1162,7 @@
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast, #fff);
   flex-shrink: 0;
 }
 
@@ -1445,9 +1445,6 @@
   flex: 0 1 auto;
   min-width: 0;
   height: 100%;
-  /* thinner scrollbar to avoid overlap */
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
 }
 
 /* Right-aligned project + file actions cluster in the Design Files tab row.

@@ -446,7 +446,6 @@
      the rest scrolls instead of pushing the popover off-screen. */
   max-height: 248px;
   overflow-y: auto;
-  scrollbar-width: thin;
   display: flex;
   flex-direction: column;
   padding: 4px;
@@ -699,10 +698,10 @@
 .connector-inline-error {
   margin: 0 0 12px;
   padding: 10px 12px;
-  border: 1px solid color-mix(in oklab, #ff6b6b 45%, var(--line) 55%);
+  border: 1px solid color-mix(in oklab, var(--red) 45%, var(--border) 55%);
   border-radius: var(--radius-lg);
-  background: color-mix(in oklab, #ff6b6b 10%, var(--panel) 90%);
-  color: color-mix(in oklab, #ff6b6b 70%, var(--fg) 30%);
+  background: color-mix(in oklab, var(--red) 10%, var(--bg-panel) 90%);
+  color: color-mix(in oklab, var(--red) 70%, var(--text) 30%);
   font-size: 13px;
   line-height: 1.45;
 }

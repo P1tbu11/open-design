@@ -45,6 +45,7 @@
   --accent-soft: #ededed;
   --accent-tint: #f7f7f7;
   --accent-hover: #202020;
+  --primary-hover: #353535;
   --brand: #87ea5c;
   --brand-weak: #d0ffb5;
   --brand-soft: #ebffde;
@@ -218,6 +219,16 @@
   --code-body-bg: #fafafa;
   --code-font-size: 13px;
   --code-line-height: 1.65;
+
+  /* Unified global scrollbar contract (see styles/base.css):
+     8px lane − 2×2px transparent border (`background-clip: padding-box`) = 4px
+     centered capsule thumb over a 100% transparent track. */
+  --scrollbar-size: 8px;
+  --scrollbar-thumb-inset: 2px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(0, 0, 0, 0.14);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.24);
+  --scrollbar-thumb-active: rgba(0, 0, 0, 0.36);
 }
 
 /* Dark theme variables — shared between explicit [data-theme="dark"] and the
@@ -253,6 +264,9 @@
   --accent-soft: #494949;
   --accent-tint: #353535;
   --accent-hover: #fafafa;
+  --primary-hover: #e4e4e4;
+  --selected: #ededed;
+  --selected-soft: color-mix(in srgb, #ededed 16%, transparent);
   --brand: #87ea5c;
   --brand-weak: #2f781d;
   --brand-soft: #164111;
@@ -275,6 +289,15 @@
   --amber: #FFC740;
   --amber-bg: color-mix(in srgb, #FFBA12 22%, #202020);
 
+  --tag-prototype-ink: #8ab4ff;
+  --tag-prototype-tint: color-mix(in srgb, #4b83f2 24%, #202020);
+  --tag-live-artifact-ink: #b4a2ff;
+  --tag-live-artifact-tint: #8b75ff;
+  --tag-web-clone-ink: #57c7eb;
+  --tag-slide-ink: #ffba52;
+  --tag-slide-tint: #ff9f40;
+  --tag-media-ink: #4dd4b6;
+
   --shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.2);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.25);
@@ -282,6 +305,11 @@
 
   --code-header-bg: #1e1e20;
   --code-body-bg: #18181b;
+
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
+  --scrollbar-thumb-active: rgba(255, 255, 255, 0.38);
 }
 
 /* System mode: follow OS preference when no explicit data-theme is set. */
@@ -317,6 +345,9 @@
     --accent-soft: #494949;
     --accent-tint: #353535;
     --accent-hover: #fafafa;
+    --primary-hover: #e4e4e4;
+    --selected: #ededed;
+    --selected-soft: color-mix(in srgb, #ededed 16%, transparent);
     --brand: #87ea5c;
     --brand-weak: #2f781d;
     --brand-soft: #164111;
@@ -339,6 +370,15 @@
     --amber: #FFC740;
     --amber-bg: color-mix(in srgb, #FFBA12 22%, #202020);
 
+    --tag-prototype-ink: #8ab4ff;
+    --tag-prototype-tint: color-mix(in srgb, #4b83f2 24%, #202020);
+    --tag-live-artifact-ink: #b4a2ff;
+    --tag-live-artifact-tint: #8b75ff;
+    --tag-web-clone-ink: #57c7eb;
+    --tag-slide-ink: #ffba52;
+    --tag-slide-tint: #ff9f40;
+    --tag-media-ink: #4dd4b6;
+
     --shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.2);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
     --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.25);
@@ -346,5 +386,10 @@
 
     --code-header-bg: #1e1e20;
     --code-body-bg: #18181b;
+
+    --scrollbar-track: transparent;
+    --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
+    --scrollbar-thumb-active: rgba(255, 255, 255, 0.38);
   }
 }

@@ -50,3 +50,45 @@
   color: #BDBDB8;
   opacity: 1;
 }
+
+:global([data-theme="dark"]) .toolbar {
+  --toolbar-action-background: var(--accent);
+  --toolbar-action-color: var(--accent-contrast);
+}
+
+:global([data-theme="dark"]) .toolbarSecondary {
+  --toolbar-action-background: var(--bg-panel);
+  --toolbar-action-color: var(--text);
+}
+
+:global([data-theme="dark"] .app .ws-tabs-actions .chrome-action.chrome-action-secondary).toolbar:disabled {
+  background: var(--bg-subtle);
+  color: var(--text-faint);
+}
+
+:global([data-theme="dark"] .artifact-card) .card:global(.artifact-card-act):disabled {
+  background: var(--bg-subtle);
+  color: var(--text-faint);
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-theme])) .toolbar {
+    --toolbar-action-background: var(--accent);
+    --toolbar-action-color: var(--accent-contrast);
+  }
+
+  :global(html:not([data-theme])) .toolbarSecondary {
+    --toolbar-action-background: var(--bg-panel);
+    --toolbar-action-color: var(--text);
+  }
+
+  :global(html:not([data-theme]) .app .ws-tabs-actions .chrome-action.chrome-action-secondary).toolbar:disabled {
+    background: var(--bg-subtle);
+    color: var(--text-faint);
+  }
+
+  :global(html:not([data-theme]) .artifact-card) .card:global(.artifact-card-act):disabled {
+    background: var(--bg-subtle);
+    color: var(--text-faint);
+  }
+}

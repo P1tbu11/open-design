@@ -221,11 +221,7 @@
 }
 .workspaceMenu :global(.entry-nav-rail__workspace-list) {
   max-height: 180px;
-  scrollbar-width: thin;
-  scrollbar-color: #c8c8c4 transparent;
 }
-.workspaceMenu :global(.entry-nav-rail__workspace-list)::-webkit-scrollbar { width: 4px; }
-.workspaceMenu :global(.entry-nav-rail__workspace-list)::-webkit-scrollbar-thumb { border-radius: 4px; background: #c8c8c4; }
 .workspaceCreateLimited:global(.entry-nav-rail__menu-item) {
   color: var(--text-faint, #999);
   cursor: not-allowed;
@@ -252,8 +248,8 @@
 
 /* The supplied HTML restores neutral ink after leaving the open quota chip. */
 .sharedQuotaPill:global(.entry-top-right-account-pill):not(:global(.entry-top-right-account-pill--upgrade)):has(:global([aria-expanded='true'])):not(:hover) {
-  background: #fafafa;
-  color: #666;
+  background: var(--bg-panel);
+  color: var(--text-muted);
 }
 
 /* An unresolved workspace tier carries no plan identity. */

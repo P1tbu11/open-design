@@ -34,7 +34,25 @@ export const TOOL_DETAIL_MAX_CHARS = 2_000;
 export const TOOL_PREVIEW_MAX_CHARS = 96;
 
 /** 摘要在入参里优先读的键 —— 顺序就是「谁更能说明这次调用在干什么」。 */
-const PREVIEW_KEYS = ['command', 'cmd', 'CommandLine', 'file_path', 'filePath', 'path', 'Path', 'AbsolutePath', 'TargetFile', 'query', 'Query', 'pattern', 'url', 'prompt'];
+const PREVIEW_KEYS = ['command', 'cmd', 'CommandLine', 'file_path', 'filePath', 'path', 'Path', 'AbsolutePath', 'TargetFile', 'query', 'Query', 'pattern', 'url', 'prompt', 'toolName', 'tool_name', 'uri'];
+
+/**
+ * `other` 档工具行左侧的工具名前缀。
+ * 当 `title` 已经退回成 `name` 本身(如 `call_mcp_tool`、`manage_task`)或已以 `${name} ` 开头时,
+ * 不再拼第二遍工具名,避免出现 `call_mcp_tool call_mcp_tool`。
+ */
+export function otherToolNamePrefix(name: string, title: string): string | null {
+  const trimmedName = name.trim();
+  const trimmedTitle = title.trim();
+  if (!trimmedName || !trimmedTitle) return null;
+  if (
+    trimmedTitle.startsWith(trimmedName) &&
+    /^($|[\s:/-])/.test(trimmedTitle.slice(trimmedName.length))
+  ) {
+    return null;
+  }
+  return `${trimmedName} `;
+}
 
 /** 这几个键装的是**命令**,摘要要走 `commandHeadline` 那一套剥壳 / 剥 heredoc。 */
 const COMMAND_KEYS = new Set(['command', 'cmd', 'CommandLine']);

@@ -262,6 +262,18 @@ describe('entry layout materials (styles/home/entry-layout.css)', () => {
       /margin-left:\s*0/,
     );
   });
+
+  it('separates primary nav (首页/社区) from destination items (全部项目…设置) by vertical spacing with no divider at rest or on hover', () => {
+    const teamSection = declarations(entryLayoutCss, '.entry-nav-rail__team-section');
+    expect(teamSection).toMatch(/margin-top:\s*10px/);
+    expect(teamSection).toMatch(/padding-top:\s*10px/);
+    expect(teamSection).not.toMatch(/border/);
+    expect(entryLayoutCss).not.toContain('.entry-nav-rail:hover .entry-nav-rail__team-section');
+
+    const railRecentHover = declarations(entryLayoutCss, '.entry-nav-rail:hover .entry-nav-rail__recent-list');
+    expect(railRecentHover).toMatch(/--scrollbar-thumb-bg:\s*var\(--scrollbar-thumb\)/);
+    expect(railRecentHover).toMatch(/transition-duration:\s*80ms/);
+  });
 });
 
 describe('workspace tab dropdown (styles/viewer/routines.css)', () => {

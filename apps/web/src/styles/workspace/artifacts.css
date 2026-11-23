@@ -113,7 +113,7 @@
   gap: 6px;
   padding: 7px 12px;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast, #fff);
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   font-size: 12px;
@@ -3709,7 +3709,6 @@ button.agent-group-rescan-btn:hover:not(:disabled) {
   overflow-x: auto;
   padding: 2px 2px 6px;
   scroll-snap-type: x proximity;
-  scrollbar-width: thin;
 }
 .newproj-start-card {
   scroll-snap-align: start;

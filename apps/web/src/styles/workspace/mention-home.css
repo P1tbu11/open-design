@@ -576,7 +576,7 @@
 .modal-rename .row button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast, #fff);
 }
 .modal-rename .row button.primary:disabled {
   opacity: 0.5;
@@ -613,25 +613,25 @@
 }
 .modal-confirm .row button:hover { border-color: var(--border-strong); }
 .modal-confirm .row button.primary {
-  background: #202020;
-  border-color: #202020;
-  color: #fafafa;
+  background: var(--text-strong);
+  border-color: var(--text-strong);
+  color: var(--bg);
 }
 .modal-confirm .row button.primary:hover {
-  background: #353535;
-  border-color: #353535;
-  color: #fafafa;
+  background: var(--primary-hover, #353535);
+  border-color: var(--primary-hover, #353535);
+  color: var(--bg);
 }
 .modal-confirm .row button.primary:active {
-  background: #494949;
-  border-color: #494949;
-  color: #fafafa;
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
 }
 .modal-confirm .row button.primary:disabled,
 .modal-confirm .row button.primary:disabled:hover {
-  background: #ededed;
+  background: var(--bg-subtle);
   border-color: transparent;
-  color: #bdbdbd;
+  color: var(--text-faint);
   cursor: not-allowed;
 }
 .modal-confirm .row button.primary.danger {
@@ -665,29 +665,29 @@
   min-width: 0;
 }
 .design-card-tag.tag-prototype {
-  color: #2348b8;
-  background: #e8efff;
-  border-color: rgba(35, 72, 184, 0.18);
+  color: var(--tag-prototype-ink);
+  background: var(--tag-prototype-tint);
+  border-color: color-mix(in srgb, var(--tag-prototype-ink) 24%, transparent);
 }
 .design-card-tag.tag-live-artifact {
-  color: #6d4ff5;
-  background: rgba(116, 92, 255, 0.12);
-  border-color: rgba(116, 92, 255, 0.28);
+  color: var(--tag-live-artifact-ink);
+  background: color-mix(in srgb, var(--tag-live-artifact-tint) 16%, transparent);
+  border-color: color-mix(in srgb, var(--tag-live-artifact-tint) 32%, transparent);
 }
 .design-card-tag.tag-web-clone {
-  color: #0a7ea4;
-  background: rgba(10, 126, 164, 0.12);
-  border-color: rgba(10, 126, 164, 0.28);
+  color: var(--tag-web-clone-ink);
+  background: color-mix(in srgb, var(--tag-web-clone-ink) 14%, transparent);
+  border-color: color-mix(in srgb, var(--tag-web-clone-ink) 30%, transparent);
 }
 .design-card-tag.tag-slide {
-  color: #b15e00;
-  background: rgba(255, 159, 64, 0.14);
-  border-color: rgba(255, 159, 64, 0.32);
+  color: var(--tag-slide-ink);
+  background: color-mix(in srgb, var(--tag-slide-tint) 16%, transparent);
+  border-color: color-mix(in srgb, var(--tag-slide-tint) 34%, transparent);
 }
 .design-card-tag.tag-media {
-  color: #1c8a73;
-  background: rgba(28, 138, 115, 0.12);
-  border-color: rgba(28, 138, 115, 0.28);
+  color: var(--tag-media-ink);
+  background: color-mix(in srgb, var(--tag-media-ink) 14%, transparent);
+  border-color: color-mix(in srgb, var(--tag-media-ink) 30%, transparent);
 }
 .design-card-tag.tag-brand {
   color: var(--purple);
@@ -1544,9 +1544,6 @@
   z-index: 1;
   min-width: 0;
   min-height: 0;
-  /* Hide the overlay scrollbar (the dark bar) — content still scrolls. */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
   /* Top inset matches `.settings-sidebar`'s `padding-top: 16` so the first
      content row (the Local CLI / BYOK pill) sits level with the first
      sidebar nav-item across the gutter. */
@@ -1557,9 +1554,6 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-}
-.settings-content::-webkit-scrollbar {
-  display: none;
 }
 .settings-page-shell .settings-content {
   grid-column: 2;
@@ -1860,9 +1854,6 @@
 }
 
 .settings-section { display: flex; flex-direction: column; gap: 12px; }
-/* Hide the scroll bar on settings panels while keeping them scrollable. */
-.settings-section { scrollbar-width: none; }
-.settings-section::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .project-locations-section { gap: 14px; }
 .project-location-card,
 .project-location-edit {
@@ -2184,7 +2175,7 @@
   gap: 6px;
   padding: 7px 14px;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast, #fff);
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   font-size: 13px;

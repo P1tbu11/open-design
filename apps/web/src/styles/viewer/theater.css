@@ -832,6 +832,9 @@
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0) 120px),
     #0b0b0d;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
+  --scrollbar-thumb-active: rgba(255, 255, 255, 0.38);
   overflow: hidden;
 }
 .preview-viewport:not(.preview-viewport-desktop).comment-preview-layer-with-deck-rail {
@@ -899,24 +902,10 @@
   height: 100%;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
   padding: 12px 12px 16px;
   display: grid;
   align-content: start;
   gap: 10px;
-}
-.deck-thumbnail-list::-webkit-scrollbar {
-  width: 8px;
-}
-.deck-thumbnail-list::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background-clip: padding-box;
-  background-color: rgba(255, 255, 255, 0.14);
-}
-.deck-thumbnail-list::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.24);
 }
 .deck-thumbnail-button {
   position: relative;
