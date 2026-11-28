@@ -84,14 +84,16 @@ describe('1. Global theme token parity (styles/tokens.css & app/layout.tsx)', ()
   });
 
   it('defines dark overrides for surface, accent, selection, primary-hover, and project tag tokens', () => {
-    expect(explicitDark.get('--bg')).toBe('#121212');
-    expect(explicitDark.get('--bg-app')).toBe('#121212');
-    expect(explicitDark.get('--bg-panel')).toBe('#353535');
-    expect(explicitDark.get('--accent')).toBe('#ededed');
-    expect(explicitDark.get('--accent-contrast')).toBe('#202020');
-    expect(explicitDark.get('--primary-hover')).toBe('#e4e4e4');
-    expect(explicitDark.get('--selected')).toBe('#ededed');
+    expect(explicitDark.get('--bg')).toBe('#09090b');
+    expect(explicitDark.get('--bg-app')).toBe('#09090b');
+    expect(explicitDark.get('--bg-panel')).toBe('#141417');
+    expect(explicitDark.get('--accent')).toBe('#fafafa');
+    expect(explicitDark.get('--accent-contrast')).toBe('#09090b');
+    expect(explicitDark.get('--primary-hover')).toBe('#e4e4e7');
+    expect(explicitDark.get('--selected')).toBe('#fafafa');
     expect(explicitDark.has('--selected-soft')).toBe(true);
+    expect(explicitDark.has('--surface-raised-shadow')).toBe(true);
+    expect(explicitDark.has('--surface-primary-shadow')).toBe(true);
     expect(explicitDark.has('--tag-prototype-ink')).toBe(true);
     expect(explicitDark.has('--tag-live-artifact-ink')).toBe(true);
     expect(explicitDark.has('--tag-web-clone-ink')).toBe(true);
@@ -99,7 +101,7 @@ describe('1. Global theme token parity (styles/tokens.css & app/layout.tsx)', ()
     expect(explicitDark.has('--tag-media-ink')).toBe(true);
   });
 
-  it('resolves default neutral --accent to #ededed in dark mode at runtime and pre-hydration', () => {
+  it('resolves default neutral --accent to #fafafa in dark mode at runtime and pre-hydration', () => {
     applyAppearanceToDocument({ theme: 'dark' });
     expect(document.documentElement.style.getPropertyValue('--accent')).toBe(
       DEFAULT_DARK_ACCENT_COLOR,
@@ -107,10 +109,10 @@ describe('1. Global theme token parity (styles/tokens.css & app/layout.tsx)', ()
     expect(document.documentElement.style.getPropertyValue('--accent')).not.toBe(
       DEFAULT_ACCENT_COLOR,
     );
-    expect(document.documentElement.style.getPropertyValue('--accent-contrast')).toBe('#202020');
+    expect(document.documentElement.style.getPropertyValue('--accent-contrast')).toBe('#09090b');
 
     const layoutSource = readWebFile('app/layout.tsx');
-    expect(layoutSource).toContain("if(t==='dark'&&a==='#353535')a='#ededed'");
+    expect(layoutSource).toContain("if(t==='dark'&&a==='#18181b')a='#fafafa'");
     expect(layoutSource).toContain("'--accent-contrast'");
 
     document.documentElement.removeAttribute('data-theme');
@@ -312,7 +314,7 @@ describe('4. Core workspace, chat user bubble, viewer, library & share dark surf
     );
     expect(
       ruleDecls(routines, '.chat-composer-fixed-layer .composer-shell')['border-color'],
-    ).toBe('var(--chat-border-soft)');
+    ).toBe('var(--chat-border)');
 
     // Verify Electron macOS vibrancy & veil pass-through parity in app-wash.css and material.css.
     const appWash = postcss.parse(readWebFile('src/styles/app-wash.css'));

@@ -116,11 +116,11 @@ function expectActionMenu(block: string) {
 describe('composer shell is one opaque floating card (styles/viewer/routines.css)', () => {
   const shell = declarations(routinesCss, '.chat-composer-fixed-layer .composer-shell');
 
-  it('reads the floating-card ground and soft edge at the xl radius, with no shadow', () => {
+  it('reads the floating-card ground and crisp edge at the xl radius with whisper tactile rim', () => {
     expectFloatingCard(shell);
-    expect(value(shell, 'border-color')).toBe('var(--chat-border-soft)');
+    expect(value(shell, 'border-color')).toBe('var(--chat-border)');
     expect(value(shell, 'border-radius')).toBe('var(--chat-radius-xl)');
-    expect(value(shell, 'box-shadow')).toBe('none');
+    expect(value(shell, 'box-shadow')).toBe('var(--surface-hover-shadow, none)');
   });
 
   it('switches the backdrop blur off explicitly (chat.css used to give it glass)', () => {

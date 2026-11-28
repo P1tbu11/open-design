@@ -1073,8 +1073,8 @@
 .prose-block .md-code-block {
   position: relative;
   margin: 16px 0;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   background: transparent;
   overflow: hidden;
   box-shadow: none;
@@ -1127,14 +1127,13 @@
 .prose-block .md-code-block[data-collapsed="true"] .md-code-body {
   max-height: 7em;
   overflow: hidden;
+  /* Translucent alpha fade-out instead of an opaque var(--bg) slab so the text
+     melts cleanly into any surface (light, dark, or macOS translucent vibrancy). */
+  -webkit-mask-image: linear-gradient(to bottom, #000 42%, rgba(0, 0, 0, 0.42) 78%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 42%, rgba(0, 0, 0, 0.42) 78%, transparent 100%);
 }
 .prose-block .md-code-block[data-collapsed="true"] .md-code-body::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 3.2em;
-  background: linear-gradient(to bottom, transparent, var(--bg));
-  pointer-events: none;
+  display: none;
 }
 .prose-block .md-color-token {
   display: inline-flex;

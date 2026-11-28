@@ -31,67 +31,97 @@
  * `.card` 那 6px 上下外边距也要按稿子归零 —— 稿实体上是 0。
  */
 .appliedCard {
+  width: 100%;
   margin: 0;
   padding: 0;
+  /* No separate outer border: --surface-hover-shadow already draws the single
+     1px top rim light and bottom bevel, preventing a doubled 2px top edge. */
   border: 0;
   border-radius: var(--radius-2xl);
-  background: var(--bg-panel);
+  background: color-mix(in srgb, var(--bg-fill-tertiary) 60%, transparent);
+  box-shadow: var(--surface-hover-shadow, none);
+  transition:
+    background-color 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+.appliedCard:hover {
+  box-shadow: var(--surface-raised-shadow, none);
+}
+.appliedCard:has(> summary:active) {
+  box-shadow: var(--surface-pressed-shadow, none);
+  transform: scale(0.995);
+}
+.appliedCard[open] {
+  box-shadow: var(--surface-raised-shadow, none);
 }
 .appliedCard > summary {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 11px;
+  padding: 8px 12px;
   list-style: none;
   cursor: pointer;
   /* 稿子写的是 var(--t-mini),而 --t-mini 是稿子自己的别名(= var(--font-size-12));
      我们这边没有这个别名,照抄会**静默失效**、字号退回继承的 13px。所以映射到我们的 token。 */
   font-size: var(--font-size-12);
-  color: var(--text-strong);
+  line-height: 18px;
+  color: var(--text-muted);
   border-radius: var(--radius-2xl);
+  transition: background-color 120ms var(--ease-out), color 120ms var(--ease-out);
 }
 /* 稿子 `.fold > summary:hover { background: var(--bg-fill-tertiary) }`
    (`361b78253e:docs/design/chat-panel/src/components.css:908`,与交付稿
    `8015870095` 同一行同一值)。标题行是可点的 —— 手型给了、点了会展开,
    唯独没有悬停反馈,是这一行原来漏搬的那一条。 */
-.appliedCard > summary:hover { background: var(--bg-fill-tertiary); }
+.appliedCard > summary:hover { background: var(--bg-fill-tertiary); color: var(--text); }
+.appliedCard[open] > summary {
+  color: var(--text);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+}
 .appliedCard > summary::-webkit-details-marker { display: none; }
 .appliedCard > summary::marker { content: ''; }
 /* 没有条目时点开是空的,索性不给手型也不给箭头 */
 .appliedCard:not(:has(.appliedBody)) > summary { cursor: default; }
-/* 箭头不另设颜色 —— 稿子的 `.chev` 没有 color 规则,跟着 summary 的 --text-strong 走 */
 .appliedChev {
   display: inline-flex;
   margin-inline-start: auto;
-  transition: transform 140ms var(--ease-out);
+  color: var(--text-soft);
+  transition: transform 140ms var(--ease-out), color 120ms var(--ease-out);
 }
-.appliedCard[open] > summary .appliedChev { transform: rotate(180deg); }
+.appliedCard[open] > summary .appliedChev {
+  transform: rotate(180deg);
+}
 .appliedBody {
   /* 稿子的 `.fold .body` 是普通块级 —— 条目之间靠 <br> 断行,不是 flex 列表。
      原来这里是 flex/column/gap:3px,连带把 <br> 变成了块级元素。 */
   display: block;
-  /* 稿子:padding: 0 11px 11px。原来左边缩进 30px 是给类型色点让位的,色点已按稿子去掉 */
-  padding: 0 11px 11px;
+  padding: 7px 12px 10px 30px;
+  border-top: 1px solid var(--border-soft);
   /* 稿子写的是 --t-mini / --lh-body,那是它自己的别名,值分别是 font-size-12 与 1.7 */
   font-size: var(--font-size-12);
-  line-height: 1.7;
+  line-height: 1.75;
   color: var(--text-muted);
 }
 /* 稿子还有一条:`.fold[open] > summary + .body { padding-top: 4px }` ——
-   展开之后正文和标题之间留 4px,不是紧贴。漏这一条会让展开态挤在一起。 */
+   展开之后正文和标题之间留间距,不是紧贴。 */
 .appliedCard[open] > summary + .appliedBody {
-  padding-top: 4px;
+  padding-top: 7px;
 }
 
-/*
- * 只染图标不染文字(交付稿注释原话)。色号 `#00ff04` 是产品指定的那一支,
- * 和绿勾底片同源 —— 这两处说的本来就是同一类事(存下了 / 过了)。
- * 稿子也说明了为什么不用 `--brand-text` 那档深绿:一枚 15px 的实心块面靠形状识别,
- * 不靠笔画,而它右边紧跟着深色的那句话,信息本身不依赖这枚图标读得清。
- */
 .appliedIcon {
   display: inline-flex;
-  color: #00ff04;
+  align-items: center;
+  color: var(--text-soft);
+  transition: color 120ms var(--ease-out);
+}
+.appliedIcon svg {
+  width: 13px;
+  height: 13px;
+}
+.appliedCard > summary:hover .appliedIcon,
+.appliedCard[open] > summary .appliedIcon {
+  color: var(--text-muted);
 }
 
 /* 稿子的 summary 没有 font-weight,也就是 400 —— 原来这里写了 500,标题比稿子粗一档 */

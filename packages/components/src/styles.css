@@ -14,55 +14,55 @@ button {
   color: var(--text);
   background: transparent;
   border: var(--stroke-thin, 1px) solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-large);
+  box-shadow: none;
   cursor: pointer;
   transition:
     background-color var(--duration-ultra-fast, 50ms) var(--curve-easy-ease, ease),
     border-color var(--duration-ultra-fast, 50ms) var(--curve-easy-ease, ease),
     color var(--duration-ultra-fast, 50ms) var(--curve-easy-ease, ease),
     transform var(--duration-faster, 100ms) var(--curve-easy-ease, ease),
-    box-shadow var(--duration-ultra-fast, 50ms) var(--curve-easy-ease, ease);
+    box-shadow var(--duration-faster, 100ms) var(--curve-easy-ease, ease);
 }
-/*
- * 默认值,不是判决 —— 特异性归零(`:where()`),理由和 `apps/web/src/styles/primitives.css`
- * 里那份**一模一样**,而且必须两边一起改:这两个文件都会被加载,只改一边的话
- * 剩下那条裸选择器(0,2,1)照样压过组件自己的单类 hover(0,2,0),
- * 深色实心按钮 hover 时仍旧被刷成近白的 `--bg-subtle`。
- * (2026-08-27 就是这么漏的:改完 `primitives.css` 在真机上量,发现两条规则都还在。)
- */
 :where(button:hover:not(:disabled)) { background: var(--bg-subtle); border-color: var(--border-strong); }
-:where(button:active:not(:disabled)) { transform: translateY(1px); }
+:where(button:active:not(:disabled)) { transform: translateY(0.5px) scale(0.985); }
 button:focus-visible { outline: var(--stroke-thin, 1px) solid var(--blue); outline-offset: 2px; }
 
 button.primary {
   background: var(--text-strong);
   border-color: var(--text-strong);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius);
   color: var(--bg);
+  box-shadow: var(--surface-primary-shadow, none);
 }
 button.primary:hover:not(:disabled) {
-  background: var(--primary-hover, #353535);
-  border-color: var(--primary-hover, #353535);
+  background: var(--primary-hover, #27272a);
+  border-color: var(--primary-hover, #27272a);
+  box-shadow: var(--surface-primary-shadow, none);
 }
 button.primary:active:not(:disabled) {
   background: var(--text);
   border-color: var(--text);
+  transform: translateY(0.5px) scale(0.98);
+  box-shadow: var(--surface-pressed-shadow, none);
 }
 button.primary-ghost {
   background: var(--bg-subtle);
   border-color: transparent;
   color: var(--text-strong);
+  box-shadow: none;
 }
-button.primary-ghost:hover:not(:disabled) { background: var(--bg-muted); }
-button.primary-ghost:active:not(:disabled) { background: var(--border-strong); }
+button.primary-ghost:hover:not(:disabled) { background: var(--bg-muted); box-shadow: none; }
+button.primary-ghost:active:not(:disabled) { background: var(--border-strong); box-shadow: none; }
 
 button.ghost {
   background: transparent;
   border-color: transparent;
   color: var(--text);
+  box-shadow: none;
 }
-button.ghost:hover:not(:disabled) { background: var(--bg-subtle); border-color: transparent; }
-button.ghost:active:not(:disabled) { background: var(--bg-muted); }
+button.ghost:hover:not(:disabled) { background: var(--bg-subtle); border-color: transparent; box-shadow: none; }
+button.ghost:active:not(:disabled) { background: var(--bg-muted); box-shadow: none; }
 /*
  * Transient success state for ghost buttons. Used by the Media
  * Providers "Reload from daemon" button after a successful reload —
@@ -120,10 +120,12 @@ button.is-selected,
 button[aria-pressed="true"] {
   border-color: var(--border-selected);
 }
-button:disabled {
+button:disabled,
+button.primary:disabled {
   background: var(--bg-subtle);
   border-color: transparent;
   color: var(--text-faint);
+  box-shadow: none;
   cursor: not-allowed;
   transform: none;
 }
@@ -134,7 +136,7 @@ input, textarea, select {
   color: var(--text);
   background: var(--bg-panel);
   border: var(--stroke-thin, 1px) solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   padding: var(--spacing-8, 8px) var(--spacing-10, 10px);
   width: 100%;
   transition:
@@ -144,7 +146,7 @@ input, textarea, select {
 input::placeholder, textarea::placeholder { color: var(--text-faint); }
 input:focus, textarea:focus, select:focus {
   outline: none;
-  border-color: var(--selected);
+  border-color: var(--border-selected);
   box-shadow: none;
 }
 /* Entry sidebar form fields keep a quieter, neutral focus so the orange
@@ -210,9 +212,10 @@ textarea { resize: vertical; font-family: inherit; }
   font: inherit;
   color: var(--text);
   text-align: left;
-  background: var(--bg-panel);
+  background: var(--surface-raised-bg, var(--bg-panel));
   border: var(--stroke-thin, 1px) solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-large);
+  box-shadow: var(--surface-raised-shadow, none);
   cursor: pointer;
   transition:
     border-color var(--duration-faster, 100ms) var(--curve-easy-ease, ease),
@@ -223,6 +226,7 @@ textarea { resize: vertical; font-family: inherit; }
 .od-select-trigger[aria-expanded='true'] {
   border-color: var(--border-strong);
   background: var(--bg-subtle);
+  box-shadow: var(--surface-raised-hover-shadow, none);
 }
 .od-select-trigger:focus-visible,
 .od-select-trigger[aria-expanded='true'] {

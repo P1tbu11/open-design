@@ -23,8 +23,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f7f7f7' },
-    { media: '(prefers-color-scheme: dark)', color: '#202020' },
+    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
+    { media: '(prefers-color-scheme: dark)', color: '#09090b' },
   ],
 };
 
@@ -43,7 +43,7 @@ export const viewport: Viewport = {
  * ratios in sync with `accentVars()` in `src/state/appearance.ts`; this
  * script cannot import application modules.
  */
-const themeInitScript = `(function(){try{var c=JSON.parse(localStorage.getItem('open-design:config')||'{}');var s=typeof c.theme==='string'?c.theme:'light';var t=s==='dark'?'dark':s==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t);var a=typeof c.accentColor==='string'&&/^#[0-9a-fA-F]{6}$/.test(c.accentColor.trim())?c.accentColor.trim().toLowerCase():'#353535';if(c.configMigrationVersion!==3&&(a==='#87ea5c'||a==='#c96442'))a='#353535';if(t==='dark'&&a==='#353535')a='#ededed';var ch=function(n){var v=parseInt(a.slice(n,n+2),16)/255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);};var lum=0.2126*ch(1)+0.7152*ch(3)+0.0722*ch(5);var st=document.documentElement.style;st.setProperty('--accent',a);st.setProperty('--accent-contrast',lum>=0.42?'#202020':'#fafafa');st.setProperty('--accent-strong','color-mix(in srgb, '+a+' 82%, var(--text-strong))');st.setProperty('--accent-soft','color-mix(in srgb, '+a+' 12%, var(--bg-subtle))');st.setProperty('--accent-tint','color-mix(in srgb, '+a+' 6%, var(--bg-panel))');st.setProperty('--accent-hover','color-mix(in srgb, '+a+' 86%, var(--text-strong))');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`;
+const themeInitScript = `(function(){try{var c=JSON.parse(localStorage.getItem('open-design:config')||'{}');var s=typeof c.theme==='string'?c.theme:'light';var t=s==='dark'?'dark':s==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t);var a=typeof c.accentColor==='string'&&/^#[0-9a-fA-F]{6}$/.test(c.accentColor.trim())?c.accentColor.trim().toLowerCase():'#18181b';if(c.configMigrationVersion!==3&&(a==='#87ea5c'||a==='#c96442'))a='#18181b';if(a==='#353535')a='#18181b';if(t==='dark'&&a==='#18181b')a='#fafafa';var ch=function(n){var v=parseInt(a.slice(n,n+2),16)/255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);};var lum=0.2126*ch(1)+0.7152*ch(3)+0.0722*ch(5);var st=document.documentElement.style;st.setProperty('--accent',a);st.setProperty('--accent-contrast',lum>=0.42?'#09090b':'#fafafa');st.setProperty('--accent-strong','color-mix(in srgb, '+a+' 82%, var(--text-strong))');st.setProperty('--accent-soft','color-mix(in srgb, '+a+' 12%, var(--bg-subtle))');st.setProperty('--accent-tint','color-mix(in srgb, '+a+' 6%, var(--bg-panel))');st.setProperty('--accent-hover','color-mix(in srgb, '+a+' 86%, var(--text-strong))');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

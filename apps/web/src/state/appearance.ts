@@ -10,18 +10,18 @@ const ACCENT_VARS = [
   '--accent-hover',
 ] as const;
 
-export const DEFAULT_ACCENT_COLOR = '#353535';
-export const DEFAULT_DARK_ACCENT_COLOR = '#ededed';
+export const DEFAULT_ACCENT_COLOR = '#18181b';
+export const DEFAULT_DARK_ACCENT_COLOR = '#fafafa';
 export const ACCENT_SWATCHES = [
   DEFAULT_ACCENT_COLOR,
-  '#202020',
-  '#848484',
-  '#87ea5c',
-  '#0d5400',
-  '#1A74FF',
-  '#FFBA12',
-  '#FF7528',
-  '#F04142',
+  '#09090b',
+  '#71717a',
+  '#7c3aed',
+  '#2563eb',
+  '#0ea5e9',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
 ] as const;
 
 export function normalizeAccentColor(value: unknown): string | null {
@@ -39,7 +39,7 @@ function srgbChannelLuminance(channelByte: number): number {
   return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
 }
 
-export function resolveAccentContrastColor(accentHex: string): '#202020' | '#fafafa' {
+export function resolveAccentContrastColor(accentHex: string): '#09090b' | '#fafafa' {
   const r = Number.parseInt(accentHex.slice(1, 3), 16);
   const g = Number.parseInt(accentHex.slice(3, 5), 16);
   const b = Number.parseInt(accentHex.slice(5, 7), 16);
@@ -47,7 +47,7 @@ export function resolveAccentContrastColor(accentHex: string): '#202020' | '#faf
     0.2126 * srgbChannelLuminance(r) +
     0.7152 * srgbChannelLuminance(g) +
     0.0722 * srgbChannelLuminance(b);
-  return luminance >= 0.42 ? '#202020' : '#fafafa';
+  return luminance >= 0.42 ? '#09090b' : '#fafafa';
 }
 
 function accentVars(accentColor: string): Record<(typeof ACCENT_VARS)[number], string> {
@@ -126,10 +126,14 @@ export function applyAppearanceToDocument({
   getOpenDesignHost()?.appearance?.setTheme(normalizeAppTheme(theme));
 
   const normalized = resolveAccentColor(accentColor);
+  const isDefaultNeutral =
+    normalized === DEFAULT_ACCENT_COLOR || normalized === '#353535';
   const effectiveAccent =
-    resolved === 'dark' && normalized === DEFAULT_ACCENT_COLOR
+    resolved === 'dark' && isDefaultNeutral
       ? DEFAULT_DARK_ACCENT_COLOR
-      : normalized;
+      : normalized === '#353535'
+        ? DEFAULT_ACCENT_COLOR
+        : normalized;
   const vars = accentVars(effectiveAccent);
   for (const name of ACCENT_VARS) {
     root.style.setProperty(name, vars[name]);

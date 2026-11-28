@@ -484,7 +484,7 @@
   box-sizing: border-box;
   border-radius: var(--radius-pill, 999px);
   background: var(--accent);
-  color: #00ff08;
+  color: var(--accent-contrast);
   font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
@@ -850,6 +850,7 @@
      a row change shape as the pointer crosses it. */
   border-radius: 12px;
   background: transparent;
+  box-shadow: none;
   /* The workspace console entries (成员/数据大盘/Workspace 设置) render as
      anchors; the UA underline breaks the uniform nav-item look (#5517 rail
      items are plain). */
@@ -866,7 +867,7 @@
   cursor: pointer;
   font: inherit;
   text-align: left;
-  transition: background-color 120ms var(--ease-out), color 120ms var(--ease-out), border-color 120ms var(--ease-out);
+  transition: background-color 120ms var(--ease-out), color 120ms var(--ease-out), border-color 120ms var(--ease-out), box-shadow 140ms var(--ease-out), transform 120ms var(--ease-out);
 }
 .entry-nav-rail__btn-icon {
   /* Anchor for the unread dot (message-center rail item). */
@@ -890,10 +891,13 @@
 }
 .entry-nav-rail__btn-label {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.entry-nav-rail__btn.is-active .entry-nav-rail__btn-label {
+  font-weight: 600;
 }
 
 /* ── 最近浏览过 (rail section under 插件) ─────────────────────────────────
@@ -936,13 +940,19 @@
   /* The rail's shared quiet ink — this heading is where that tone came from
      (per product), and the unselected rows above and below now match it. */
   color: var(--rail-ink-quiet);
-  transition: background-color 120ms var(--ease-out), color 120ms var(--ease-out);
+  box-shadow: none;
+  transition: background-color 120ms var(--ease-out), color 120ms var(--ease-out), box-shadow 140ms var(--ease-out), transform 120ms var(--ease-out);
 }
 .entry-nav-rail__recent-head:hover:not(:disabled) {
   /* The same fill 首页 wears when it is the selected destination (per product):
      the ink at 10%, not --bg-subtle. See `.entry-nav-rail__btn.is-active`. */
   background: color-mix(in srgb, var(--text-strong) 10%, transparent);
   color: var(--text-strong);
+  box-shadow: var(--surface-hover-shadow, none);
+}
+.entry-nav-rail__recent-head:active:not(:disabled) {
+  box-shadow: var(--surface-pressed-shadow, none);
+  transform: scale(0.985);
 }
 .entry-nav-rail__recent-chevron {
   display: inline-flex;
@@ -1144,6 +1154,7 @@
 .entry-nav-rail__recent-menu button:hover:not(:disabled) {
   background: color-mix(in srgb, var(--text-strong) 10%, transparent);
   color: var(--text-strong);
+  box-shadow: var(--surface-hover-shadow, none);
 }
 /* 删除 reads as the destructive item (red ink, red-tinted hover), the same
    treatment the project cards' menu gives theirs. It no longer arms in place:
@@ -1328,7 +1339,8 @@
   font-weight: 500;
   text-align: left;
   overflow: hidden;
-  transition: background-color 120ms var(--ease-out), color 120ms var(--ease-out);
+  box-shadow: none;
+  transition: background-color 120ms var(--ease-out), color 120ms var(--ease-out), box-shadow 140ms var(--ease-out), transform 120ms var(--ease-out);
 }
 /* The leading glyph's slot: the folder, or this project's live run status when
    it has one (RailRecentRow). Same 18px box the destinations' icons occupy
@@ -1370,6 +1382,11 @@
      `.entry-nav-rail__btn.is-active`. */
   background: color-mix(in srgb, var(--text-strong) 10%, transparent);
   color: var(--text-strong);
+  box-shadow: var(--surface-hover-shadow, none);
+}
+.entry-nav-rail__recent-item:active:not(:disabled) {
+  box-shadow: var(--surface-pressed-shadow, none);
+  transform: scale(0.985);
 }
 /* Selected ink is #121212 (per product), darker than `--selected`'s #353535.
    A literal rather than a token change: `--selected` is the app-wide selected
@@ -1522,6 +1539,7 @@
 .entry-nav-rail__collapse:hover:not(:disabled) {
   background: color-mix(in srgb, var(--text-strong) 10%, transparent);
   color: var(--text);
+  box-shadow: var(--surface-hover-shadow, none);
 }
 .entry-nav-rail__search:hover:not(:disabled),
 .entry-nav-rail__search:focus-visible:not(:disabled) {
@@ -1690,28 +1708,29 @@
 .entry-nav-rail__btn:not(.is-active):hover {
   /* ONE hover for the whole rail (OPEND-2700): the same fill and the same
      ink step the 最近浏览过 heading and its project rows take under the
-     pointer (`.entry-nav-rail__recent-head:hover`), so 个人项目 and the
-     section below it light up identically. The Demo left this row at
-     `--text` 5% with no ink change while the rows under it took 10% + a
-     darker ink — the two read as two different controls in one column. The
-     selected row still stands apart through its ink (#121212) and weight. */
+     pointer (`.entry-nav-rail__recent-head:hover`), lifted with subtle
+     tactile bevel depth on hover while staying completely flat at rest. */
   background: color-mix(in srgb, var(--text-strong) 10%, transparent);
   color: var(--text-strong);
   border-color: transparent;
+  box-shadow: var(--surface-hover-shadow, none);
+}
+.entry-nav-rail__btn:active:not(:disabled) {
+  box-shadow: var(--surface-pressed-shadow, none);
+  transform: scale(0.985);
 }
 .entry-nav-rail__btn.is-active {
-  /* Selected = the ink at 10% (per product: #202020 @ 10%), which is exactly
-     what --text-strong resolves to in light. Written as the token rather than
-     the literal so dark inverts with the rest of the theme (#fafafa there) —
-     a 10% veil of near-black would be invisible on the dark ground. Label +
-     icon keep the spec's --selected. */
+  /* Selected = the ink at 10% (per product: #202020 @ 10%), lifted with
+     subtle tactile depth so the active destination stands apart cleanly. */
   background: color-mix(in srgb, var(--text-strong) 10%, transparent);
   color: var(--selected);
   border-color: transparent;
+  box-shadow: var(--surface-hover-shadow, none);
 }
 .entry-nav-rail__btn.is-active:hover {
   background: color-mix(in srgb, var(--text-strong) 10%, transparent);
   border-color: transparent;
+  box-shadow: var(--surface-hover-strong-shadow, none);
 }
 .entry-nav-rail__btn:focus-visible {
   outline: 2px solid var(--accent);
@@ -7436,7 +7455,8 @@ button.entry-nav-rail__menu-credits-row:active:not(:disabled) {
    two different controls in one column. */
 .entry-nav-rail__team:hover {
   background: color-mix(in srgb, var(--text-strong) 10%, transparent);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--surface-hover-shadow, none);
 }
 .entry-nav-rail__team-avatar--alt { background: #6c3aa6; }
 .entry-nav-rail__team-plan {

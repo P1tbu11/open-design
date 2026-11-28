@@ -145,7 +145,7 @@ describe('applyAppearanceToDocument', () => {
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
     expect(document.documentElement.style.getPropertyValue('--accent')).toBe(DEFAULT_DARK_ACCENT_COLOR);
-    expect(document.documentElement.style.getPropertyValue('--accent-contrast')).toBe('#202020');
+    expect(document.documentElement.style.getPropertyValue('--accent-contrast')).toBe('#09090b');
 
     applyAppearanceToDocument({ theme: 'light', accentColor: 'not-a-color' });
 
@@ -155,9 +155,9 @@ describe('applyAppearanceToDocument', () => {
   });
 
   it('picks readable contrast ink for bright and dark custom accents', () => {
-    expect(resolveAccentContrastColor('#ededed')).toBe('#202020');
-    expect(resolveAccentContrastColor('#87ea5c')).toBe('#202020');
-    expect(resolveAccentContrastColor('#353535')).toBe('#fafafa');
+    expect(resolveAccentContrastColor('#fafafa')).toBe('#09090b');
+    expect(resolveAccentContrastColor('#87ea5c')).toBe('#09090b');
+    expect(resolveAccentContrastColor('#18181b')).toBe('#fafafa');
     expect(resolveAccentContrastColor('#1a74ff')).toBe('#fafafa');
   });
 });

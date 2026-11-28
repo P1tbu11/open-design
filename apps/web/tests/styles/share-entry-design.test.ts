@@ -24,7 +24,7 @@ describe('C0 toolbar / G1 card visual contract (◇ design provenance)', () => {
   it.each([toolbar, toolbarSecondary])('uses scoped C0 geometry for %s', selector => {
     expect(declarations(selector)).toMatchObject({
       'box-sizing': 'border-box', height: '30px', 'min-height': '30px', padding: '0 12px',
-      gap: '8px', border: '0', 'border-radius': '7px',
+      gap: '8px', border: '0', 'border-radius': 'var(--radius)',
       background: 'var(--toolbar-action-background)', color: 'var(--toolbar-action-color)',
       'font-size': '12px', 'font-weight': '500', 'box-shadow': 'none',
     });

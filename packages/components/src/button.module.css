@@ -19,14 +19,15 @@
   color: var(--text);
   background: transparent;
   border: var(--stroke-thin, 1px) solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-large);
+  box-shadow: none;
   cursor: pointer;
   transition:
     background-color var(--duration-ultra-fast, 50ms) var(--curve-easy-ease, ease),
     border-color var(--duration-ultra-fast, 50ms) var(--curve-easy-ease, ease),
     color var(--duration-ultra-fast, 50ms) var(--curve-easy-ease, ease),
     transform var(--duration-faster, 100ms) var(--curve-easy-ease, ease),
-    box-shadow var(--duration-ultra-fast, 50ms) var(--curve-easy-ease, ease);
+    box-shadow var(--duration-faster, 100ms) var(--curve-easy-ease, ease);
 }
 
 .button:hover:not(:disabled) {
@@ -40,99 +41,109 @@
 }
 
 .button:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: translateY(0.5px) scale(0.985);
 }
 
 /*
  * 稿子的 `.btn` **不带描边**,只有 `.mod-secondary` 自己加一条。
- * 我们的基底给了 1px,这几档再把描边色刷成和底色一样 —— 看着一样,盒子却各方向多 2px。
- * `.sm` 的高度是内距撑出来的(4+18+4=26),多这 2px 就直接高成 28,和稿子差一档。
  */
 .primary,
 .primaryGhost,
 .ghost,
 .subtle {
-  /* `border: 0` 而不是 `border-width: 0`:稿子这几档写的是 `border: none`,
-     只归零宽度的话 `border-style` 仍是 solid、`border-color` 仍是继承色,
-     四边的 style / color 逐条都对不上(量到 42 条)。 */
   border: 0;
 }
 
 .primary {
   background: var(--text-strong);
   border-color: var(--text-strong);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius);
   color: var(--bg);
+  box-shadow: var(--surface-primary-shadow, none);
 }
 
 .primary:hover:not(:disabled) {
-  background: var(--primary-hover, #353535);
-  border-color: var(--primary-hover, #353535);
+  background: var(--primary-hover, #27272a);
+  border-color: var(--primary-hover, #27272a);
+  box-shadow: var(--surface-primary-shadow, none);
 }
 
 .primary:active:not(:disabled) {
   background: var(--text);
   border-color: var(--text);
+  box-shadow: var(--surface-pressed-shadow, none);
 }
 
 .primaryGhost {
   background: var(--bg-subtle);
   border-color: transparent;
   color: var(--text-strong);
+  box-shadow: none;
 }
 
 .primaryGhost:hover:not(:disabled) {
   background: var(--bg-muted);
+  box-shadow: none;
 }
 
 .primaryGhost:active:not(:disabled) {
   background: var(--border-strong);
+  box-shadow: none;
 }
 
 .ghost {
   background: transparent;
   border-color: transparent;
   color: var(--text);
+  box-shadow: none;
 }
 
 .ghost:hover:not(:disabled) {
   background: var(--bg-subtle);
   border-color: transparent;
+  box-shadow: none;
 }
 
 .ghost:active:not(:disabled) {
   background: var(--bg-muted);
+  box-shadow: none;
 }
 
 .subtle {
   background: var(--bg-subtle);
   border-color: transparent;
   color: var(--text-strong);
+  box-shadow: none;
 }
 
 .subtle:hover:not(:disabled) {
   background: var(--bg-muted);
+  box-shadow: none;
 }
 
 .subtle:active:not(:disabled) {
   background: var(--border-strong);
+  box-shadow: none;
 }
 
 .secondary {
-  background: var(--bg);
+  background: var(--surface-raised-bg, var(--bg));
   border-color: var(--border);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius);
   color: var(--text);
+  box-shadow: var(--surface-raised-shadow, none);
 }
 
 .secondary:hover:not(:disabled) {
-  background: var(--bg);
+  background: var(--bg-subtle);
   border-color: var(--border-strong);
   color: var(--text-strong);
+  box-shadow: var(--surface-raised-hover-shadow, none);
 }
 
 .secondary:active:not(:disabled) {
-  background: var(--bg);
+  background: var(--bg-subtle);
+  box-shadow: var(--surface-pressed-shadow, none);
 }
 
 .icon {
@@ -163,10 +174,13 @@
   height: 11px;
 }
 
-.button:disabled {
+.button:disabled,
+.primary:disabled,
+.secondary:disabled {
   background: var(--bg-subtle);
   border-color: transparent;
   color: var(--text-faint);
+  box-shadow: none;
   cursor: not-allowed;
   transform: none;
 }

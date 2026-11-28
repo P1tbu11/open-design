@@ -55,10 +55,9 @@
   --beam-border-width: var(--stroke-thin);
   --beam-light-width: 280px;
   --beam-duration: 8s;
-  /* The light's two colours (per product): green core grading out
-     through cyan. */
-  --beam-color: #00ff08;
-  --beam-color-2: #00fbff;
+  /* Antigravity silk-aurora border beam: cool violet grading into ice blue. */
+  --beam-color: #a78bfa;
+  --beam-color-2: #60a5fa;
 
   border-radius: var(--beam-radius);
   /* The ring: a border-box mask minus a padding-box one leaves exactly

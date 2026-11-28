@@ -52,9 +52,7 @@ const LEAD_CHIPS = ['prototype', 'deck', 'document'] as const;
 describe('home hero — type chips are neutral (OPEND-3103)', () => {
   it('every chip keeps the clearly visible 1px ring on both themes (OPEND-2684, unchanged)', () => {
     const pill = declarations(homeHeroCss, '.home-hero__type-pill');
-    expect(pill).toMatch(
-      /border:\s*1px solid color-mix\(in srgb, var\(--text\) 20%, transparent\);/,
-    );
+    expect(pill).toMatch(/border:\s*1px solid var\(--border\);/);
     expect(pill).toMatch(/color:\s*var\(--text-strong\);/);
   });
 

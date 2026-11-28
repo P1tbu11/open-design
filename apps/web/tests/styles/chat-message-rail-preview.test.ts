@@ -35,19 +35,19 @@ describe('chat message rail preview card and floating-card dark seam', () => {
     expect(previewRule).not.toMatch(/linear-gradient|backdrop-filter/);
 
     const lightScope = seamScopeBlock(chatRootCss, '.root');
-    expect(lightScope).toMatch(/--chat-floating-card-bg:\s*#fff;/);
-    expect(lightScope).toMatch(/--chat-floating-card-text:\s*#202020;/);
-    expect(lightScope).toMatch(/--chat-plan-current-text:\s*#353535;/);
+    expect(lightScope).toMatch(/--chat-floating-card-bg:\s*#ffffff;/);
+    expect(lightScope).toMatch(/--chat-floating-card-text:\s*#09090b;/);
+    expect(lightScope).toMatch(/--chat-plan-current-text:\s*#18181b;/);
   });
 
   it('maps floating-card and plan-current tokens to dark surfaces/inks in [data-theme="dark"]', () => {
     const darkScope = seamScopeBlock(chatRootCss, ":global([data-theme='dark']) .root");
-    expect(darkScope).toMatch(/--chat-floating-card-bg:\s*var\(--bg\);/);
+    expect(darkScope).toMatch(/--chat-floating-card-bg:\s*var\(--bg-panel\);/);
     expect(darkScope).toMatch(/--chat-floating-card-text:\s*var\(--text-strong\);/);
     expect(darkScope).toMatch(/--chat-plan-current-text:\s*var\(--text\);/);
     expect(darkScope).not.toMatch(/--chat-floating-card-bg:\s*#(?:fff|ffffff)\b/i);
-    expect(darkScope).not.toMatch(/--chat-floating-card-text:\s*#202020\b/i);
-    expect(darkScope).not.toMatch(/--chat-plan-current-text:\s*#353535\b/i);
+    expect(darkScope).not.toMatch(/--chat-floating-card-text:\s*#09090b\b/i);
+    expect(darkScope).not.toMatch(/--chat-plan-current-text:\s*#18181b\b/i);
 
     const cleanTokens = stripComments(tokensCss);
     const darkTokensBlock = cleanTokens.match(/\[data-theme="dark"\]\s*\{([^}]*)\}/)?.[1] ?? '';

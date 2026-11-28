@@ -620,11 +620,14 @@
 @media (prefers-color-scheme: dark) {
   html:not([data-theme]) [data-chat-root] {
     --chat-confirm-surface: var(--brand-soft);
-    --chat-floating-card-bg: var(--bg);
+    --chat-floating-card-bg: var(--bg-panel);
     --chat-floating-card-text: var(--text-strong);
-    --chat-brand-weak: #2f781d;
-    --chat-anim-ink: #dbdbdb;
+    --chat-brand-weak: #6d28d9;
+    --chat-pick: #a78bfa;
+    --chat-anim-ink: #e4e4e7;
     --chat-plan-current-text: var(--text);
+    --chat-stream-ink: #a1a1aa;
+    --chat-tool-ink: #a1a1aa;
     --chat-dia-1: #a78bfa;
     --chat-dia-2: #fb7185;
     --chat-dia-3: #fb923c;
@@ -1214,7 +1217,7 @@
   font-size: 13px;
   font-weight: 600;
   padding: 6px 14px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   transition: background 140ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .chat-error-action:hover { background: var(--accent-hover, var(--accent)); }
@@ -1261,7 +1264,7 @@
   font: inherit;
   font-weight: 600;
   padding: 6px 14px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   transition: background 140ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .chat-error-amr-login .amr-account-control--signed-out .amr-account-control__action:hover,

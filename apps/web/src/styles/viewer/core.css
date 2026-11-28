@@ -1732,7 +1732,7 @@
   overflow: auto;
   padding: 10px;
   border: 1px solid var(--material-separator);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--glass-regular);
   -webkit-backdrop-filter: var(--glass-backdrop);
   backdrop-filter: var(--glass-backdrop);
@@ -1993,6 +1993,8 @@
   overflow-wrap: anywhere;
 }
 .comment-popover textarea {
+  display: block;
+  box-sizing: border-box;
   height: 112px;
   max-height: 112px;
   overflow-y: auto;

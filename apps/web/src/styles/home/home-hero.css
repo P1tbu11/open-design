@@ -132,32 +132,13 @@
   pointer-events: none;
 }
 .home-hero__title {
-  /* The subtitle below carries the gap to the composer card now; this only
-     needs the tight pairing space to its own second line. */
   margin: 0 0 var(--spacing-4);
-  /* Georgia for the headline (per product). Referenced as a SYSTEM font, not
-     bundled: the file is Microsoft's Georgia (© 2006 Microsoft, Matthew
-     Carter), whose licence covers the products it ships with rather than
-     redistribution as a webfont — and macOS and Windows both install it, so
-     the stack renders the real face on every host we ship to without shipping
-     the file.
-
-     Georgia carries no CJK glyphs (1111 codepoints, zero Han), so the Chinese
-     headline would fall straight through to the UI sans and look unchanged.
-     The two Song faces behind it are what actually make 让我们创建原型 read
-     as a serif; drop them if the headline should stay sans in Chinese. */
-  font-family: Georgia, "Songti SC", STSong, SimSun, serif;
+  font-family: var(--sans);
   font-weight: 600;
-  /* 32 (per product, was 42). */
   font-size: 32px;
-  line-height: 1.24;
-  letter-spacing: -0.02em;
-  /* Pure black (per product), one step past `--text-strong`'s #202020. A
-     literal rather than a change to that token: the rest of the app's
-     strongest text reads the same token and is not meant to move with the
-     headline. Dark mode keeps the token — #000 on a dark ground is
-     unreadable — via the two overrides below. */
-  color: #000;
+  line-height: 1.22;
+  letter-spacing: -0.03em;
+  color: var(--text-strong);
   text-align: center;
 }
 [data-theme="dark"] .home-hero__title {
@@ -383,18 +364,10 @@
   gap: 6px;
   min-height: 32px;
   padding: 5px 12px;
-  /* Outline only (per product): a hairline and NO fill, so the pill is a
-     ring on the page ground rather than a chip sitting on it. The ring is
-     mixed from the text ink at 20% (OPEND-2684): the #EDEDED it used to be
-     sat too close to a white page to read as an edge, and on the dark panel
-     it vanished altogether. Through --text rather than a literal, so the same
-     20% is a visible outline on either theme's ground. */
-  border: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
+  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: transparent;
-  /* Label + icon rest at the hover ink (#202020) — the old --text-soft rest
-     read as washed out next to the composer above it. Hover keeps the same
-     colour and carries its state in the border/background instead. */
+  background: var(--surface-raised-bg, var(--bg-panel));
+  box-shadow: var(--surface-raised-shadow, none);
   color: var(--text-strong);
   font-size: 13px;
   font-weight: 500;
@@ -404,16 +377,19 @@
     color 120ms var(--ease-out),
     background-color 120ms var(--ease-out),
     border-color 120ms var(--ease-out),
+    box-shadow 120ms var(--ease-out),
     transform 120ms var(--ease-out);
 }
 .home-hero__type-pill:hover:not(:disabled) {
   color: var(--text-strong);
-  /* Hover darkens the RING, not the inside: the pill has no fill at rest, so
-     growing one on hover would make it change category rather than state.
-     One step up the same ink ladder the rest ring is mixed from. */
-  border-color: color-mix(in srgb, var(--text) 40%, transparent);
-  background: transparent;
+  border-color: var(--border-strong);
+  background: var(--bg-subtle);
+  box-shadow: var(--surface-raised-hover-shadow, none);
   transform: translateY(-0.5px);
+}
+.home-hero__type-pill:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.97);
+  box-shadow: var(--surface-pressed-shadow, none);
 }
 /* No per-type colour (OPEND-3103, product 2026-09-16, per the #7635 Demo):
    the icon inherits the pill's ink like the label, on every type including
@@ -547,24 +523,15 @@
      flex `gap` above it stays, so the card never closes up against the input
      card's bottom border. */
   padding: var(--spacing-4) var(--spacing-4) var(--spacing-8);
-  /* Opaque grouping tray on --bg-subtle (#ededed) — the same selected-surface
-     gray the nav rail's active item uses, so the two read as one selection
-     tone across the entry screen. A translucent white is not an option: it
-     picks up whatever the page wash is doing underneath. */
   background: var(--bg-subtle);
   transition: background-color var(--duration-faster, 100ms) var(--curve-easy-ease, ease);
-  /* Borderless: the tinted surface alone provides the grouping; the inner
-     input card keeps the only stroke. */
-  border: none;
+  border: var(--stroke-thin) solid var(--border-soft);
+  box-shadow: var(--surface-inset-shadow, none);
   /* Rounder, and concentric with the inner input card: outer radius = inner
      radius (16px) + the 4px gap (this card's side padding), so the two corners
      run parallel and read as consistent. */
   border-radius: 20px;
 }
-/* The engaged state used to darken this tray a notch. With an opaque fill the
-   next step down the neutral ladder (--bg-subtle) is far heavier than the old
-   60% → 72% white it replaced, and the inner input card already grows its own
-   stroke on focus — so the tray holds one flat tone. */
 .home-hero__composer-card .home-hero__input-card,
 .home-hero__composer-card .home-hero__workdir-row {
   width: 100%;
@@ -578,19 +545,12 @@
   z-index: 2;
   width: 100%;
   max-width: 720px;
-  /* Inner prompt surface stays white; the outer composer card provides the
-     subtle selected-gray grouping. */
-  background: var(--bg-app);
-  /* Stroke only appears once the user engages the field (focus-within
-     below); idle state stays borderless. */
-  border: var(--stroke-thin) solid transparent;
-  /* Concentric with the outer composer card (20px) minus its 4px inset.
-     Published as a variable because the focus beam has to trace this exact
-     shape: the beam is this card's own child and reads the value below, so the
-     ring can never be left rounded to a radius the card no longer has. */
+  background: var(--bg-panel);
+  border: var(--stroke-thin) solid var(--border);
+  /* Concentric with the outer composer card (20px) minus its 4px inset. */
   --composer-card-radius: 16px;
   border-radius: var(--composer-card-radius);
-  box-shadow: none;
+  box-shadow: var(--surface-card-shadow, none);
   /* 16px from the white edge to the prompt text (and to the action row
      below it). The 1px transparent stroke above already eats one of those
      pixels, so the padding carries the other 15. */
@@ -639,11 +599,8 @@
   max-width: 640px;
 }
 .home-hero__input-card:focus-within {
-  /* Engaged stroke sits on the LIGHTEST step of the neutral border ladder
-     (#ededed light / #494949 dark) — just enough to outline the field over the
-     tray, per product: 选中后的描边用最浅的灰. */
-  border-color: var(--border-soft);
-  box-shadow: none;
+  border-color: var(--border-strong);
+  box-shadow: var(--surface-raised-hover-shadow, none);
 }
 .home-hero__input-card.is-drag-active {
   border-color: color-mix(in srgb, var(--accent) 56%, var(--border));
@@ -2864,7 +2821,7 @@
   border: 0;
   background: var(--home-hero-submit-bg);
   color: var(--home-hero-submit-fg);
-  box-shadow: none;
+  box-shadow: var(--surface-primary-shadow, none);
   cursor: pointer;
   font: inherit;
   font-size: var(--font-size-14);
@@ -2872,14 +2829,22 @@
   line-height: 1;
   filter: none;
   backdrop-filter: none;
-  transition: none;
+  transition:
+    background-color var(--duration-faster) var(--curve-easy-ease),
+    transform var(--duration-faster) var(--curve-easy-ease),
+    box-shadow var(--duration-faster) var(--curve-easy-ease);
 }
-.home-hero__submit:hover:not(:disabled),
-.home-hero__submit:active:not(:disabled) {
+.home-hero__submit:hover:not(:disabled) {
   background: color-mix(in srgb, var(--home-hero-submit-bg) 88%, var(--send-ground));
   color: var(--home-hero-submit-fg);
-  box-shadow: none;
-  transform: none;
+  box-shadow: var(--surface-primary-shadow, none);
+  transform: translateY(-0.5px);
+}
+.home-hero__submit:active:not(:disabled) {
+  background: color-mix(in srgb, var(--home-hero-submit-bg) 82%, var(--send-ground));
+  color: var(--home-hero-submit-fg);
+  box-shadow: var(--surface-pressed-shadow, none);
+  transform: scale(0.96);
 }
 
 .home-hero__submit.home-hero__attention-sheen::after {

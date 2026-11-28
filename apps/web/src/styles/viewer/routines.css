@@ -2520,20 +2520,13 @@
 .chat-composer-fixed-layer .composer-shell {
   padding: 5px;
   gap: 8px;
-  /* OPEND-3173 (container material only — the left/right pane grounds are
-     untouched, pending design): the shell is ONE opaque floating card, the
-     same `--chat-floating-card-*` family the queued-send cards stacked right
-     above it already read (#8165 commit 1). No frost and no shadow: once the
-     pane went transparent (OPEND-3090) a blurred or shadowed shell read as a
-     second material floating over the wash, while the queue cards did not.
-     Dark and reduced transparency follow the tokens; nothing here overrides
-     them per appearance. */
-  border-color: var(--chat-border-soft);
+  border-color: var(--chat-border);
   border-radius: var(--chat-radius-xl);
   background: var(--chat-floating-card-bg);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  box-shadow: none;
+  box-shadow: var(--surface-hover-shadow, none);
+  transition: border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
 }
 .chat-composer-fixed-layer .composer-shell > * {
   margin-left: 0;
@@ -2547,15 +2540,17 @@
     0 0 0 1px color-mix(in srgb, var(--accent) 6%, transparent);
 }
 .chat-composer-fixed-layer .composer-shell:focus-within {
-  border-color: var(--border-soft);
-  box-shadow: none;
+  border-color: var(--border-strong);
+  box-shadow: var(--surface-raised-shadow, none);
 }
 [data-theme="dark"] .chat-composer-fixed-layer .composer-shell:focus-within {
-  border-color: var(--border);
+  border-color: var(--border-strong);
+  box-shadow: var(--surface-raised-shadow, none);
 }
 @media (prefers-color-scheme: dark) {
   html:not([data-theme]) .chat-composer-fixed-layer .composer-shell:focus-within {
-    border-color: var(--border);
+    border-color: var(--border-strong);
+    box-shadow: var(--surface-raised-shadow, none);
   }
 }
 .app .composer.drag-active .composer-shell,

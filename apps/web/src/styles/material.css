@@ -46,14 +46,14 @@
   --scrim-backdrop: blur(50px);
 
   /* Standard material surfaces (content-layer separation) */
-  --material-ultrathin: rgba(250, 250, 250, 0.45);
-  --material-thin: rgba(250, 250, 250, 0.6);
-  --material-regular: rgba(250, 250, 250, 0.72);
-  --material-thick: rgba(250, 250, 250, 0.85);
+  --material-ultrathin: rgba(255, 255, 255, 0.52);
+  --material-thin: rgba(255, 255, 255, 0.68);
+  --material-regular: rgba(255, 255, 255, 0.80);
+  --material-thick: rgba(255, 255, 255, 0.90);
 
   /* Liquid glass surfaces (--glass-regular itself lives in tokens.css) */
-  --glass-clear: rgba(250, 250, 250, 0.18);
-  --glass-clear-dim: rgba(0, 0, 0, 0.35);
+  --glass-clear: rgba(255, 255, 255, 0.22);
+  --glass-clear-dim: rgba(9, 9, 11, 0.36);
   /* Dark glass for controls that float over MEDIA rather than over the app's
      own ground — a template thumbnail can be any colour, so these cannot use
      the neutral materials above (which follow the theme and would vanish on
@@ -84,23 +84,23 @@
    (same contract as tokens.css). Surfaces sit on the elevated neutral
    (#353535) so translucent layers still read as lifted off #202020. */
 [data-theme='dark'] {
-  --material-ultrathin: rgba(53, 53, 53, 0.45);
-  --material-thin: rgba(53, 53, 53, 0.6);
-  --material-regular: rgba(53, 53, 53, 0.72);
-  --material-thick: rgba(53, 53, 53, 0.85);
-  --glass-clear: rgba(32, 32, 32, 0.18);
-  --glass-clear-dim: rgba(0, 0, 0, 0.35);
-  --vibrancy-label: rgba(250, 250, 250, 0.92);
-  --vibrancy-label-secondary: rgba(237, 237, 237, 0.62);
-  --vibrancy-label-tertiary: rgba(237, 237, 237, 0.4);
-  --vibrancy-label-quaternary: rgba(237, 237, 237, 0.24);
-  --vibrancy-fill: rgba(255, 255, 255, 0.2);
-  --vibrancy-fill-secondary: rgba(255, 255, 255, 0.13);
-  --vibrancy-fill-tertiary: rgba(255, 255, 255, 0.07);
-  --material-separator: rgba(255, 255, 255, 0.16);
-  --glass-refract-ring-top: rgba(255, 255, 255, 0.3);
-  --glass-refract-ring-edge: rgba(255, 255, 255, 0.09);
-  --glass-refract-ring-bottom: rgba(255, 255, 255, 0.12);
+  --material-ultrathin: rgba(20, 20, 24, 0.52);
+  --material-thin: rgba(20, 20, 24, 0.68);
+  --material-regular: rgba(20, 20, 24, 0.80);
+  --material-thick: rgba(20, 20, 24, 0.90);
+  --glass-clear: rgba(20, 20, 24, 0.24);
+  --glass-clear-dim: rgba(0, 0, 0, 0.42);
+  --vibrancy-label: rgba(250, 250, 250, 0.94);
+  --vibrancy-label-secondary: rgba(228, 228, 231, 0.66);
+  --vibrancy-label-tertiary: rgba(228, 228, 231, 0.44);
+  --vibrancy-label-quaternary: rgba(228, 228, 231, 0.26);
+  --vibrancy-fill: rgba(255, 255, 255, 0.16);
+  --vibrancy-fill-secondary: rgba(255, 255, 255, 0.10);
+  --vibrancy-fill-tertiary: rgba(255, 255, 255, 0.06);
+  --material-separator: rgba(255, 255, 255, 0.11);
+  --glass-refract-ring-top: rgba(255, 255, 255, 0.22);
+  --glass-refract-ring-edge: rgba(255, 255, 255, 0.08);
+  --glass-refract-ring-bottom: rgba(255, 255, 255, 0.10);
   /* Scrim behind modals / dialogs / drawers / previews: a dark tint in dark
      mode (mirrors the light `rgba(255,255,255,0.6)` but on --bg at the same
      60% alpha) so the preview/modal backdrop reads as a dimmed dark ground
@@ -111,27 +111,27 @@
 
 @media (prefers-color-scheme: dark) {
   html:not([data-theme]) {
-    --material-ultrathin: rgba(53, 53, 53, 0.45);
-    --material-thin: rgba(53, 53, 53, 0.6);
-    --material-regular: rgba(53, 53, 53, 0.72);
-    --material-thick: rgba(53, 53, 53, 0.85);
-    --glass-clear: rgba(32, 32, 32, 0.18);
-    --glass-clear-dim: rgba(0, 0, 0, 0.35);
-    --vibrancy-label: rgba(250, 250, 250, 0.92);
-    --vibrancy-label-secondary: rgba(237, 237, 237, 0.62);
-    --vibrancy-label-tertiary: rgba(237, 237, 237, 0.4);
-    --vibrancy-label-quaternary: rgba(237, 237, 237, 0.24);
-    --vibrancy-fill: rgba(255, 255, 255, 0.2);
-    --vibrancy-fill-secondary: rgba(255, 255, 255, 0.13);
-    --vibrancy-fill-tertiary: rgba(255, 255, 255, 0.07);
-    --material-separator: rgba(255, 255, 255, 0.16);
-    --glass-refract-ring-top: rgba(255, 255, 255, 0.3);
-    --glass-refract-ring-edge: rgba(255, 255, 255, 0.09);
-    --glass-refract-ring-bottom: rgba(255, 255, 255, 0.12);
-  /* Scrim behind modals / dialogs / drawers / previews: dark tint in dark mode
-     (mirrors the light `rgba(255,255,255,0.6)` on --bg at 60% alpha). Token-
-     driven — no hardcoded hex. */
-  --scrim-tint: color-mix(in srgb, var(--bg) 60%, transparent);
+    --material-ultrathin: rgba(20, 20, 24, 0.52);
+    --material-thin: rgba(20, 20, 24, 0.68);
+    --material-regular: rgba(20, 20, 24, 0.80);
+    --material-thick: rgba(20, 20, 24, 0.90);
+    --glass-clear: rgba(20, 20, 24, 0.24);
+    --glass-clear-dim: rgba(0, 0, 0, 0.42);
+    --vibrancy-label: rgba(250, 250, 250, 0.94);
+    --vibrancy-label-secondary: rgba(228, 228, 231, 0.66);
+    --vibrancy-label-tertiary: rgba(228, 228, 231, 0.44);
+    --vibrancy-label-quaternary: rgba(228, 228, 231, 0.26);
+    --vibrancy-fill: rgba(255, 255, 255, 0.16);
+    --vibrancy-fill-secondary: rgba(255, 255, 255, 0.10);
+    --vibrancy-fill-tertiary: rgba(255, 255, 255, 0.06);
+    --material-separator: rgba(255, 255, 255, 0.11);
+    --glass-refract-ring-top: rgba(255, 255, 255, 0.22);
+    --glass-refract-ring-edge: rgba(255, 255, 255, 0.08);
+    --glass-refract-ring-bottom: rgba(255, 255, 255, 0.10);
+    /* Scrim behind modals / dialogs / drawers / previews: dark tint in dark mode
+       (mirrors the light `rgba(255,255,255,0.6)` on --bg at 60% alpha). Token-
+       driven — no hardcoded hex. */
+    --scrim-tint: color-mix(in srgb, var(--bg) 60%, transparent);
   }
 }
 

@@ -199,7 +199,10 @@ describe('entry layout materials (styles/home/entry-layout.css)', () => {
     expect(btn).toMatch(/border-radius:\s*12px/);
     expect(btn).toMatch(/color:\s*var\(--rail-ink-quiet\)/);
     expect(declarations(entryLayoutCss, '.entry-nav-rail__btn-icon')).toMatch(/color:\s*inherit/);
-    expect(declarations(entryLayoutCss, '.entry-nav-rail__btn-label')).toMatch(/font-weight:\s*600/);
+    expect(declarations(entryLayoutCss, '.entry-nav-rail__btn-label')).toMatch(/font-weight:\s*500/);
+    expect(declarations(entryLayoutCss, '.entry-nav-rail__btn.is-active .entry-nav-rail__btn-label')).toMatch(
+      /font-weight:\s*600/,
+    );
 
     const active = declarations(entryLayoutCss, '.entry-nav-rail__btn.is-active');
     expect(active).toMatch(/background:\s*color-mix\(in srgb, var\(--text-strong\) 10%, transparent\)/);
